@@ -22,6 +22,7 @@ Create a high-quality English translation of the Japanese PS2 **Kowloon Youma Ga
 - PS4 extracted root: `/private/tmp/khc-ps4-extracted/CUSA27034`
 - PS4 ADV: `/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV`
 - Repository: `/Users/juan.pena/repos/kowloon-recharge-translation`
+- Canonical private GitHub remote: `https://github.com/Kimeru29/kowloon-recharge-translation` (`main`).
 - PCSX2: `/Users/juan.pena/Desktop/Emulators/PCSX2-v2.7.514.app` — **do not launch without the explicit visual-test approval above**.
 
 Source hashes are in `docs/DISCOVERY.md` and `config/sources.example.json`. `local/source-manifest.json` contains the current machine-specific paths and verified hashes.
@@ -80,7 +81,11 @@ The PS4 remaster applies localization externally, so an exact KSF does not prove
 
 The existing early build was intended to show `New Game` / `Load Game`, the mapped DG00 opening conversation in English, several opening choices, and many H.A.N.T./command labels. `Media`, `Report card`, and `Return above ground` intentionally remained Japanese because mapping/capacity was not safe. This expectation is historical only: before the **next** emulator launch, restate the expectation for the actual new build and obtain fresh approval.
 
-## Next technical phase after repository publication
+## Reproducible-importer phase status
+
+Completed and published in the private GitHub repository. The generated `local/` reports remain local-only and reproducible from owned sources.
+
+## Next technical phase
 
 1. Turn the proven exact MTX/KSF outputs into a deterministic multi-file build layer rather than isolated output trees.
 2. Solve structurally changed MTX transfer using token/control-aware monotonic alignment, validating `DG13_02` first.
