@@ -1,0 +1,29 @@
+# Generated/local outputs
+artifacts/
+local/
+.superpowers/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local copyrighted fixtures: keep only explanatory README
+fixtures/*
+!fixtures/README.md
+
+# Game/source binaries must never be committed
+*.iso
+*.ISO
+*.pkg
+*.PKG
+*.cvm
+*.CVM
+*.7z
+*.FNT
+*.TMX
+*.MTX
+*.KSF
+*.BIN
+SLPM_*
+
+# Editor/OS noise
+.DS_Store

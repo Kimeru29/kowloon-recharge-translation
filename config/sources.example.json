@@ -1,0 +1,19 @@
+{
+  "ps2_archive": {
+    "path": "/path/to/Kowloon Youma Gakuenki re-charge (Japan).7z",
+    "sha256": "e5ff46e62846758cda33bd5a4ef98d12d6bdfe2f76cdd6ac73145a76f68a3fec"
+  },
+  "ps2_iso": {
+    "path": "/path/to/Kowloon Youma Gakuenki re-charge (Japan).iso",
+    "sha256": "29e305e344c146e1416cca498e2d288718075380552d37886d9b469717779476",
+    "serial": "SLPM-66511",
+    "save_directory": "BISLPM-66511Save"
+  },
+  "ps2_adv_root": "/path/to/extracted/PS2/ADV",
+  "ps4_pkg": {
+    "path": "/path/to/khc.pkg",
+    "sha256": "054ceec8ef413f66c5c6057eadd8862dd7bf48eec1d3cfb183fdcdf97b700314",
+    "title_id": "CUSA27034"
+  },
+  "ps4_adv_root": "/path/to/extracted/CUSA27034/Media/StreamingAssets/data/ADV"
+}

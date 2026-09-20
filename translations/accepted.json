@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "invariants": {
+    "serial": "SLPM-66511",
+    "save_directory": "BISLPM-66511Save"
+  },
+  "entries": [
+    {
+      "id": "artifact:ADV/DG/DG00_00.MTX:vertical-slice",
+      "asset": "ADV/DG/DG00_00.MTX",
+      "source_sha256": "ed15d0402b8fc05fe21657a5d63962cd63e96206bb19b6bdb743013e9753819b",
+      "output_sha256": "eba4a22adc59b12857c0ecde22025608ccd5533c28def6ee7ffae5b74c5cfd6e",
+      "provenance": "official-ps4"
+    },
+    {
+      "id": "artifact:ADV/DG/DG00_00.KSF:vertical-slice",
+      "asset": "ADV/DG/DG00_00.KSF",
+      "source_sha256": "93462741f2c724c4c096ed463f6b14dc8e3a08d2fb7bf35f8f990eebd3190e31",
+      "output_sha256": "db445fbce3a0fc6111ca2e0f121ba29bbd40dcab646eb4ce43b2db9bd6179ecd",
+      "provenance": "official-ps4-constrained"
+    },
+    {
+      "id": "artifact:SLPM_665.11:early-ui",
+      "asset": "SLPM_665.11",
+      "source_sha256": "6cc4f52dd2b576396003a9455f8222c9b647aa2d7076c08a97c703778d024794",
+      "output_sha256": "d25a3424f885353aeadfda0850e4a47386996d36825c765be2ade50ef29a7293",
+      "provenance": "ui-patch"
+    }
+  ]
+}

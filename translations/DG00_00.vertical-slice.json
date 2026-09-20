@@ -1,0 +1,9 @@
+{
+  "ksf": [
+    {"offset": 6959, "capacity": 30, "official": "Look  around  the  area", "text": "Look around the area", "constrained": false},
+    {"offset": 6990, "capacity": 32, "official": "Stand  here", "text": "Stand here", "constrained": false},
+    {"offset": 9339, "capacity": 31, "official": "Pick  up  the  device  on  the  ground", "text": "Pick up device on the ground", "constrained": true},
+    {"offset": 11689, "capacity": 31, "official": "Pick  up  the  device  on  the  ground", "text": "Pick up device on the ground", "constrained": true},
+    {"offset": 14039, "capacity": 31, "official": "Say  no", "text": "Say no", "constrained": false}
+  ]
+}
