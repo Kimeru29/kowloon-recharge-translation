@@ -41,3 +41,16 @@ Future multi-file build stages should emit a generated current manifest and comp
 Before runtime testing, preserve a backup of the PCSX2 memory card. After the first successful in-game create-save/load-save validation, keep one golden Kowloon test save and verify later builds can load it. Normal memory-card saves are the compatibility contract; savestates are considered build-specific.
 
 The emulator launch still requires Pablo's explicit approval after the exact visible expectations for that build are stated.
+
+## Whole-game candidate gate
+
+The generic builder now validates the finished ISO, not only intermediate overlay files. For the current candidate it verifies:
+
+- source/output total size relationship and unchanged outer declared volume;
+- CVM header, outer `DATA.CVM` record, and embedded PVD sector counts agree;
+- all 1,113 translated ADV files in the finished ISO hash exactly to their overlay manifest values;
+- 17 shifted outer-tail files remain byte-identical;
+- translated `SLPM_665.11` is fixed-size and contains `SLPM-66511` + `BISLPM-66511Save`;
+- accepted baseline hashes for `ADV/DG/DG00_00.MTX`, `ADV/DG/DG00_00.KSF`, and `SLPM_665.11` match the finished image.
+
+Current ignored evidence is `local/whole-build-report.json` plus `local/candidate-verification.json`. A new accepted artifact must still be added through the committed regression manifest rather than relying only on a local report.

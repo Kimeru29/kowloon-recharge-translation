@@ -91,3 +91,25 @@ PS2 `SYSFONTALL.FNT` and `ADVFONTALL.FNT` contain Latin uppercase/lowercase/digi
 ## Save system
 
 The executable contains `BISLPM-66511Save` and normal `mc0:`/`mc%d:` save paths. Treat normal memory-card saves as the compatibility contract across patched builds; do not rely on savestates across builds. A real cross-build create-save/load-save runtime test is still required once the next emulator launch is approved.
+
+## 2026-09-20 whole-game phase findings
+
+### Structural MTX
+
+The changed-source importer now requires all localized semantic groups in a file to be proven before emitting that file. Current candidate coverage is 7 changed/template MTX files / 2,284 official entries: `DG13_02`, `FD00_31`, `FN13_16`, `ID00_21`, `ID00_26`, `ID00_41`, and `MS05_03`. `DG13_02` transfers all 577 official entries.
+
+The 26 mapped FD00 template-classified files were deliberately probed. Only `FD00_31` passes the generic structural proof; 25 are rejected. This confirms that the consolidated remaster FD00 family requires a dedicated semantic/template model, not raw offset alignment.
+
+### KSF overflow evidence
+
+The conservative exact KSF importer has 48 overflow entries across 21 files. These fields are inline fixed records under the currently proven layout. Searching each overflow DC key as LE/BE 16/32-bit numeric values within its KSF found zero internal key patterns, but this is not sufficient evidence to shift following binary data. Relocatable KSF remains unproven. The current policy is therefore unchanged: fit or explicit reviewed constrained override; otherwise leave Japanese.
+
+### Localized graphics found
+
+`AssetFileDic_en.txt` contains 1,167 pairs: 1,127 file-like mappings and 40 bundle aliases. The official English graphics are present as Unity AssetBundles under `Media/StreamingAssets/BLBRD`, not as loose PNGs. Thirty-nine of the 40 logical English bundle aliases have same-named files (the exception is `bg_en`) and expose 1,181 Texture2D objects in aggregate.
+
+Examples from the official bundles: `panel_item_en` contains 450 item textures, `letter_en` 160, `memo_en` 50, and `b_gp001_en` 11. Matching PS2 `B_GPxxx.BIN` TMX names against PS4 Texture2D names produced 246 comparable assets across 31 groups; 235/246 are exactly 2.25x PS2 dimensions on both axes. Special-layout outliers must be handled separately. This removes the extraction blocker; the remaining work is deterministic downscale, PS2 indexed-palette TMX encoding, and safe container repacking.
+
+### Whole-game build evidence
+
+A deterministic candidate built from the pristine ISO has SHA-256 `8fc57b8b295a414e15ebb5d2d762114e3106282564f38ae30a7f63bc10a06362`. It overlays 1,113 ADV assets, relocates 253 that outgrow their old sector allocations, grows the embedded ISO by 900 sectors, shifts 17 outer-tail files within existing slack, and keeps the outer ISO size unchanged. Finished-image validation proves every overlay hash, shifted-tail payload identity, `SLPM-66511`, `BISLPM-66511Save`, and the historical accepted DG00/ELF artifacts.

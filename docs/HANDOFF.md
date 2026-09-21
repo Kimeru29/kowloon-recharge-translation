@@ -2,113 +2,206 @@
 
 ## Mission
 
-Create a high-quality English translation of the Japanese PS2 **Kowloon Youma Gakuenki re-charge** by automatically backporting the official PS4 remaster English wherever correspondence is proven, then manually translating only PS2/re-charge-exclusive content. Pablo supervises; the agent does the technical work.
+Create a high-quality English translation of the Japanese PS2 **Kowloon Youma Gakuenki re-charge** by backporting the official PS4 remaster English wherever correspondence is provable, then translate PS2/re-charge-exclusive material separately. Pablo supervises; the agent performs the reverse engineering, tooling, builds, validation, documentation, and Git work.
 
 ## Non-negotiable rules
 
-1. Never alter pristine PS2/PS4 source files; work on copies/output trees only.
-2. Never commit copyrighted game binaries/extracted assets to GitHub.
-3. Automatic import is fail-closed: ambiguous items go to a report/manual queue, never guessed.
-4. Preserve serial/save identity: `SLPM-66511`, `BISLPM-66511Save`.
-5. **Do not launch PCSX2 until you have stated the exact expected visible result for that build and Pablo explicitly approves the launch.** Static analysis/building needs no approval.
-6. Pablo explicitly authorized autonomous coding/documentation/Git work for the project; do not stop for routine implementation approvals.
+1. Never alter pristine PS2/PS4 sources; always derive outputs from copies/pristine inputs.
+2. Never commit copyrighted game binaries, extracted assets, official bulk localization data, fonts, textures, ISO/PKG/CVM files, or executable fixtures.
+3. Automatic import is fail-closed. Ambiguous correspondence stays Japanese and is reported; never guess merely to increase coverage.
+4. Preserve `SLPM-66511` and `BISLPM-66511Save` across builds.
+5. **Do not launch PCSX2 until the exact expected visible result for that build has been stated to Pablo and Pablo explicitly approves the launch.** Static analysis/builds need no approval.
+6. Pablo authorized autonomous implementation/documentation/Git decisions. Do not stop for routine approvals.
 
-## Current local sources
+## Canonical workspace
 
-- PS2 archive: `/Volumes/TerraMas MAC A/Roms/PS2/Kowloon Youma Gakuenki re-charge (Japan).7z`
-- PS2 pristine ISO copy: `/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso`
-- PS2 extracted ADV: `/private/tmp/khc-ps2-assets/ADV`
+- Repo: `/Users/juan.pena/repos/kowloon-recharge-translation`
+- Private GitHub: `https://github.com/Kimeru29/kowloon-recharge-translation` (`main`)
+- PS2 pristine ISO: `/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso`
+  - SHA-256: `29e305e344c146e1416cca498e2d288718075380552d37886d9b469717779476`
+  - size: `2,095,382,528`
+- PS2 ADV: `/private/tmp/khc-ps2-assets/ADV`
 - PS4 PKG: `/Volumes/TerraMas MAC A/Roms/PS2/khc.pkg`
+  - SHA-256: `054ceec8ef413f66c5c6057eadd8862dd7bf48eec1d3cfb183fdcdf97b700314`
+  - title ID: `CUSA27034`
 - PS4 extracted root: `/private/tmp/khc-ps4-extracted/CUSA27034`
 - PS4 ADV: `/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV`
-- Repository: `/Users/juan.pena/repos/kowloon-recharge-translation`
-- Canonical private GitHub remote: `https://github.com/Kimeru29/kowloon-recharge-translation` (`main`).
-- PCSX2: `/Users/juan.pena/Desktop/Emulators/PCSX2-v2.7.514.app` — **do not launch without the explicit visual-test approval above**.
+- PCSX2: `/Users/juan.pena/Desktop/Emulators/PCSX2-v2.7.514.app` — **do not launch without the approval gate above**.
 
-Source hashes are in `docs/DISCOVERY.md` and `config/sources.example.json`. `local/source-manifest.json` contains the current machine-specific paths and verified hashes.
+Machine-specific identity is regenerated into ignored `local/source-manifest.json`.
 
-## Current verified corpus
+## Current milestone: whole-game candidate built, not yet runtime-tested
 
-- PS2 MTX/KSF: 1,516 each.
-- PS4 counterpart MTX/KSF: 1,067 each.
-- PS2-only: 449 MTX + 449 KSF, overwhelmingly FI plus one MS file.
-- Exact common MTX: 1,022; exact+English-mapped MTX: 985 / 78,314 official entries.
-- Exact MTX importer currently proves **962 files / 56,642 entries** and rejects 23 files / 21,672 entries rather than guessing.
-- Changed MTX: 45 total; 43 English-mapped / 22,084 entries.
-- Exact common KSF: **1,010**; exact+English-mapped KSF: 144.
-- Conservative KSF importer: 868 fitting entries, 48 overflows untouched, 4 ambiguous.
-- Lexical PS2-only estimate: 568 unique runs occur in PS2-only files, but only **419 runs / 3,672 Japanese characters** are novel relative to mapped common MTX content.
+The deterministic multi-file builder is implemented and a candidate was rebuilt from the pristine ISO using the public tooling in this repository.
 
-Do not revive the old exploratory `1,019 exact KSF` count; the deterministic current scan plus independent byte comparison both prove 1,010.
+Candidate:
 
-## Current generated local reports
+- path: `/private/tmp/kowloon-recharge-whole-en-candidate.iso`
+- SHA-256: `8fc57b8b295a414e15ebb5d2d762114e3106282564f38ae30a7f63bc10a06362`
+- size: `2,095,382,528` — unchanged from pristine ISO
+- ADV overlay files: **1,113**
+  - 962 exact MTX
+  - 143 exact KSF outputs after one exact KSF is superseded by the accepted override
+  - 7 structural MTX
+  - 1 accepted DG00 KSF override
+- 860 replacements fit existing sector allocation
+- 253 replacements append-relocated inside the embedded ISO
+- embedded ISO grew by 900 sectors
+- 17 outer-tail files were shifted; the builder verified their payloads byte-for-byte unchanged
+- boot ELF SHA-256: `d25a3424f885353aeadfda0850e4a47386996d36825c765be2ade50ef29a7293`
+- finished ISO contains `SLPM-66511` and `BISLPM-66511Save`
+- all three historical accepted artifacts match `translations/accepted.json` in the finished ISO exactly
 
-These are intentionally ignored by Git:
+Evidence lives in ignored:
 
-- `local/source-manifest.json` — source paths/sizes/hashes + serial/save identity.
-- `local/corpus-manifest.json` — full MTX/KSF source relationship and map inventory plus lexical text-size estimate.
-- `local/exact-import-report.json` — every exact mapped MTX import/rejection and output hash.
-- `local/exact-mtx/` — generated exact-tier MTX outputs.
-- `local/ksf-report.json` — exact KSF field status and output hashes.
-- `local/exact-ksf/` — conservatively patched exact KSF outputs.
+- `local/whole-build-report.json`
+- `local/candidate-verification.json`
 
-Regenerate these rather than trusting stale copies if source or parser code changes.
+No emulator launch has occurred for this candidate.
 
-## Current implementation
+Verification snapshot:
 
-- `tools/mtx.py`: parses quarter-offset MTX header, rebuilds pointer regions and relocates pointers.
-- `tools/localization.py`: DC grouping, boundary-aware localized-span inference and generalized two-byte CP932 English encoder.
-- `tools/corpus.py`: deterministic corpus classification and lexical PS2-only text estimate.
-- `tools/exact_import.py` / `tools/import_exact_mtx.py`: fail-closed exact official-English MTX importer.
-- `tools/ksf_import.py` / `tools/import_exact_ksf.py`: conservative exact KSF fixed-field proof/import.
-- `tools/regression.py` / `tools/check_regression.py`: cumulative accepted-translation + save/serial regression gate.
-- `tools/source_manifest.py`: reproducible local source identity manifest.
-- `tools/elf_strings.py` / `tools/early_ui.py`: proven early UI fixed-string patches.
-- `tools/cvm.py`, `tools/iso9660_patch.py`, `tools/build_vertical_slice_iso.py`: validated early ISO/CVM rebuild path.
-- `translations/accepted.json`: artifact-level accepted regression baseline; stores hashes/provenance, not copied bulk script text.
+- full local suite with owned fixtures: **82/82 passed**
+- clean repository copy with no proprietary fixtures: **59 tests run, 7 expected fixture skips, all runnable tests passed**
+- `git diff --check`/repository safety audit: no game-binary extensions in the commit candidate
 
-Baseline before this phase was 34 passing tests. Run the current suite rather than relying on that number.
+## Current corpus / import coverage
 
-## Exact MTX caveat
+MTX:
 
-Exact source identity is necessary but not sufficient. `FN/FN02_31.MTX` is only 604 bytes while its English DC map contains 1,294 entries with repeated/dense keys. It is byte-identical PS2↔PS4 but the map is indirect/dynamic, so the exact importer correctly rejects it. Several MS files have unresolved continuation/control-key semantics (`l`, `p`, partial anchors) and are also intentionally rejected. Do not “fix” these by blindly treating all keys as byte offsets.
+- PS2: 1,516
+- PS4 counterparts: 1,067
+- PS2-only: 449
+- exact common: 1,022
+- exact + English-mapped: 985 / 78,314 official entries
+- proven exact import: **962 files / 56,642 entries**
+- rejected exact: 23 files / 21,672 entries
+- changed + English-mapped: 43 / 22,084 entries
+- proven changed/template import in this candidate: **7 files / 2,284 entries**
 
-## KSF caveat
+The seven changed/template MTX files emitted are:
 
-The PS4 remaster applies localization externally, so an exact KSF does not prove English can fit the PS2 inline field. Current KSF import requires the observed `0x01` record marker, valid CP932 source, NUL/padding boundary and a following structural byte. Overflows stay Japanese until a relocatable KSF compiler is proven. Never truncate official text as a bulk-import strategy.
+- `DG/DG13_02.MTX` — 577 official entries, 573 semantic groups (571 direct + 2 semantic)
+- `FD/FD00_31.MTX` — 29 entries
+- `FN/FN13_16.MTX` — 339 entries
+- `ID/ID00_21.MTX` — 45 entries
+- `ID/ID00_26.MTX` — 47 entries
+- `ID/ID00_41.MTX` — 50 entries
+- `MS/MS05_03.MTX` — 1,197 entries
 
-## Early vertical-slice runtime expectation from the last completed build
+KSF:
 
-The existing early build was intended to show `New Game` / `Load Game`, the mapped DG00 opening conversation in English, several opening choices, and many H.A.N.T./command labels. `Media`, `Report card`, and `Return above ground` intentionally remained Japanese because mapping/capacity was not safe. This expectation is historical only: before the **next** emulator launch, restate the expectation for the actual new build and obtain fresh approval.
+- exact common: **1,010**; do not revive the old exploratory 1,019 count
+- exact + English-mapped: 144 files
+- proven fixed fields: 868 fitting official entries
+- 48 overflows across 21 files remain fail-closed
+- 4 entries remain ambiguous
 
-## Reproducible-importer phase status
+PS2-only lexical proxy:
 
-Completed and published in the private GitHub repository. The generated `local/` reports remain local-only and reproducible from owned sources.
+- 41,337 unique Japanese CP932 lexical runs overall
+- 568 unique runs occur in PS2-only MTX
+- only **419 runs / 3,672 Japanese characters** are novel relative to mapped common content
+- this is a lexical-run estimate, not a dialogue-line percentage
 
-## Next technical phase
+## Exact-map caveat
 
-1. Turn the proven exact MTX/KSF outputs into a deterministic multi-file build layer rather than isolated output trees.
-2. Solve structurally changed MTX transfer using token/control-aware monotonic alignment, validating `DG13_02` first.
-3. Solve template/semantic FD00 matching separately; do not raw-align remaster templates.
-4. Build a relocatable KSF compiler for the 48 current overflows and changed KSF maps.
-5. Locate/extract the packed PS4 localized graphics referenced by `AssetFileDic_en.txt` and backport only proven format-equivalent assets.
-6. Generate the next controlled test ISO. Before launching it, state the exact expected visible English scope and wait for Pablo's explicit approval.
+Byte-identical source data does **not** imply every PS4 DC key is a literal PS2 text offset. Example: `FN/FN02_31.MTX` is only 604 bytes but its localization map has 1,294 entries, 1,150 unique keys, repeated keys, and keys extending far beyond the file size. Other rejected maps split semantic text on control tokens such as `l`, `px`, `pn`, and `pm`. Never make the exact importer treat every DC key as an independent literal replacement merely to increase coverage.
 
-## Key reverse-engineering facts
+## Structural / FD00 status
 
-- MTX first u16 × 4 = header size; header u16 values are 4-byte-unit entry offsets.
-- MTX data mixes CP932 Japanese with ASCII control language; ordinary ASCII English cannot yet be injected blindly.
-- Full-width/two-byte CP932 Latin is the current safe dialogue representation.
-- FD00 remaster scripts are often shared templates; use semantic/template matching later, not raw offsets.
-- PS4 `English.bytes` parses to 11,711 Japanese→English records; useful as terminology/translation memory, not for blind substring replacement.
-- PS4 localized graphics are referenced by `AssetFileDic_en.txt`; actual localized PNG data appears packed rather than loose and still needs extraction/backport work.
+`tools/structural_import.py` uses monotonic exact-byte alignment plus semantic/control validation and emits a changed file only when every localized semantic group is proven.
+
+`DG/DG13_02.MTX` is the principal proof case: all official groups are safely transferred.
+
+The remaster consolidates the FD00 family into small shared templates. A deliberate probe allowed all 26 mapped `template` files through the structural matcher:
+
+- only `FD/FD00_31.MTX` passed
+- the other **25/26 template files were rejected**
+
+Therefore raw offset alignment is explicitly not the FD00 solution. The remaining family needs a dedicated semantic/template interpreter using speaker/text/control/sequence identity.
+
+Ignored evidence: `local/fd00-template-probe-report.json`.
+
+## KSF overflow status
+
+KSF overflow relocation is **not solved** and must not be claimed as solved.
+
+Evidence:
+
+- all 48 overflows are in fields whose current conservative parser proves as inline fixed fields following the observed record marker/layout;
+- searching each overflow DC key as little/big-endian 16/32-bit numeric values throughout its KSF found zero internal numeric-key occurrences;
+- absence of numeric references is evidence only, not proof that following binary structures can be shifted safely;
+- PS2↔PS4 changed KSF data does not expose a simple universal relocation scheme.
+
+Current rule: fitting fields are patched; overflow fields remain Japanese unless there is an explicit reviewed constrained override such as the two DG00 choice strings. Never bulk-truncate official text.
+
+Ignored evidence: `local/ksf-overflow-research.json`.
+
+## Localized graphics status — extraction blocker is solved
+
+`AssetFileDic_en.txt` has 1,167 pairs: 1,127 file-like localized mappings + 40 logical bundle aliases.
+
+The actual English graphics are packed as Unity AssetBundles under:
+
+`/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/BLBRD/`
+
+`tools/graphics_inventory.py` can inventory them. With optional UnityPy (`uv run --with UnityPy ... --deep`):
+
+- 40 English bundle aliases are declared
+- **39 bundles are physically present**; only logical `bg_en` has no same-named file
+- the 39 bundles expose **1,181 Texture2D objects**
+- examples: `panel_item_en` = 450 item textures, `letter_en` = 160, `memo_en` = 50, `b_gp001_en` = 11
+
+PS4 localized texture dimensions often map cleanly to PS2 TMX. Across the currently matched `B_GPxxx` sample:
+
+- 246 same-name PS2/PS4 assets were compared across 31 groups
+- **235/246 have exactly 9/4 (2.25×) PS4 dimensions in both axes**
+- 11 have special/non-uniform layouts and need per-asset handling
+- `GP001_00`, for example, is PS2 512×256 vs PS4 English 1152×576
+
+The remaining graphics blocker is no longer finding/extracting the English art. It is implementing and proving deterministic downscale + indexed PS2 TMX palette encoding + container repacking. Graphics are **not included in the current runtime candidate**.
+
+Ignored evidence:
+
+- `local/graphics-inventory.json`
+- `local/graphics-scale-report.json`
+
+## Current implementation map
+
+- `tools/mtx.py` — MTX pointer-region parser/compiler
+- `tools/localization.py` — DC grouping + CP932 safe English encoder
+- `tools/exact_import.py`, `tools/import_exact_mtx.py` — fail-closed exact MTX importer
+- `tools/ksf_import.py`, `tools/import_exact_ksf.py` — conservative fixed-field KSF importer
+- `tools/structural_import.py`, `tools/import_structural_mtx.py` — changed-source semantic/structural MTX importer
+- `tools/translation_overlay.py` — deterministic overlay precedence/provenance + relocation planning
+- `tools/build_translation_iso.py` — generic whole-game nested ISO/CVM builder + finished-image validation
+- `tools/accepted_overrides.py` — explicit reviewed KSF exceptions
+- `tools/early_ui.py`, `tools/elf_strings.py` — fixed-size ELF UI patches
+- `tools/regression.py`, `tools/check_regression.py` — cumulative accepted-artifact and identity gate
+- `tools/graphics_inventory.py` — PS4 localized graphics bundle inventory; UnityPy imported lazily
+- `tools/decode_tmx_preview.py` — PS2 TMX preview decoder (research utility)
+
+## Runtime gate for this candidate
+
+Before launching `/private/tmp/kowloon-recharge-whole-en-candidate.iso`, state the exact visible expectations to Pablo and wait for a fresh explicit approval. At minimum the expected opening scope must include the historical accepted slice (`New Game`, `Load Game`, the DG00 opening conversation/choices, early command labels), while explicitly warning that baked Japanese graphics and rejected/unsupported scripts can still appear Japanese.
+
+## What comes after the first successful runtime test
+
+1. Establish a golden in-game memory-card save and prove cross-build loading; back up the card before automated runtime tests. Treat emulator savestates as build-specific.
+2. Investigate any rendering/control regressions observed in the broad 1,113-file candidate before increasing coverage.
+3. Solve the 23 rejected exact MTX maps by modeling dynamic placeholders/semantic line grouping rather than broadening offset heuristics.
+4. Build the dedicated FD00 semantic/template importer.
+5. Implement PS4 Texture2D -> PS2 TMX downscale/quantize/repack, beginning with a simple exact-name 2.25× group such as GP001.
+6. Continue KSF format research; leave overflow text untouched until shifting/references are proven.
+7. Finally translate the small novel PS2-only queue with official terminology/style reuse.
 
 ## Resume procedure
 
 1. `cd /Users/juan.pena/repos/kowloon-recharge-translation`
-2. Read this file, `docs/DISCOVERY.md`, the current spec/plan, and `git log --oneline -10`.
+2. Read this file, `docs/DISCOVERY.md`, `docs/BUILD.md`, and the current spec/plan.
 3. Run `python3 -m unittest discover -s tests -v`.
-4. Inspect/regenerate `local/` reports; they are intentionally untracked.
-5. Check `git status --short --branch` and continue from the first incomplete technical item.
-6. Never rebuild from the previous patched ISO; always derive from pristine sources.
-7. Never launch the emulator without the fresh visual-expectation approval gate.
+4. Check `git status --short --branch` and `git log --oneline -10`.
+5. Regenerate `local/` reports if parser/importer code changed; never trust stale local artifacts after code changes.
+6. Always build from the pristine PS2 ISO, never from a prior translated ISO.
+7. Never launch PCSX2 without the exact-visual-scope approval gate.

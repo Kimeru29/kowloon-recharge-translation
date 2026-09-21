@@ -89,3 +89,61 @@ and can rebuild the early test ISO with `tools/build_vertical_slice_iso.py`. The
 ## Runtime testing
 
 Do not start PCSX2 automatically. Before every new runtime test, describe exactly which title/menu/dialogue elements are expected to be English, which Japanese text is intentionally still present, and any rendering caveat. Wait for Pablo's explicit approval before launch.
+
+## Whole-game deterministic candidate
+
+The current generic builder is `tools/build_translation_iso.py`. Run repository CLIs as modules (`python3 -m tools.<name>`) so repository imports resolve consistently.
+
+Current overlay precedence, low to high:
+
+1. `local/exact-mtx`
+2. `local/exact-ksf`
+3. `local/structural-mtx`
+4. `local/accepted-overrides`
+
+Generate the reviewed DG00 override and ELF, then build:
+
+```bash
+python3 -m tools.accepted_overrides \
+  --manifest translations/DG00_00.vertical-slice.json \
+  --ps2-adv /private/tmp/khc-ps2-assets/ADV \
+  --exact-ksf-root local/exact-ksf \
+  --output-root local/accepted-overrides
+
+python3 -m tools.build_early_ui_elf
+
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-whole-en-candidate.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/whole-build-report.json
+```
+
+Verified result for the current inputs:
+
+- SHA-256 `8fc57b8b295a414e15ebb5d2d762114e3106282564f38ae30a7f63bc10a06362`
+- 1,113 overlay files
+- 860 in place / 253 relocated
+- +900 embedded sectors
+- 17 shifted outer-tail files, payload-identical after shift
+- outer ISO size unchanged at 2,095,382,528 bytes
+
+The builder is deliberately fail-closed on missing paths, insufficient outer slack, directory relocation, CVM/PVD disagreement, changed overlay input hashes, translated-output hash mismatch, shifted-tail payload drift, ELF size drift, and serial/save-identity loss.
+
+### Graphics inventory
+
+Graphics are not yet included in the candidate. The packed PS4 English art can be inventoried without making UnityPy a repository dependency:
+
+```bash
+uv run --with UnityPy python -m tools.graphics_inventory \
+  --dictionary /private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/AssetFileDic_en.txt \
+  --bundle-root /private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/BLBRD \
+  --output local/graphics-inventory.json \
+  --deep
+```
+
+Do not add graphics to a runtime build until the PS2 TMX encoder/container repacker has round-trip tests.
