@@ -7,8 +7,12 @@ from tools.elf_strings import ElfFixedStringPatch, patch_fixed_strings
 # the exact English fits without relocating executable data or pointers.
 EARLY_UI_PATCHES: tuple[ElfFixedStringPatch, ...] = (
     # Title screen.
-    ElfFixedStringPatch(0x5CBDE8, 16, "初めから", "New Game"),
-    ElfFixedStringPatch(0x5CBDF8, 16, "続きから", "Load Game"),
+    # This renderer consumes two-byte PS2 glyph codes.  Single-byte ASCII was
+    # runtime-proven to collapse into four/five nonsense glyphs.  The exact
+    # remaster labels do not fit as NUL-terminated wide strings in 16 bytes, so
+    # use short, meaningful constrained forms until pointer relocation is added.
+    ElfFixedStringPatch(0x5CBDE8, 16, "初めから", "NewGame", encoding="ps2-wide"),
+    ElfFixedStringPatch(0x5CBDF8, 16, "続きから", "Load", encoding="ps2-wide"),
     # Command thumbnail / H.A.N.T.-adjacent menu table.
     ElfFixedStringPatch(0x3BC7C8, 16, "アイテム", "Items"),
     ElfFixedStringPatch(0x3BC7D8, 16, "クエスト", "Quests"),

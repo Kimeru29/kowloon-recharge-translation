@@ -11,6 +11,7 @@ import subprocess
 from typing import Any
 
 from tools.cvm import CvmHeader, HEADER_SIZE
+from tools.elf_rofs import RofsFileUpdate, find_rofs_record, patch_rofs_records
 from tools.iso9660_patch import (
     SECTOR_SIZE,
     find_record,
@@ -66,7 +67,9 @@ def build_translation_iso(
         if sha256(replacement_data[entry.path]).hexdigest() != entry.sha256:
             raise ValueError(f"Overlay hash changed while building: {entry.source_path}")
 
-    elf_bytes = translated_elf.read_bytes() if translated_elf is not None else None
+    supplied_elf_bytes = translated_elf.read_bytes() if translated_elf is not None else None
+    elf_bytes: bytes | None = None
+    rofs_records_patched = 0
     _clone_file(source, destination)
     source_size = source.stat().st_size
     if destination.stat().st_size != source_size:
@@ -91,14 +94,14 @@ def build_translation_iso(
             old_cvm_end_sector = data_cvm.extent + data_cvm.sectors
             highest_outer_sector = max(record.extent + record.sectors for record in outer_records)
 
-            if elf_bytes is not None:
-                game_elf = find_record(outer_records, "SLPM_665.11")
-                if len(elf_bytes) != game_elf.size:
-                    raise ValueError(
-                        f"Translated SLPM_665.11 must stay {game_elf.size} bytes, got {len(elf_bytes)}"
-                    )
-                elf_start = game_elf.extent * SECTOR_SIZE
-                image[elf_start:elf_start + len(elf_bytes)] = elf_bytes
+            game_elf = find_record(outer_records, "SLPM_665.11")
+            elf_start = game_elf.extent * SECTOR_SIZE
+            pristine_elf_bytes = bytes(image[elf_start:elf_start + game_elf.size])
+            base_elf_bytes = supplied_elf_bytes if supplied_elf_bytes is not None else pristine_elf_bytes
+            if len(base_elf_bytes) != game_elf.size:
+                raise ValueError(
+                    f"Translated SLPM_665.11 must stay {game_elf.size} bytes, got {len(base_elf_bytes)}"
+                )
 
             cvm_base = data_cvm.extent * SECTOR_SIZE
             cvm_header = CvmHeader.parse(bytes(image[cvm_base:cvm_base + HEADER_SIZE]))
@@ -182,6 +185,7 @@ def build_translation_iso(
                         "provenance": manifest_entry.provenance,
                         "sha256": manifest_entry.sha256,
                         "size": len(data),
+                        "input_size": source_record.size,
                         "input_extent": item.input_extent,
                         "output_extent": item.output_extent,
                         "input_sectors": item.input_sectors,
@@ -189,6 +193,22 @@ def build_translation_iso(
                         "relocated": item.relocated,
                     }
                 )
+
+            rofs_updates = tuple(
+                RofsFileUpdate(
+                    path=row["path"],
+                    expected_size=row["input_size"],
+                    expected_extent=row["input_extent"],
+                    size=row["size"],
+                    extent=row["output_extent"],
+                )
+                for row in build_rows
+            )
+            elf_bytes, rofs_records = patch_rofs_records(base_elf_bytes, rofs_updates)
+            rofs_records_patched = len(rofs_records)
+            if b"SLPM-66511" not in elf_bytes or b"BISLPM-66511Save" not in elf_bytes:
+                raise ValueError("Serial/save identity missing from translated SLPM_665.11")
+            image[elf_start:elf_start + len(elf_bytes)] = elf_bytes
 
             image.flush()
         finally:
@@ -256,15 +276,20 @@ def build_translation_iso(
                 if len(actual) != entry.size or sha256(actual).hexdigest() != entry.sha256:
                     raise ValueError(f"Translated output validation failed for ADV/{entry.path}")
 
-            if elf_bytes is not None:
-                elf_record = find_record(out_outer_records, "SLPM_665.11")
-                actual_elf = bytes(
-                    out[elf_record.extent * SECTOR_SIZE:elf_record.extent * SECTOR_SIZE + elf_record.size]
-                )
-                if actual_elf != elf_bytes:
-                    raise ValueError("Translated SLPM_665.11 validation failed")
-                if b"SLPM-66511" not in actual_elf or b"BISLPM-66511Save" not in actual_elf:
-                    raise ValueError("Serial/save identity missing from translated SLPM_665.11")
+            if elf_bytes is None:
+                raise ValueError("Translated SLPM_665.11 was not generated")
+            elf_record = find_record(out_outer_records, "SLPM_665.11")
+            actual_elf = bytes(
+                out[elf_record.extent * SECTOR_SIZE:elf_record.extent * SECTOR_SIZE + elf_record.size]
+            )
+            if actual_elf != elf_bytes:
+                raise ValueError("Translated SLPM_665.11 validation failed")
+            if b"SLPM-66511" not in actual_elf or b"BISLPM-66511Save" not in actual_elf:
+                raise ValueError("Serial/save identity missing from translated SLPM_665.11")
+            for row in build_rows:
+                # Re-resolve each finished record against its output metadata.
+                # This is the runtime lookup path the previous builder omitted.
+                find_rofs_record(actual_elf, row["path"], row["size"], row["output_extent"])
         finally:
             src.close()
             out.close()
@@ -281,6 +306,7 @@ def build_translation_iso(
         "in_place_files": sum(1 for row in build_rows if not row["relocated"]),
         "relocated_files": sum(1 for row in build_rows if row["relocated"]),
         "shifted_outer_files": len(shifted_outer_paths),
+        "elf_rofs_records_patched": rofs_records_patched,
         "collisions": [asdict(collision) for collision in overlay.collisions],
         "files": build_rows,
         "elf_sha256": sha256(elf_bytes).hexdigest() if elf_bytes is not None else None,

@@ -6,15 +6,15 @@ This repository intentionally contains **no game image, package, executable, ext
 
 ## Current status
 
-A deterministic whole-game PS2 candidate can now be generated from the pristine ISO. The current local candidate combines **1,113 translated ADV assets** plus the proven early ELF UI patch while preserving PS2 serial/save identity and validating the finished nested ISO/CVM image.
+A deterministic whole-game PS2 candidate can now be generated from the pristine ISO. The current local v2 candidate combines **1,113 translated ADV assets** plus the early ELF UI patch, updates the executable ROFS extent/size table used by the game at runtime, preserves PS2 serial/save identity, and validates the finished nested ISO/CVM image.
 
 Verified live-corpus snapshot:
 
 - exact MTX: 962 files / 56,642 official English entries proven and imported;
 - changed/template MTX: 7 files / 2,284 official entries proven and imported;
 - exact KSF: 868 fitting fields imported; 48 overflows and 4 ambiguous entries stay fail-closed;
-- current whole-game candidate: 860 in-place replacements + 253 append-relocations, same total ISO size as pristine;
-- current candidate SHA-256: `8fc57b8b295a414e15ebb5d2d762114e3106282564f38ae30a7f63bc10a06362`;
+- current whole-game candidate: 860 in-place replacements + 253 append-relocations, with all **1,113** matching ELF ROFS records updated and cross-validated;
+- current v2 candidate SHA-256: `b549af9528236092631026929990fa3a1dc890451f6a9ecbcb443eed4734b97e` (runtime re-test pending);
 - PS4 English graphics bundles have been located and inventoried; PS2 TMX re-encoding/repacking is the remaining graphics blocker.
 
 Exact file identity is deliberately not treated as sufficient proof: indirect/dynamic localization maps are rejected until understood.

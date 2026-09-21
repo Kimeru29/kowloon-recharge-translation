@@ -31,3 +31,13 @@ PS4 KSF DC maps provide useful official string anchors, but the PS4 runtime exte
 ## Save compatibility
 
 The PS2 executable uses `BISLPM-66511Save`. Ordinary memory-card saves are treated as cross-build compatibility targets. Savestates are build-specific and disposable.
+
+## Runtime CVM / ROFS lookup
+
+ISO9660 directory metadata is **not** the only runtime source of truth. `SLPM_665.11` contains a ROFS file table for CVM assets. Each proven record stores the file byte size 14 bytes before the NUL-terminated basename and the sector extent 6 bytes before it. The failed v1 whole-game runtime build proved that relocating a file while updating only ISO9660 leaves the game loading stale Japanese data.
+
+`tools/build_translation_iso.py` therefore treats the executable table and embedded ISO directory as one atomic metadata update. Every overlay asset must have exactly one ELF record matching its pristine size+extent; the final record must resolve to the same output size+extent and payload hash as ISO9660. Missing, duplicate, or mismatched records are hard failures.
+
+## ELF UI encodings
+
+Do not assume all PS2 UI renderers accept single-byte ASCII simply because the executable contains ASCII elsewhere. The title renderer was runtime-proven to consume its menu labels as two-byte glyph units: replacing four Japanese CP932 glyphs with 8/9 ASCII bytes produced roughly 4/5 meaningless glyphs. Title test labels now use the two-byte CP932/full-width path. Other fixed UI fields remain renderer-specific and should not be promoted from static evidence to runtime-proven status without a visual test.

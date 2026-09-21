@@ -51,6 +51,9 @@ The generic builder now validates the finished ISO, not only intermediate overla
 - all 1,113 translated ADV files in the finished ISO hash exactly to their overlay manifest values;
 - 17 shifted outer-tail files remain byte-identical;
 - translated `SLPM_665.11` is fixed-size and contains `SLPM-66511` + `BISLPM-66511Save`;
-- accepted baseline hashes for `ADV/DG/DG00_00.MTX`, `ADV/DG/DG00_00.KSF`, and `SLPM_665.11` match the finished image.
+- every overlay asset has exactly one pristine-matching executable ROFS record; final ROFS size/extent must resolve to the same translated payload as ISO9660;
+- the early UI artifact is the base executable input; final whole-game ELF hash is expected to differ because ROFS metadata is deterministically patched on top.
 
-Current ignored evidence is `local/whole-build-report.json` plus `local/candidate-verification.json`. A new accepted artifact must still be added through the committed regression manifest rather than relying only on a local report.
+The `SLPM_665.11` accepted-baseline hash was intentionally migrated after the failed v1 runtime test: single-byte title ASCII was replaced by two-byte PS2 glyph encoding. This is a reviewed bug-fix mutation, not silent regression.
+
+Current ignored evidence is `local/whole-build-report-v2.json`; v1 reports remain diagnostic history only. A new accepted artifact must still be added through the committed regression manifest rather than relying only on a local report.

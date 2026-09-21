@@ -15,8 +15,11 @@ class EarlyUiPatchTests(unittest.TestCase):
     def test_manifest_uses_official_title_and_menu_localization(self) -> None:
         actual = {(patch.offset, patch.expected): patch.text for patch in EARLY_UI_PATCHES}
 
-        self.assertEqual("New Game", actual[(0x5CBDE8, "初めから")])
-        self.assertEqual("Load Game", actual[(0x5CBDF8, "続きから")])
+        self.assertEqual("NewGame", actual[(0x5CBDE8, "初めから")])
+        self.assertEqual("Load", actual[(0x5CBDF8, "続きから")])
+        by_offset = {patch.offset: patch for patch in EARLY_UI_PATCHES}
+        self.assertEqual("ps2-wide", by_offset[0x5CBDE8].encoding)
+        self.assertEqual("ps2-wide", by_offset[0x5CBDF8].encoding)
         self.assertEqual("Items", actual[(0x3BC7C8, "アイテム")])
         self.assertEqual("Quests", actual[(0x3BC7D8, "クエスト")])
         self.assertEqual("H.A.N.T", actual[(0x3BC7E8, "Ｈ．Ａ．Ｎ．Ｔ")])

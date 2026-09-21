@@ -114,25 +114,29 @@ python3 -m tools.build_early_ui_elf
 
 python3 -m tools.build_translation_iso \
   '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
-  /private/tmp/kowloon-recharge-whole-en-candidate.iso \
+  /private/tmp/kowloon-recharge-whole-en-candidate-v2.iso \
   --overlay exact-mtx local/exact-mtx \
   --overlay exact-ksf local/exact-ksf \
   --overlay structural-mtx local/structural-mtx \
   --overlay accepted local/accepted-overrides \
   --elf artifacts/SLPM_665.11.en-early \
-  --report local/whole-build-report.json
+  --report local/whole-build-report-v2.json
 ```
 
-Verified result for the current inputs:
+Verified static result for the current v2 inputs:
 
-- SHA-256 `8fc57b8b295a414e15ebb5d2d762114e3106282564f38ae30a7f63bc10a06362`
+- SHA-256 `b549af9528236092631026929990fa3a1dc890451f6a9ecbcb443eed4734b97e`
 - 1,113 overlay files
 - 860 in place / 253 relocated
+- **1,113/1,113 executable ROFS file records patched and re-resolved against final output size/extent**
 - +900 embedded sectors
 - 17 shifted outer-tail files, payload-identical after shift
 - outer ISO size unchanged at 2,095,382,528 bytes
+- runtime re-test pending
 
-The builder is deliberately fail-closed on missing paths, insufficient outer slack, directory relocation, CVM/PVD disagreement, changed overlay input hashes, translated-output hash mismatch, shifted-tail payload drift, ELF size drift, and serial/save-identity loss.
+The builder is deliberately fail-closed on missing paths, missing/duplicate ROFS records, pristine ROFS preimage mismatch, insufficient outer slack, directory relocation, CVM/PVD disagreement, changed overlay input hashes, translated-output hash mismatch, shifted-tail payload drift, ELF size drift, and serial/save-identity loss.
+
+The executable ROFS table is mandatory. The failed v1 runtime candidate proved that updating only ISO9660 directory records is insufficient: `SLPM_665.11` stores each embedded file's byte size and sector extent next to its filename and the game uses those values at runtime.
 
 ### Graphics inventory
 

@@ -28,6 +28,24 @@ class ElfFixedStringTests(unittest.TestCase):
         self.assertEqual(b"prefix", result[:6])
         self.assertEqual(b"suffix", result[22:])
 
+    def test_patches_two_byte_ps2_glyph_string_and_zero_fills_slot(self) -> None:
+        raw = bytearray(b"prefix" + "初めから".encode("cp932") + b"\x00" * 8 + b"suffix")
+        patch = ElfFixedStringPatch(
+            offset=6,
+            capacity=16,
+            expected="初めから",
+            text="NewGame",
+            encoding="ps2-wide",
+        )
+
+        result = patch_fixed_strings(bytes(raw), (patch,))
+
+        encoded = "ＮｅｗＧａｍｅ".encode("cp932")
+        self.assertEqual(14, len(encoded))
+        self.assertEqual(encoded + b"\x00\x00", result[6:22])
+        self.assertEqual(b"prefix", result[:6])
+        self.assertEqual(b"suffix", result[22:])
+
     def test_rejects_wrong_source_version(self) -> None:
         raw = b"Wrong\x00" + b"\x00" * 10
         patch = ElfFixedStringPatch(0, 16, "初めから", "New Game")

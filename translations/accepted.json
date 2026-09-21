@@ -23,8 +23,8 @@
       "id": "artifact:SLPM_665.11:early-ui",
       "asset": "SLPM_665.11",
       "source_sha256": "6cc4f52dd2b576396003a9455f8222c9b647aa2d7076c08a97c703778d024794",
-      "output_sha256": "d25a3424f885353aeadfda0850e4a47386996d36825c765be2ade50ef29a7293",
-      "provenance": "ui-patch"
+      "output_sha256": "ccd14e96bb0eb416b463463b2c79821b75bac2398f69f8f044520d6854ec10cb",
+      "provenance": "ui-patch-wide-title"
     }
   ]
 }

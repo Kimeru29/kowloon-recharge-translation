@@ -64,14 +64,20 @@ def make_nested_iso(path: Path) -> dict[str, int]:
         0,
         outer_root,
         [
-            dir_record(b"SLPM_665.11;1", elf_extent, 64),
+            dir_record(b"SLPM_665.11;1", elf_extent, 128),
             dir_record(b"DATA.CVM;1", cvm_extent, cvm_sectors * SECTOR_SIZE),
             dir_record(b"SYSTEM.CNF;1", tail_extent, 64),
         ],
     )
-    image[elf_extent * SECTOR_SIZE:elf_extent * SECTOR_SIZE + 64] = (
-        b"SLPM-66511\x00BISLPM-66511Save\x00" + b"E" * 34
-    )[:64]
+    elf = bytearray(128)
+    elf[:32] = (b"SLPM-66511\x00BISLPM-66511Save\x00")[:32]
+    # Synthetic ROFS record: size is filename_offset-14, extent is filename_offset-6.
+    filename_offset = 86
+    struct.pack_into("<I", elf, filename_offset - 14, 100)
+    struct.pack_into("<I", elf, filename_offset - 6, 30)
+    elf[filename_offset - 2:filename_offset] = b"\x00\xdf"
+    elf[filename_offset:filename_offset + 6] = b"A.MTX\x00"
+    image[elf_extent * SECTOR_SIZE:elf_extent * SECTOR_SIZE + len(elf)] = elf
     tail_payload = b"TAIL-PAYLOAD" + b"T" * 52
     image[tail_extent * SECTOR_SIZE:tail_extent * SECTOR_SIZE + 64] = tail_payload
 
@@ -145,6 +151,41 @@ class WholeIsoOverlayBuildTests(unittest.TestCase):
                             ]
                         ),
                     )
+                finally:
+                    image.close()
+
+
+    def test_updates_embedded_rofs_size_and_extent_in_translated_elf(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.iso"
+            output = root / "output.iso"
+            make_nested_iso(source)
+            overlay_root = root / "overlay"
+            (overlay_root / "DG").mkdir(parents=True)
+            replacement = b"E" * 3000
+            (overlay_root / "DG" / "A.MTX").write_bytes(replacement)
+            overlay = collect_overlay([("test", overlay_root)])
+
+            source_bytes = source.read_bytes()
+            translated_elf = root / "translated.elf"
+            translated_elf.write_bytes(source_bytes[22 * SECTOR_SIZE:22 * SECTOR_SIZE + 128])
+
+            build_translation_iso(source, output, overlay, translated_elf)
+
+            with output.open("rb") as handle:
+                image = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+                try:
+                    _, outer = index_iso(image)
+                    elf_record = find_record(outer, "SLPM_665.11")
+                    actual = bytes(
+                        image[
+                            elf_record.extent * SECTOR_SIZE:
+                            elf_record.extent * SECTOR_SIZE + elf_record.size
+                        ]
+                    )
+                    self.assertEqual(len(replacement), struct.unpack_from("<I", actual, 72)[0])
+                    self.assertEqual(40, struct.unpack_from("<I", actual, 80)[0])
                 finally:
                     image.close()
 

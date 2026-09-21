@@ -31,40 +31,24 @@ Create a high-quality English translation of the Japanese PS2 **Kowloon Youma Ga
 
 Machine-specific identity is regenerated into ignored `local/source-manifest.json`.
 
-## Current milestone: whole-game candidate built, not yet runtime-tested
+## Current milestone: v1 runtime failure diagnosed; v2 candidate statically verified
 
-The deterministic multi-file builder is implemented and a candidate was rebuilt from the pristine ISO using the public tooling in this repository.
+The first broad runtime candidate was launched after approval and **failed**: opening dialogue remained Japanese and the title options became 4–5 meaningless Latin-looking glyphs. Do not treat v1 as valid.
 
-Candidate:
+Root causes are now proven:
 
-- path: `/private/tmp/kowloon-recharge-whole-en-candidate.iso`
-- SHA-256: `8fc57b8b295a414e15ebb5d2d762114e3106282564f38ae30a7f63bc10a06362`
-- size: `2,095,382,528` — unchanged from pristine ISO
-- ADV overlay files: **1,113**
-  - 962 exact MTX
-  - 143 exact KSF outputs after one exact KSF is superseded by the accepted override
-  - 7 structural MTX
-  - 1 accepted DG00 KSF override
-- 860 replacements fit existing sector allocation
-- 253 replacements append-relocated inside the embedded ISO
-- embedded ISO grew by 900 sectors
-- 17 outer-tail files were shifted; the builder verified their payloads byte-for-byte unchanged
-- boot ELF SHA-256: `d25a3424f885353aeadfda0850e4a47386996d36825c765be2ade50ef29a7293`
-- finished ISO contains `SLPM-66511` and `BISLPM-66511Save`
-- all three historical accepted artifacts match `translations/accepted.json` in the finished ISO exactly
+- `SLPM_665.11` contains the runtime ROFS file table (size at filename-14, sector extent at filename-6). The v1 generic builder relocated 253 files in ISO9660 but did not update this table, so the game read stale Japanese extents. All 1,113 overlay assets have unique pristine size+extent matches in the ELF.
+- The title renderer consumes two-byte glyph codes. v1 wrote single-byte ASCII. The title now uses wide CP932 constrained labels `NewGame` and `Load`.
 
-Evidence lives in ignored:
+Current v2 candidate:
 
-- `local/whole-build-report.json`
-- `local/candidate-verification.json`
-
-No emulator launch has occurred for this candidate.
-
-Verification snapshot:
-
-- full local suite with owned fixtures: **82/82 passed**
-- clean repository copy with no proprietary fixtures: **59 tests run, 7 expected fixture skips, all runnable tests passed**
-- `git diff --check`/repository safety audit: no game-binary extensions in the commit candidate
+- path: `/private/tmp/kowloon-recharge-whole-en-candidate-v2.iso`
+- SHA-256: `b549af9528236092631026929990fa3a1dc890451f6a9ecbcb443eed4734b97e`
+- 1,113 overlay assets; 860 in place / 253 relocated
+- 1,113/1,113 ELF ROFS records patched and final-runtime-path validated
+- 84/84 local tests pass
+- `SLPM-66511` and `BISLPM-66511Save` preserved
+- **runtime re-test has NOT occurred yet; fresh explicit approval is required**
 
 ## Current corpus / import coverage
 
@@ -170,6 +154,8 @@ Ignored evidence:
 
 ## Current implementation map
 
+- `tools/elf_rofs.py`: parses/patches the executable ROFS size+sector-extent records used for runtime CVM asset lookup.
+
 - `tools/mtx.py` — MTX pointer-region parser/compiler
 - `tools/localization.py` — DC grouping + CP932 safe English encoder
 - `tools/exact_import.py`, `tools/import_exact_mtx.py` — fail-closed exact MTX importer
@@ -185,7 +171,7 @@ Ignored evidence:
 
 ## Runtime gate for this candidate
 
-Before launching `/private/tmp/kowloon-recharge-whole-en-candidate.iso`, state the exact visible expectations to Pablo and wait for a fresh explicit approval. At minimum the expected opening scope must include the historical accepted slice (`New Game`, `Load Game`, the DG00 opening conversation/choices, early command labels), while explicitly warning that baked Japanese graphics and rejected/unsupported scripts can still appear Japanese.
+Before launching `/private/tmp/kowloon-recharge-whole-en-candidate-v2.iso`, state the exact visible expectations to Pablo and wait for a fresh explicit approval. At minimum the expected opening scope must include the historical accepted slice (`NewGame`, `Load`, and the DG00 opening conversation; test further choices/UI only after this minimal proof passes), while explicitly warning that baked Japanese graphics and rejected/unsupported scripts can still appear Japanese.
 
 ## What comes after the first successful runtime test
 

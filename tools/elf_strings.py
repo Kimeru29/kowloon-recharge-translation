@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from tools.localization import encode_ps2_english
+
 
 @dataclass(frozen=True)
 class ElfFixedStringPatch:
@@ -9,15 +11,21 @@ class ElfFixedStringPatch:
     capacity: int
     expected: str
     text: str
+    encoding: str = "ascii"
 
     def expected_bytes(self) -> bytes:
         return self.expected.encode("cp932")
 
     def replacement_bytes(self) -> bytes:
-        try:
-            encoded = self.text.encode("ascii")
-        except UnicodeEncodeError as exc:
-            raise ValueError("ELF replacement text must be ASCII") from exc
+        if self.encoding == "ascii":
+            try:
+                encoded = self.text.encode("ascii")
+            except UnicodeEncodeError as exc:
+                raise ValueError("ELF replacement text must be ASCII") from exc
+        elif self.encoding == "ps2-wide":
+            encoded = encode_ps2_english(self.text)
+        else:
+            raise ValueError(f"Unsupported ELF string encoding: {self.encoding}")
         if len(encoded) >= self.capacity:
             raise ValueError(
                 f"Replacement needs {len(encoded)} bytes plus a NUL terminator, "
