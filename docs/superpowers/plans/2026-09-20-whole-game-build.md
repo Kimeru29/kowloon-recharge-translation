@@ -36,5 +36,5 @@
 - [x] Run full test suite and clean-clone suite (82/82 local; 59 clean-copy with 7 expected proprietary-fixture skips).
 - [x] Audit commit candidate for copyrighted/generated binaries; ignored game data remains outside Git.
 - [x] Update `docs/HANDOFF.md`, `docs/DISCOVERY.md`, `docs/BUILD.md` and regression docs with actual results.
-- [ ] Commit and push tooling/docs/tests to private GitHub.
+- [x] Commit and push tooling/docs/tests to private GitHub (`e1b5153`).
 - [ ] State the exact expected visual result of the generated test candidate and wait for Pablo's explicit approval before launching PCSX2.

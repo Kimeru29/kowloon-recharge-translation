@@ -17,6 +17,7 @@ Create a high-quality English translation of the Japanese PS2 **Kowloon Youma Ga
 
 - Repo: `/Users/juan.pena/repos/kowloon-recharge-translation`
 - Private GitHub: `https://github.com/Kimeru29/kowloon-recharge-translation` (`main`)
+- Whole-game phase implementation commit: `e1b5153` (`Build deterministic whole-game translation candidate`)
 - PS2 pristine ISO: `/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso`
   - SHA-256: `29e305e344c146e1416cca498e2d288718075380552d37886d9b469717779476`
   - size: `2,095,382,528`
