@@ -74,6 +74,183 @@ def patch_title_labels(raw: bytes) -> bytes:
     return bytes(result)
 
 
+# Name-entry/profile text is rendered through the same two-byte glyph path as
+# the title.  The original m_name module has only 272 bytes for its eight
+# Japanese prompts, while the exact official English needs 326 bytes including
+# terminators.  Four kana-reading defaults become unused in the English flow;
+# each has one unique pointer, so redirecting those pointers to the module's
+# existing blank wide string safely reclaims their 64-byte block.  Together
+# these two module-local arenas hold the exact English without borrowing
+# unrelated executable storage.
+NAME_READING_ARENA_START = 0x5865F0
+NAME_READING_ARENA_END = 0x586630
+NAME_READING_POINTER_OFFSETS = (0x586638, 0x58663C, 0x586648, 0x58664C)
+NAME_BLANK_STRING_OFFSET = 0x586B98
+NAME_PROMPT_ARENA_START = 0x5869C0
+NAME_PROMPT_ARENA_END = 0x586AD0
+NAME_PROMPT_POINTER_TABLE_OFFSET = 0x586AD0
+NAME_PROMPT_TEXTS = (
+    "Enter last name.",
+    "Enter first name.",
+    "Enter reading for last name.",
+    "Enter reading for first name.",
+    "Is this fine?",
+    "Yes / No",
+    "Verifying license ID...",
+    "ID verification complete.",
+)
+_NAME_PROMPT_SOURCES = (
+    (0x5869C0, "苗字を入力して下さい。"),
+    (0x5869E0, "名前を入力して下さい。"),
+    (0x586A00, "苗字の読み仮名を入力して下さい。"),
+    (0x586A30, "名前の読み仮名を入力して下さい。"),
+    (0x586A60, "これでよろしいですか？"),
+    (0x586A78, "は　い／いいえ"),
+    (0x586A90, "ライセンスＩＤを照合中です…。"),
+    (0x586AB0, "ＩＤの確認を完了しました。"),
+)
+_NAME_READING_SOURCES = (
+    (0x5865F0, "はばき　　　"),
+    (0x586600, "くろう　　　"),
+    (0x586610, "ひゆう　　　"),
+    (0x586620, "たつま　　　"),
+)
+# The official English flow does not ask for kana readings.  That lets us use
+# the 64-byte reading-default arena for four wide Latin default names and the
+# existing 272-byte prompt arena for the six visible prompts.
+_NAME_VISIBLE_PROMPT_INDICES = (0, 1, 4, 5, 6, 7)
+_NAME_READING_PROMPT_INDICES = (2, 3)
+NAME_WIDE_TEXTS = ("Habaki", "Kuro", "Hiyuu", "Tatsuma")
+NAME_DEFAULT_POINTER_OFFSETS = {
+    "Habaki": (0x586630,),
+    "Kuro": (0x586634,),
+    "Hiyuu": (0x586640,),
+    "Tatsuma": (0x586644,),
+}
+_NAME_DEFAULT_SOURCES = {
+    "Habaki": (0x695840, "葉佩　"),
+    "Kuro": (0x695848, "九龍　"),
+    "Hiyuu": (0x695850, "緋勇　"),
+    "Tatsuma": (0x695858, "龍麻　"),
+}
+# Generic ADV character-name lookup: record zero is the protagonist.  Both
+# references to the surname and the one reference to the given name must move
+# with the m_name defaults or later dialogue/HUD code will still see Japanese.
+NAME_RUNTIME_POINTER_OFFSETS = {
+    "Habaki": (0x577C60, 0x577C74),
+    "Kuro": (0x577C64,),
+}
+_NAME_RUNTIME_SOURCES = {
+    "Habaki": (0x695188, "葉佩"),
+    "Kuro": (0x695190, "九龍"),
+}
+_NAME_RUNTIME_READING_POINTERS = (
+    (0x577C68, 0x695198, "はばき"),
+    (0x577C6C, 0x6951A0, "くろう"),
+)
+
+
+def _validate_c_string(raw: bytes, offset: int, expected: str) -> None:
+    encoded = expected.encode("cp932")
+    if raw[offset:offset + len(encoded)] != encoded or raw[offset + len(encoded)] != 0:
+        raise ValueError(f"Source preimage mismatch at {offset:#x}: expected {expected!r}")
+
+
+def _pack_named_wide_strings(
+    result: bytearray,
+    start: int,
+    end: int,
+    items: tuple[tuple[object, str], ...],
+) -> dict[object, int]:
+    result[start:end] = b"\x00" * (end - start)
+    cursor = start
+    targets: dict[object, int] = {}
+    for key, text in items:
+        if cursor & 1:
+            cursor += 1
+        payload = encode_ps2_english(text, collapse_spaces=False) + b"\x00"
+        if cursor + len(payload) > end:
+            raise ValueError("Translated name-entry strings do not fit proven module-local arenas")
+        result[cursor:cursor + len(payload)] = payload
+        targets[key] = cursor
+        cursor += len(payload)
+    return targets
+
+
+def patch_name_prompt_arena(raw: bytes) -> bytes:
+    if NAME_BLANK_STRING_OFFSET + 13 > len(raw):
+        raise ValueError("Name-entry relocation patch is outside executable")
+
+    for (source_offset, source), pointer_offset in zip(
+        _NAME_READING_SOURCES, NAME_READING_POINTER_OFFSETS, strict=True
+    ):
+        _validate_c_string(raw, source_offset, source)
+        if struct.unpack_from("<I", raw, pointer_offset)[0] != _elf_va(source_offset):
+            raise ValueError(f"Source preimage mismatch for reading pointer at {pointer_offset:#x}")
+
+    for index, (source_offset, source) in enumerate(_NAME_PROMPT_SOURCES):
+        _validate_c_string(raw, source_offset, source)
+        pointer_offset = NAME_PROMPT_POINTER_TABLE_OFFSET + index * 4
+        if struct.unpack_from("<I", raw, pointer_offset)[0] != _elf_va(source_offset):
+            raise ValueError(f"Source preimage mismatch for prompt pointer at {pointer_offset:#x}")
+
+    for name, (source_offset, source) in _NAME_DEFAULT_SOURCES.items():
+        _validate_c_string(raw, source_offset, source)
+        for pointer_offset in NAME_DEFAULT_POINTER_OFFSETS[name]:
+            if struct.unpack_from("<I", raw, pointer_offset)[0] != _elf_va(source_offset):
+                raise ValueError(f"Source preimage mismatch for default-name pointer at {pointer_offset:#x}")
+
+    for name, (source_offset, source) in _NAME_RUNTIME_SOURCES.items():
+        _validate_c_string(raw, source_offset, source)
+        for pointer_offset in NAME_RUNTIME_POINTER_OFFSETS[name]:
+            if struct.unpack_from("<I", raw, pointer_offset)[0] != _elf_va(source_offset):
+                raise ValueError(f"Source preimage mismatch for runtime-name pointer at {pointer_offset:#x}")
+    for pointer_offset, source_offset, source in _NAME_RUNTIME_READING_POINTERS:
+        _validate_c_string(raw, source_offset, source)
+        if struct.unpack_from("<I", raw, pointer_offset)[0] != _elf_va(source_offset):
+            raise ValueError(f"Source preimage mismatch for runtime-reading pointer at {pointer_offset:#x}")
+
+    blank = "　　　　　　".encode("cp932") + b"\x00"
+    if raw[NAME_BLANK_STRING_OFFSET:NAME_BLANK_STRING_OFFSET + len(blank)] != blank:
+        raise ValueError("Source preimage mismatch for m_name blank wide string")
+
+    result = bytearray(raw)
+    blank_va = _elf_va(NAME_BLANK_STRING_OFFSET)
+    for pointer_offset in NAME_READING_POINTER_OFFSETS:
+        struct.pack_into("<I", result, pointer_offset, blank_va)
+    for prompt_index in _NAME_READING_PROMPT_INDICES:
+        struct.pack_into(
+            "<I", result, NAME_PROMPT_POINTER_TABLE_OFFSET + prompt_index * 4, blank_va
+        )
+    for pointer_offset, _, _ in _NAME_RUNTIME_READING_POINTERS:
+        struct.pack_into("<I", result, pointer_offset, blank_va)
+
+    name_targets = _pack_named_wide_strings(
+        result,
+        NAME_READING_ARENA_START,
+        NAME_READING_ARENA_END,
+        tuple((name, name) for name in NAME_WIDE_TEXTS),
+    )
+    prompt_targets = _pack_named_wide_strings(
+        result,
+        NAME_PROMPT_ARENA_START,
+        NAME_PROMPT_ARENA_END,
+        tuple((index, NAME_PROMPT_TEXTS[index]) for index in _NAME_VISIBLE_PROMPT_INDICES),
+    )
+
+    for index, target in prompt_targets.items():
+        struct.pack_into(
+            "<I", result, NAME_PROMPT_POINTER_TABLE_OFFSET + int(index) * 4, _elf_va(target)
+        )
+    for name, target in name_targets.items():
+        target_va = _elf_va(target)
+        for pointer_offset in NAME_DEFAULT_POINTER_OFFSETS[str(name)]:
+            struct.pack_into("<I", result, pointer_offset, target_va)
+        for pointer_offset in NAME_RUNTIME_POINTER_OFFSETS.get(str(name), ()):
+            struct.pack_into("<I", result, pointer_offset, target_va)
+
+    return bytes(result)
+
 def _keyboard_storage_text(logical_cells: str) -> str:
     """Lay 20 logical keys into the PS2 keyboard's four five-key groups."""
 
@@ -141,42 +318,25 @@ KEYBOARD_ROW_PATCHES: tuple[ElfFixedStringPatch, ...] = tuple(
 STARTUP_FIXED_PATCHES: tuple[ElfFixedStringPatch, ...] = (
     # Official English remaster suppresses the default-name kana readings.
     # Keep the PS2 fixed 16-byte fields but blank their visible contents.
-    ElfFixedStringPatch(0x5865F0, 16, "はばき　　　", ""),
-    ElfFixedStringPatch(0x586600, 16, "くろう　　　", ""),
-    ElfFixedStringPatch(0x586610, 16, "ひゆう　　　", ""),
-    ElfFixedStringPatch(0x586620, 16, "たつま　　　", ""),
     # Runtime character-name record 0 (the protagonist).  This separate table
     # is used by the generic character-name lookup (28-byte records); its first
     # record contains surname, given name, and both readings.  English.bytes
     # confirms 葉佩 -> Habaki and 九龍 -> Kuro and suppresses the readings.
-    ElfFixedStringPatch(0x695188, 8, "葉佩", "Habaki"),
-    ElfFixedStringPatch(0x695190, 8, "九龍", "Kuro"),
-    ElfFixedStringPatch(0x695198, 8, "はばき", ""),
-    ElfFixedStringPatch(0x6951A0, 8, "くろう", ""),
     # Name-entry/profile prompts (m_name.c data block).
-    ElfFixedStringPatch(0x5869C0, 32, "苗字を入力して下さい。", "Enter last name."),
-    ElfFixedStringPatch(0x5869E0, 32, "名前を入力して下さい。", "Enter first name."),
-    ElfFixedStringPatch(0x586A00, 48, "苗字の読み仮名を入力して下さい。", "Enter reading for last name."),
-    ElfFixedStringPatch(0x586A30, 48, "名前の読み仮名を入力して下さい。", "Enter reading for first name."),
-    ElfFixedStringPatch(0x586A60, 24, "これでよろしいですか？", "Is this fine?"),
-    ElfFixedStringPatch(0x586A78, 24, "は　い／いいえ", "Yes / No"),
-    ElfFixedStringPatch(0x586A90, 32, "ライセンスＩＤを照合中です…。", "Verifying license ID..."),
-    ElfFixedStringPatch(0x586AB0, 32, "ＩＤの確認を完了しました。", "ID verification complete."),
     # First-dungeon location label.
     ElfFixedStringPatch(
         0x5CCD40,
         64,
         "ヘラクレイオンの神殿（ヘラクレイオンのしんでん）",
         "Heracleion Shrine",
+        encoding="ps2-wide-fixed",
     ),
     # Default protagonist name table; the first runtime pass showed 九龍 in the HUD.
-    ElfFixedStringPatch(0x695840, 8, "葉佩　", "Habaki"),
-    ElfFixedStringPatch(0x695848, 8, "九龍　", "Kuro"),
-    ElfFixedStringPatch(0x695850, 8, "緋勇　", "Hiyuu"),
-    ElfFixedStringPatch(0x695858, 8, "龍麻　", "Tatsuma"),
     *KEYBOARD_ROW_PATCHES,
 )
 
 
 def build_startup_ui_elf(raw: bytes) -> bytes:
-    return patch_fixed_strings(patch_title_labels(raw), STARTUP_FIXED_PATCHES)
+    titled = patch_title_labels(raw)
+    relocated = patch_name_prompt_arena(titled)
+    return patch_fixed_strings(relocated, STARTUP_FIXED_PATCHES)

@@ -242,6 +242,78 @@ class WholeIsoOverlayBuildTests(unittest.TestCase):
                 finally:
                     image.close()
 
+    def test_allows_translated_elf_to_grow_within_existing_sector_allocation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.iso"
+            output = root / "output.iso"
+            make_nested_iso(source)
+            empty = root / "empty"
+            empty.mkdir()
+            overlay = collect_overlay([("empty", empty)])
+
+            source_bytes = source.read_bytes()
+            original = source_bytes[22 * SECTOR_SIZE:22 * SECTOR_SIZE + 128]
+            translated = original + b"T" * (1500 - len(original))
+            translated_elf = root / "translated.elf"
+            translated_elf.write_bytes(translated)
+
+            report = build_translation_iso(source, output, overlay, translated_elf)
+            self.assertFalse(report["elf_relocated"])
+            self.assertEqual(22, report["elf_output_extent"])
+
+            with output.open("rb") as handle:
+                image = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+                try:
+                    _, outer = index_iso(image)
+                    elf = find_record(outer, "SLPM_665.11")
+                    self.assertEqual(22, elf.extent)
+                    self.assertEqual(len(translated), elf.size)
+                    self.assertEqual(
+                        translated,
+                        bytes(image[elf.extent * SECTOR_SIZE:elf.extent * SECTOR_SIZE + elf.size]),
+                    )
+                finally:
+                    image.close()
+
+    def test_relocates_translated_elf_when_it_outgrows_original_allocation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.iso"
+            output = root / "output.iso"
+            meta = make_nested_iso(source)
+            empty = root / "empty"
+            empty.mkdir()
+            overlay = collect_overlay([("empty", empty)])
+
+            source_bytes = source.read_bytes()
+            original = source_bytes[22 * SECTOR_SIZE:22 * SECTOR_SIZE + 128]
+            translated = original + b"T" * (3000 - len(original))
+            translated_elf = root / "translated.elf"
+            translated_elf.write_bytes(translated)
+
+            report = build_translation_iso(source, output, overlay, translated_elf)
+            self.assertTrue(report["elf_relocated"])
+            self.assertEqual(meta["tail_extent"] + 1, report["elf_output_extent"])
+            self.assertEqual(source.stat().st_size, output.stat().st_size)
+
+            with output.open("rb") as handle:
+                image = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+                try:
+                    _, outer = index_iso(image)
+                    elf = find_record(outer, "SLPM_665.11")
+                    self.assertEqual(report["elf_output_extent"], elf.extent)
+                    self.assertEqual(len(translated), elf.size)
+                    self.assertEqual(
+                        translated,
+                        bytes(image[elf.extent * SECTOR_SIZE:elf.extent * SECTOR_SIZE + elf.size]),
+                    )
+                    tail = find_record(outer, "SYSTEM.CNF")
+                    self.assertEqual(meta["tail_extent"], tail.extent)
+                finally:
+                    image.close()
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,10 +1,27 @@
 from __future__ import annotations
 
+import struct
 import unittest
 from pathlib import Path
 
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
-from tools.startup_ui import TITLE_ARENA_END, TITLE_ARENA_START, TITLE_LOAD_POINTER_OFFSET
+from tools.startup_ui import (
+    NAME_BLANK_STRING_OFFSET,
+    NAME_PROMPT_ARENA_END,
+    NAME_PROMPT_ARENA_START,
+    NAME_PROMPT_POINTER_TABLE_OFFSET,
+    NAME_READING_ARENA_END,
+    NAME_READING_ARENA_START,
+    NAME_READING_POINTER_OFFSETS,
+    NAME_DEFAULT_POINTER_OFFSETS,
+    NAME_RUNTIME_POINTER_OFFSETS,
+    TITLE_ARENA_END,
+    TITLE_ARENA_START,
+    TITLE_LOAD_POINTER_OFFSET,
+)
+from tools.hant_ui import HANT_ENGLISH_LINES, HANT_POINTER_TABLE_OFFSET
+from tools.elf_translation_segment import TRANSLATION_SEGMENT_VADDR
+from tools.localization import encode_ps2_english
 from tests.local_fixtures import require_local_fixture
 
 
@@ -36,18 +53,61 @@ class EarlyUiPatchTests(unittest.TestCase):
         self.assertEqual("Noise", actual[(0x694198, "ノイズ")])
         self.assertEqual("Battle", actual[(0x6941A0, "戦闘")])
 
-    def test_build_changes_only_declared_fixed_slots(self) -> None:
+    def test_build_changes_only_declared_pristine_regions_before_appended_segment(self) -> None:
         result = build_early_ui_elf(RAW)
 
-        self.assertEqual(len(RAW), len(result))
         allowed = set(range(TITLE_ARENA_START, TITLE_ARENA_END))
         allowed.update(range(TITLE_LOAD_POINTER_OFFSET, TITLE_LOAD_POINTER_OFFSET + 4))
+        allowed.update(range(NAME_READING_ARENA_START, NAME_READING_ARENA_END))
+        allowed.update(range(NAME_PROMPT_ARENA_START, NAME_PROMPT_ARENA_END))
+        allowed.update(range(NAME_PROMPT_POINTER_TABLE_OFFSET, NAME_PROMPT_POINTER_TABLE_OFFSET + 8 * 4))
+        for off in NAME_READING_POINTER_OFFSETS:
+            allowed.update(range(off, off + 4))
+        for offsets in NAME_DEFAULT_POINTER_OFFSETS.values():
+            for off in offsets:
+                allowed.update(range(off, off + 4))
+        for offsets in NAME_RUNTIME_POINTER_OFFSETS.values():
+            for off in offsets:
+                allowed.update(range(off, off + 4))
+        # Runtime reading pointers are immediately after the protagonist name pointers.
+        allowed.update(range(0x577C68, 0x577C70))
         for patch in EARLY_UI_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
+        # ADV horizontal-layout patch and H.A.N.T pointer table are declared runtime patches.
+        for off in (0x14FA60, 0x14FA68, 0x14FAA4, 0x14FAA8):
+            allowed.update(range(off, off + 4))
+        allowed.update(range(HANT_POINTER_TABLE_OFFSET, HANT_POINTER_TABLE_OFFSET + 17 * 4))
+        # ELF program header / heap metadata used by the appended translation segment.
+        allowed.update(range(0x54, 0x54 + 32))
+        allowed.update(range(0x250, 0x254))
+        allowed.update(range(0x8030BC, 0x8030C0))
 
-        differences = {index for index, (before, after) in enumerate(zip(RAW, result)) if before != after}
+        differences = {index for index, (before, after) in enumerate(zip(RAW, result[:len(RAW)])) if before != after}
         self.assertTrue(differences)
         self.assertTrue(differences <= allowed)
+
+    def test_composite_build_includes_startup_pointer_relocation(self) -> None:
+        result = build_early_ui_elf(RAW)
+        target_va = struct.unpack_from("<I", result, NAME_PROMPT_POINTER_TABLE_OFFSET)[0]
+        target = target_va - 0x00100000 + 0x80
+        expected = encode_ps2_english("Enter last name.") + b"\x00"
+        self.assertEqual(expected, result[target:target + len(expected)])
+        self.assertGreaterEqual(target_va, 0x00100000)
+
+
+    def test_composite_build_includes_horizontal_adv_layout(self) -> None:
+        result = build_early_ui_elf(RAW)
+        self.assertEqual(0x80430465, struct.unpack_from("<I", result, 0x14FA60)[0])
+        self.assertEqual(0x00031843, struct.unpack_from("<I", result, 0x14FA68)[0])
+        self.assertEqual(0x80440463, struct.unpack_from("<I", result, 0x14FAA4)[0])
+        self.assertEqual(0x0080182D, struct.unpack_from("<I", result, 0x14FAA8)[0])
+
+    def test_composite_build_moves_hant_text_to_translation_segment(self) -> None:
+        result = build_early_ui_elf(RAW)
+        self.assertGreater(len(result), len(RAW))
+        for index in HANT_ENGLISH_LINES:
+            target = struct.unpack_from("<I", result, HANT_POINTER_TABLE_OFFSET + index * 4)[0]
+            self.assertGreaterEqual(target, TRANSLATION_SEGMENT_VADDR)
 
     def test_unfit_or_unmapped_slots_are_intentionally_unchanged(self) -> None:
         result = build_early_ui_elf(RAW)

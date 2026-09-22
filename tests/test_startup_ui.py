@@ -15,6 +15,13 @@ from tools.startup_ui import (
     TITLE_LOAD_START,
     TITLE_NEW_GAME_START,
     TITLE_POINTER_TABLE_OFFSET,
+    NAME_PROMPT_POINTER_TABLE_OFFSET,
+    NAME_PROMPT_TEXTS,
+    NAME_READING_POINTER_OFFSETS,
+    NAME_BLANK_STRING_OFFSET,
+    NAME_DEFAULT_POINTER_OFFSETS,
+    NAME_RUNTIME_POINTER_OFFSETS,
+    NAME_WIDE_TEXTS,
     build_startup_ui_elf,
 )
 
@@ -52,32 +59,10 @@ class StartupUiPatchTests(unittest.TestCase):
     def test_startup_manifest_covers_every_known_pre_dialogue_runtime_string(self) -> None:
         by_offset = {patch.offset: patch for patch in STARTUP_FIXED_PATCHES}
         expected = {
-            # The official remaster suppresses the kana readings for the default
-            # protagonist name; the PS2 English build does the same.
-            0x5865F0: ("はばき　　　", ""),
-            0x586600: ("くろう　　　", ""),
-            0x586610: ("ひゆう　　　", ""),
-            0x586620: ("たつま　　　", ""),
             # Record 0 of the runtime character-name table is the protagonist.
             # It is separately referenced by the generic character-name lookup,
             # so startup must localize it as well as the m_name default table.
-            0x695188: ("葉佩", "Habaki"),
-            0x695190: ("九龍", "Kuro"),
-            0x695198: ("はばき", ""),
-            0x6951A0: ("くろう", ""),
-            0x5869C0: ("苗字を入力して下さい。", "Enter last name."),
-            0x5869E0: ("名前を入力して下さい。", "Enter first name."),
-            0x586A00: ("苗字の読み仮名を入力して下さい。", "Enter reading for last name."),
-            0x586A30: ("名前の読み仮名を入力して下さい。", "Enter reading for first name."),
-            0x586A60: ("これでよろしいですか？", "Is this fine?"),
-            0x586A78: ("は　い／いいえ", "Yes / No"),
-            0x586A90: ("ライセンスＩＤを照合中です…。", "Verifying license ID..."),
-            0x586AB0: ("ＩＤの確認を完了しました。", "ID verification complete."),
             0x5CCD40: ("ヘラクレイオンの神殿（ヘラクレイオンのしんでん）", "Heracleion Shrine"),
-            0x695840: ("葉佩　", "Habaki"),
-            0x695848: ("九龍　", "Kuro"),
-            0x695850: ("緋勇　", "Hiyuu"),
-            0x695858: ("龍麻　", "Tatsuma"),
         }
         keyboard_offsets = {0x586650 + index * 0x30 for index in range(14)}
         self.assertEqual(set(expected) | keyboard_offsets, set(by_offset))
@@ -85,8 +70,49 @@ class StartupUiPatchTests(unittest.TestCase):
             patch = by_offset[offset]
             self.assertEqual(source, patch.expected)
             self.assertEqual(english, patch.text)
-            self.assertEqual("ascii", patch.encoding)
+            self.assertEqual("ps2-wide-fixed", patch.encoding)
 
+
+    def test_name_prompts_and_names_share_wide_relocation_arenas(self) -> None:
+        result = build_startup_ui_elf(RAW)
+
+        blank_va = _elf_va(NAME_BLANK_STRING_OFFSET)
+        # Reading-default pointers and the two reading prompts are suppressed in
+        # the official English flow instead of consuming translation storage.
+        for pointer_offset in NAME_READING_POINTER_OFFSETS:
+            self.assertEqual(blank_va, struct.unpack_from("<I", result, pointer_offset)[0])
+        for prompt_index in (2, 3):
+            pointer_offset = NAME_PROMPT_POINTER_TABLE_OFFSET + prompt_index * 4
+            self.assertEqual(blank_va, struct.unpack_from("<I", result, pointer_offset)[0])
+
+        # The six visible prompts resolve to exact official English as wide JIS.
+        for index in (0, 1, 4, 5, 6, 7):
+            english = NAME_PROMPT_TEXTS[index]
+            pointer_offset = NAME_PROMPT_POINTER_TABLE_OFFSET + index * 4
+            target_va = struct.unpack_from("<I", result, pointer_offset)[0]
+            target = target_va - 0x00100000 + 0x80
+            encoded = encode_ps2_english(english) + b"\x00"
+            self.assertEqual(encoded, result[target:target + len(encoded)])
+
+        # Both m_name defaults and the generic ADV character-name lookup must
+        # point at the same relocated wide names.  No ASCII is written into the
+        # original fixed records.
+        resolved: dict[str, int] = {}
+        for name, pointer_offsets in NAME_DEFAULT_POINTER_OFFSETS.items():
+            for pointer_offset in pointer_offsets:
+                target_va = struct.unpack_from("<I", result, pointer_offset)[0]
+                target = target_va - 0x00100000 + 0x80
+                encoded = encode_ps2_english(name) + b"\x00"
+                self.assertEqual(encoded, result[target:target + len(encoded)])
+                resolved.setdefault(name, target_va)
+                self.assertEqual(resolved[name], target_va)
+        for name, pointer_offsets in NAME_RUNTIME_POINTER_OFFSETS.items():
+            for pointer_offset in pointer_offsets:
+                self.assertEqual(resolved[name], struct.unpack_from("<I", result, pointer_offset)[0])
+
+        self.assertEqual({"Habaki", "Kuro", "Hiyuu", "Tatsuma"}, set(NAME_WIDE_TEXTS))
+        self.assertEqual(RAW[0x695188:0x6951A8], result[0x695188:0x6951A8])
+        self.assertEqual(RAW[0x695840:0x695860], result[0x695840:0x695860])
 
     def test_name_keyboard_uses_official_latin_rows_with_ps2_two_byte_cell_geometry(self) -> None:
         result = build_startup_ui_elf(RAW)
@@ -131,6 +157,10 @@ class StartupUiPatchTests(unittest.TestCase):
 
         allowed = set(range(TITLE_ARENA_START, TITLE_ARENA_END))
         allowed.update(range(TITLE_LOAD_POINTER_OFFSET, TITLE_LOAD_POINTER_OFFSET + 4))
+        allowed.update(range(0x5865F0, 0x586630))
+        allowed.update(range(0x586630, 0x586650))
+        allowed.update(range(0x5869C0, 0x586AF0))
+        allowed.update(range(0x577C60, 0x577C78))
         for patch in STARTUP_FIXED_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
 

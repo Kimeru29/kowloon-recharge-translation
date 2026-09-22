@@ -49,25 +49,39 @@ The ROFS/title fixes were brought to runtime. Before the first dialogue Pablo ob
 
 Do not treat v2 as accepted.
 
-## Current candidate — startup v5, statically verified, NOT launched
+## v5 runtime — renderer-class discovery, failed acceptance
+
+v5 was launched and is **not accepted**. Runtime established these class-level facts:
+
+- all 29 opening quote textures rendered correctly in English;
+- `New Game` / `Load Game` rendered correctly;
+- B_GP019 name-entry control graphics rendered correctly;
+- the Latin name keyboard rendered correctly;
+- name/profile prompts and default names were garbage because v5 wrote single-byte ASCII into another two-byte-glyph renderer;
+- ADV dialogue English glyphs were present but laid out vertically because the Japanese renderer maps script line/byte-position fields to vertical columns;
+- the H.A.N.T. tutorial remained Japanese and is a separate executable pointer-table text class.
+
+These are now modeled as reusable automator classes rather than screenshot-specific fixes.
+
+## Current candidate — startup v6, statically verified, NOT launched
 
 Candidate:
 
-- path: `/private/tmp/kowloon-recharge-startup-en-v5.iso`
-- SHA-256: `f8d65c029f86ce871f9d9930f76d12b6f6a95c79c4152a0437b19ceef1fd20b5`
+- path: `/private/tmp/kowloon-recharge-startup-en-v6.iso`
+- SHA-256: `beaaa53bbfe3a60cd3af6749d4113cd4d91e81d804b122f80b85c347bded761b`
 - 1,143 overlay assets
 - 890 in place / 253 relocated
 - +900 embedded sectors
 - 17 shifted outer files
 - 1,143/1,143 executable ROFS records patched/re-resolved
 - finished ISO size unchanged at 2,095,382,528 bytes
-- final ELF SHA-256: `52cfdd6d94d60c2a077056a8e55e6fc1d49b27fa00ede4c7e996f2d40df149f3`
-- static startup acceptance: **114/114 checks passed** (`local/startup-acceptance-v5.json`)
-- normal suite: **105 tests run: 101 pass + 4 expected Pillow skips**
-- Pillow-enabled suite: **105/105 tests pass**
-- **PCSX2 has not been launched for v5. Fresh explicit approval is required.**
+- final ELF size: 8,401,977 bytes; it still fits the original outer ISO sector allocation
+- final post-ROFS ELF SHA-256: `2dacea600e06c4db29311402ae5a1ae0880be23bfab2cfb3e8b0e1a811831922`
+- reproducible final-image startup acceptance: **96/96 checks passed** (`local/startup-acceptance-v6.json`)
+- Pillow-enabled suite: **121/121 tests pass**
+- **PCSX2 has not been launched for v6. Fresh explicit approval is required.**
 
-## Startup-v5 content
+## Startup renderer/storage classes
 
 ### Opening quotations
 
@@ -92,17 +106,7 @@ The exact official labels are now `New Game` and `Load Game`, not the clipped `N
 
 ### Name/profile flow
 
-Executable-resident startup patches include:
-
-- `Enter last name.`
-- `Enter first name.`
-- reading-name prompts
-- `Is this fine?`
-- `Yes / No`
-- `Verifying license ID...`
-- `ID verification complete.`
-- `Heracleion Shrine`
-- protagonist/default-name tables (`Habaki`, `Kuro`, `Hiyuu`, `Tatsuma`) with kana readings suppressed like the official English remaster.
+The v5 runtime proved that these prompts/names are also a two-byte-glyph renderer. v6 therefore packs official English as wide CP932 into verified module-local arenas and repoints the existing prompt/name tables rather than writing ASCII into the original slots. The class covers `Enter last name.`, `Enter first name.`, confirmation/license messages, `Heracleion Shrine`, and protagonist/default names (`Habaki`, `Kuro`, `Hiyuu`, `Tatsuma`). Reading prompts/readings are suppressed like the official English remaster.
 
 The name keyboard is 14 fixed rows. Runtime copies exactly two bytes per selected cell, so the English keyboard preserves wide/two-byte glyphs and the original 20-key logical geometry. It now provides Latin lower/uppercase letters, digits and punctuation instead of kana.
 
@@ -114,9 +118,13 @@ The visible Japanese control captions are baked into `BLBRD/B_GP019.BIN`, especi
 - output size: 264,640 (unchanged)
 - output SHA-256: `529aa604ba3d1e987d062daceb3e8045566d47e43b81665f8d7fa9b831b01227`
 
-### First dialogue
+### ADV dialogue layout
 
-`DG/DG00_00.MTX` remains the opening dialogue proof. Candidate verification asserts official English content including the old-man speaker/first line and verifies the original Japanese equivalents are absent. The accepted constrained `DG00_00.KSF` still carries the early interaction choices.
+`DG/DG00_00.MTX` remains the opening dialogue proof. v5 showed that the localized two-byte English itself was present, but the Japanese ADV renderer displayed it vertically. Static code/data tracing proved the script compiler stores line index in record field `+0x463` and byte position in `+0x465`, while the renderer used `+0x463` as X and `+0x465/2` as Y. v6 performs a fail-closed four-instruction renderer transform so X uses `+0x465/2` and Y uses `+0x463`. This is a renderer-class patch and therefore applies to ADV dialogue generally, not only DG00.
+
+### Executable long-text / H.A.N.T class
+
+The H.A.N.T. tutorial is an executable pointer table at `0x5C8C70`; its visible strings do not safely fit their Japanese slots. The pristine ELF has a zero-sized second PT_LOAD at virtual address `0x00902F00`. v6 uses it as a reusable translation text segment, reserves a 1 MiB virtual window by moving only the heap start, packs the wide official English there, and repoints the H.A.N.T. table. This mechanism is intended for other executable-resident long strings as they are classified.
 
 ## Current corpus/import coverage
 
@@ -164,7 +172,11 @@ PS2-only lexical proxy:
 - `tools/exact_import.py`, `tools/import_exact_mtx.py` — fail-closed exact MTX importer
 - `tools/ksf_import.py`, `tools/import_exact_ksf.py` — conservative KSF importer
 - `tools/structural_import.py`, `tools/import_structural_mtx.py` — changed-source MTX importer
-- `tools/startup_ui.py` — title arena, startup prompts/names and Latin keyboard
+- `tools/startup_ui.py` — title arena, wide startup prompt/name relocation and Latin keyboard
+- `tools/adv_layout.py` — fail-closed ADV vertical→horizontal renderer transform
+- `tools/elf_translation_segment.py` — reusable second-PT_LOAD English text segment
+- `tools/hant_ui.py` — H.A.N.T. tutorial pointer-table backport into translation segment
+- `tools/startup_acceptance.py` — reproducible final-ISO startup/renderer-class verifier
 - `tools/early_ui.py`, `tools/elf_strings.py` — executable UI build/slot handling
 - `tools/graphics_port.py` — optional-Pillow indexed PS2 graphics port
 - `tools/startup_graphics.py` — quote and B_GP019 startup graphics transforms
@@ -174,15 +186,15 @@ PS2-only lexical proxy:
 - `tools/regression.py`, `tools/check_regression.py` — cumulative accepted-artifact/identity gate
 - `tools/graphics_inventory.py` — PS4 localized bundle inventory
 
-## Exact runtime gate for v5
+## Exact runtime gate for v6
 
-Before launching v5, tell Pablo the expected visible sequence and wait for explicit approval. The test must cover **every text-bearing screen from startup through the first old-man dialogue**. Any Japanese text in that slice should be treated as a failed acceptance checkpoint and captured for analysis rather than waved away as out of scope.
+Before launching v6, state the exact expected visible sequence and wait for Pablo's explicit approval. The test covers **every text-bearing screen from startup through the first old-man dialogue**. Any Japanese text, garbage prompt/name, vertical dialogue, or untranslated H.A.N.T. tutorial in that slice is a failed acceptance checkpoint and should be captured for renderer/data-path analysis.
 
-## After a successful v5 runtime test
+## After a successful v6 runtime test
 
-1. Promote the reviewed startup ELF/graphics checkpoint into regression metadata as appropriate.
+1. Promote the reviewed startup renderer classes/graphics checkpoint into regression metadata as appropriate.
 2. Back up the memory card and establish a golden in-game save; prove it loads in a later build.
-3. Continue the broad corpus: dynamic exact maps, FD00 semantic templates, KSF overflow research and broad graphics.
+3. Generalize the now-proven classes across the whole corpus, then continue dynamic exact maps, FD00 semantic templates, KSF overflow research and broad graphics.
 4. Translate the small novel PS2-only remainder using official terminology/style.
 
 ## Resume procedure

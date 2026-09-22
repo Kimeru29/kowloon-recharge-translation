@@ -6,7 +6,7 @@ The project is cumulative: once a translation is accepted, later builds must not
 
 `translations/accepted.json` stores stable IDs, source/output hashes and provenance rather than copyrighted script content. It currently records the historical accepted DG00 MTX, constrained DG00 KSF, and the previously accepted early-UI ELF checkpoint.
 
-The current startup-v5 ELF has additional unreviewed-at-runtime startup patches and therefore **must not replace the committed accepted hash until the v5 runtime test passes**. Local candidate verification is additive evidence, not automatic promotion.
+v5 was runtime-tested and failed the full startup acceptance scope, so it must not be promoted. The current v6 renderer-class/ELF changes are statically verified but **must not replace the committed accepted hash until the v6 runtime test passes**. Local candidate verification is additive evidence, not automatic promotion.
 
 ## Gate semantics
 
@@ -25,18 +25,18 @@ python3 -m tools.check_regression translations/accepted.json translations/accept
 
 ## Finished-image gate
 
-The generic builder validates the completed nested image, not only intermediate files. For startup v5 it verifies:
+The generic builder validates the completed nested image, not only intermediate files. For startup v6 it verifies:
 
 - outer ISO declared volume and total byte size remain unchanged;
 - CVM header, outer `DATA.CVM` record and embedded PVD agree;
 - every overlay payload in the finished ISO hashes to its generated overlay input;
 - the 17 shifted outer-tail files remain byte-identical;
-- `SLPM_665.11` stays fixed-size and retains `SLPM-66511` + `BISLPM-66511Save`;
+- `SLPM_665.11` may grow/relocate only through the tested builder path and retains `SLPM-66511` + `BISLPM-66511Save`;
 - every one of the **1,143** overlay assets has a unique executable ROFS record that re-resolves to its final size/extent;
 - startup graphics retain the exact pristine file size, differ from pristine content, and hash exactly to their local generated overlay;
-- title pointers/arena, all declared startup string slots, the Latin keyboard, DG00 dialogue and DG00 interaction choices are independently asserted by `local/startup-acceptance-v5.json`.
+- `tools/startup_acceptance.py` independently reopens the final ISO and checks title/name wide-pointer paths, Latin keyboard, ADV horizontal renderer instructions, active translation PT_LOAD, H.A.N.T. relocated pointers/text, 30 startup graphics + ROFS records, DG00 English/removal assertions and DG00 KSF choices.
 
-Current v5 static acceptance: **114/114 checks passed**.
+Current v6 final-image acceptance: **96/96 checks passed** (`local/startup-acceptance-v6.json`).
 
 ## Save compatibility smoke test
 

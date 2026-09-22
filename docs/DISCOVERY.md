@@ -156,26 +156,54 @@ Across a matched `B_GPxxx` sample, 235/246 same-name assets are exactly 2.25× P
 
 The executable contains `BISLPM-66511Save` and normal memory-card paths. Normal memory-card saves are the compatibility target across builds; savestates are build-specific. A real create-save/load-save cross-build test is still pending after startup runtime acceptance succeeds.
 
-## Startup v5 static candidate
+## Startup v5 runtime result — renderer classification
 
-Current candidate:
+v5 passed its static data checks but failed the runtime acceptance scope. Runtime proved:
 
-`/private/tmp/kowloon-recharge-startup-en-v5.iso`
+- quote TMX backports work;
+- title wide strings work;
+- B_GP019 English graphics work;
+- the wide Latin keyboard works;
+- ASCII startup prompts/names are invalid for the name/profile renderer;
+- ADV uses a vertical Japanese layout even when localized English data is loaded;
+- H.A.N.T tutorial text is a separate executable pointer-table class.
 
-SHA-256:
-`f8d65c029f86ce871f9d9930f76d12b6f6a95c79c4152a0437b19ceef1fd20b5`
+This is why static byte-presence checks alone are insufficient: acceptance now verifies renderer-class transformations and still requires runtime proof.
 
-Build evidence:
+## Name/profile wide-string relocation
 
-- 1,143 overlay files;
-- 890 in place / 253 relocated;
-- +900 embedded sectors;
-- 17 shifted outer files remain byte-identical;
+The prompt table at `0x586AD0` points into `m_name.c` text around `0x5869C0`. v6 packs visible official English prompts as two-byte CP932 into the verified `0x5869C0..0x586AD0` arena and repoints that table. Default/runtime protagonist name pointers are similarly redirected to wide `Habaki`, `Kuro`, `Hiyuu`, `Tatsuma`; reading strings point to a blank wide string. The original runtime name records are preserved.
+
+## ADV horizontal-renderer transform
+
+Reverse engineering connected the script record writer and renderer:
+
+- record `+0x463` stores line index;
+- record `+0x465` stores byte position within the line;
+- pristine renderer consumes `+0x463` as X and `+0x465 / 2` as Y, yielding vertical Japanese columns;
+- v6 changes four exact MIPS instructions so X uses `+0x465 / 2` and Y uses `+0x463`.
+
+`tools/adv_layout.py` asserts the pristine instruction preimage before patching. This is a global ADV renderer-class rule, not a DG00 string exception.
+
+## Executable translation segment / H.A.N.T. tutorial
+
+The H.A.N.T. startup tutorial pointer table is at `0x5C8C70`. The pristine ELF's second PT_LOAD is zero-sized at virtual address `0x00902F00`; v6 activates it as a reusable translated-text segment. It appends the English payload, reserves a 1 MiB VA window, moves the heap start from `0x00902F00` to `0x00A02F00`, and repoints tutorial entries to wide official English. Exact program-header and heap-instruction preimages are enforced.
+
+## Startup v6 static candidate
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v6.iso`
+
+SHA-256: `beaaa53bbfe3a60cd3af6749d4113cd4d91e81d804b122f80b85c347bded761b`
+
+Evidence:
+
+- 1,143 overlay files; 890 in place / 253 relocated;
+- +900 embedded sectors; 17 shifted outer files remain byte-identical;
 - 1,143 executable ROFS records patched/re-resolved;
-- outer ISO byte size unchanged;
-- final ELF retains serial/save identity;
-- `local/startup-acceptance-v5.json`: **114/114 static checks**;
-- normal suite: 105 tests run with 101 passes + four expected optional-Pillow skips;
-- Pillow-enabled suite: 105/105 pass.
+- translated ELF size 8,401,977 bytes and remains at outer extent 288;
+- final post-ROFS ELF SHA-256 `2dacea600e06c4db29311402ae5a1ae0880be23bfab2cfb3e8b0e1a811831922`;
+- `tools/startup_acceptance.py` verifies final ISO bytes, not intermediate artifacts;
+- `local/startup-acceptance-v6.json`: **96/96** final-image checks;
+- Pillow-enabled suite: **121/121** tests pass.
 
-**v5 has not been launched in PCSX2. Runtime approval is still required.**
+**v6 has not been launched. Exact visible expectations + Pablo approval remain mandatory.**

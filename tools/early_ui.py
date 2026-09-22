@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from tools.adv_layout import patch_adv_horizontal_layout
 from tools.elf_strings import ElfFixedStringPatch, patch_fixed_strings
-from tools.startup_ui import STARTUP_FIXED_PATCHES, patch_title_labels
+from tools.hant_ui import patch_hant_tutorial
+from tools.startup_ui import STARTUP_FIXED_PATCHES, build_startup_ui_elf
 
 
 # Official remaster localization values for executable-resident fixed strings.
@@ -41,4 +43,8 @@ EARLY_UI_PATCHES: tuple[ElfFixedStringPatch, ...] = STARTUP_FIXED_PATCHES + MENU
 
 
 def build_early_ui_elf(raw: bytes) -> bytes:
-    return patch_fixed_strings(patch_title_labels(raw), EARLY_UI_PATCHES)
+    startup = build_startup_ui_elf(raw)
+    menus = patch_fixed_strings(startup, MENU_UI_PATCHES)
+    horizontal_adv = patch_adv_horizontal_layout(menus)
+    translated, _ = patch_hant_tutorial(horizontal_adv)
+    return translated

@@ -214,3 +214,37 @@ Do not promote the current startup ELF/graphics to the committed accepted baseli
 ## Runtime testing
 
 Do not start PCSX2 automatically. Before each build launch, state exactly what Pablo should see and wait for explicit approval. For v5 the acceptance scope is every text-bearing screen from the opening quotation through the first old-man dialogue; any Japanese text in that interval is a failure to capture and investigate.
+
+
+## Build startup v6 candidate
+
+v6 keeps the v5 overlay set but rebuilds `artifacts/SLPM_665.11.en-early` with the generalized renderer classes: wide name/profile relocation, ADV horizontal layout, and the executable translation PT_LOAD used by H.A.N.T. long text.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v6.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v6.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v6.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v6.json
+```
+
+Current v6 result:
+
+- ISO SHA-256: `beaaa53bbfe3a60cd3af6749d4113cd4d91e81d804b122f80b85c347bded761b`;
+- 1,143 overlay files; 890 in place / 253 relocated;
+- translated ELF size 8,401,977 bytes; it still fits the original outer sector allocation;
+- final post-ROFS ELF SHA-256: `2dacea600e06c4db29311402ae5a1ae0880be23bfab2cfb3e8b0e1a811831922`;
+- final-image startup verifier: **96/96**;
+- Pillow-enabled tests: **121/121**.
+
+Do not launch v6 until its exact expected visual sequence has been stated to Pablo and he explicitly approves.

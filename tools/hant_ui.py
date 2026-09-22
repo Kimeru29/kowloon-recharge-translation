@@ -1,0 +1,105 @@
+from __future__ import annotations
+
+import struct
+
+from tools.elf_translation_segment import (
+    TRANSLATION_SEGMENT_VADDR,
+    TranslationSegmentInfo,
+    install_translation_segment,
+)
+from tools.localization import encode_ps2_english
+
+
+HANT_POINTER_TABLE_OFFSET = 0x5C8C70
+_ELF_MAIN_FILE_OFFSET = 0x80
+_ELF_MAIN_VADDR = 0x00100000
+
+
+def _elf_va(file_offset: int) -> int:
+    return _ELF_MAIN_VADDR + file_offset - _ELF_MAIN_FILE_OFFSET
+
+
+# Exact source records in the PS2 H.A.N.T startup tutorial.  Most English is
+# taken verbatim from English.bytes; index 12 uses the official remaster's
+# semantically equivalent 方向ボタン record because re-charge's PS2 text says
+# 方向キー at that one site.
+_HANT_SOURCES: dict[int, tuple[int, str]] = {
+    0: (0x5C8AC0, "　　　＜Ｈ．Ａ．Ｎ．Ｔについて＞"),
+    2: (0x5C8AF0, "Ｈ．Ａ．Ｎ．Ｔは、"),
+    3: (0x5C8B10, "探索をサポートする小型情報端末です。"),
+    4: (0x5C8B40, "≪操作方法≫や≪情報≫の確認ができます。"),
+    7: (0x5C8B70, "　　　Ｈ．Ａ．Ｎ．Ｔの起動方法"),
+    8: (0x5C8B90, "　　　￣￣￣￣￣￣￣￣￣￣￣￣"),
+    9: (0x5C8BB0, "　ＳＥＬＥＣＴボタンを押して"),
+    10: (0x5C8BD0, "コマンドサムネイルを呼び出します。"),
+    12: (0x5C8C00, "次に、　方向キーで"),
+    13: (0x5C8C20, "「Ｈ．Ａ．Ｎ．Ｔ」を選択し"),
+    14: (0x5C8C40, "　ボタンを押すと起動させることができます。"),
+}
+
+HANT_ENGLISH_LINES: dict[int, str] = {
+    0: "                           H.A.N.T",
+    2: "The H.A.N.T is a mini info device designed",
+    3: "to support exploration. You can review",
+    4: "game controls and other info here.",
+    7: "     Booting Up the H.A.N.T",
+    8: "     -----------------------------",
+    9: "Press the      button to bring up the",
+    10: "command thumbnails.",
+    12: "Next,      press the directional buttons",
+    13: "to select the H.A.N.T",
+    14: "Press the      button to boot it up.",
+}
+
+
+def _validate_source(raw: bytes) -> None:
+    for index, (offset, source) in _HANT_SOURCES.items():
+        encoded = source.encode("cp932")
+        if raw[offset:offset + len(encoded)] != encoded or raw[offset + len(encoded)] != 0:
+            raise ValueError(f"H.A.N.T source preimage mismatch for line {index}")
+        pointer_offset = HANT_POINTER_TABLE_OFFSET + index * 4
+        if pointer_offset + 4 > len(raw):
+            raise ValueError("H.A.N.T pointer table is outside executable")
+        actual = struct.unpack_from("<I", raw, pointer_offset)[0]
+        expected = _elf_va(offset)
+        if actual != expected:
+            raise ValueError(
+                f"H.A.N.T pointer preimage mismatch for line {index}: "
+                f"expected {expected:#x}, got {actual:#x}"
+            )
+
+
+def _build_payload() -> tuple[bytes, dict[int, int]]:
+    payload = bytearray()
+    offsets: dict[int, int] = {}
+    for index in sorted(HANT_ENGLISH_LINES):
+        if len(payload) & 1:
+            payload.append(0)
+        offsets[index] = len(payload)
+        payload.extend(
+            encode_ps2_english(HANT_ENGLISH_LINES[index], collapse_spaces=False)
+        )
+        payload.append(0)
+    return bytes(payload), offsets
+
+
+def patch_hant_tutorial(
+    raw: bytes,
+    *,
+    reserve_size: int = 0x100000,
+) -> tuple[bytes, TranslationSegmentInfo]:
+    _validate_source(raw)
+    payload, offsets = _build_payload()
+    expanded, info = install_translation_segment(raw, payload, reserve_size=reserve_size)
+    if info.segment_vaddr != TRANSLATION_SEGMENT_VADDR:
+        raise ValueError("Unexpected translation-segment base")
+
+    result = bytearray(expanded)
+    for index, payload_offset in offsets.items():
+        struct.pack_into(
+            "<I",
+            result,
+            HANT_POINTER_TABLE_OFFSET + index * 4,
+            info.segment_vaddr + payload_offset,
+        )
+    return bytes(result), info

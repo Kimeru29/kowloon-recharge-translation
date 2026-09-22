@@ -83,6 +83,9 @@ def build_translation_iso(
     old_cvm_end_sector = 0
     highest_outer_sector = 0
     shifted_outer_paths: list[str] = []
+    elf_input_extent = 0
+    elf_output_extent = 0
+    elf_relocated = False
 
     with destination.open("r+b") as handle:
         image = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_WRITE)
@@ -95,12 +98,14 @@ def build_translation_iso(
             highest_outer_sector = max(record.extent + record.sectors for record in outer_records)
 
             game_elf = find_record(outer_records, "SLPM_665.11")
+            elf_input_extent = game_elf.extent
             elf_start = game_elf.extent * SECTOR_SIZE
             pristine_elf_bytes = bytes(image[elf_start:elf_start + game_elf.size])
             base_elf_bytes = supplied_elf_bytes if supplied_elf_bytes is not None else pristine_elf_bytes
-            if len(base_elf_bytes) != game_elf.size:
+            if len(base_elf_bytes) < game_elf.size:
                 raise ValueError(
-                    f"Translated SLPM_665.11 must stay {game_elf.size} bytes, got {len(base_elf_bytes)}"
+                    f"Translated SLPM_665.11 may not shrink below pristine size "
+                    f"{game_elf.size}, got {len(base_elf_bytes)}"
                 )
 
             cvm_base = data_cvm.extent * SECTOR_SIZE
@@ -209,7 +214,31 @@ def build_translation_iso(
             rofs_records_patched = len(rofs_records)
             if b"SLPM-66511" not in elf_bytes or b"BISLPM-66511Save" not in elf_bytes:
                 raise ValueError("Serial/save identity missing from translated SLPM_665.11")
-            image[elf_start:elf_start + len(elf_bytes)] = elf_bytes
+
+            elf_output_sectors = (len(elf_bytes) + SECTOR_SIZE - 1) // SECTOR_SIZE
+            if elf_output_sectors <= game_elf.sectors:
+                elf_output_extent = game_elf.extent
+            else:
+                elf_relocated = True
+                elf_output_extent = highest_outer_sector + growth_sectors
+                if elf_output_extent + elf_output_sectors > outer_volume:
+                    raise ValueError(
+                        "Outer ISO has insufficient trailing slack for translated ELF relocation: "
+                        f"need {elf_output_sectors} sectors after {elf_output_extent}, "
+                        f"volume ends at {outer_volume}"
+                    )
+
+            elf_output_start = elf_output_extent * SECTOR_SIZE
+            elf_allocation = elf_output_sectors * SECTOR_SIZE
+            image[elf_output_start:elf_output_start + elf_allocation] = (
+                elf_bytes + b"\x00" * (elf_allocation - len(elf_bytes))
+            )
+            patch_directory_record(
+                image,
+                game_elf.record_offset,
+                extent=elf_output_extent if elf_relocated else None,
+                size=len(elf_bytes),
+            )
 
             image.flush()
         finally:
@@ -308,6 +337,10 @@ def build_translation_iso(
         "relocated_files": sum(1 for row in build_rows if row["relocated"]),
         "shifted_outer_files": len(shifted_outer_paths),
         "elf_rofs_records_patched": rofs_records_patched,
+        "elf_input_extent": elf_input_extent,
+        "elf_output_extent": elf_output_extent,
+        "elf_relocated": elf_relocated,
+        "elf_size": len(elf_bytes) if elf_bytes is not None else None,
         "collisions": [asdict(collision) for collision in overlay.collisions],
         "files": build_rows,
         "elf_sha256": sha256(elf_bytes).hexdigest() if elf_bytes is not None else None,
