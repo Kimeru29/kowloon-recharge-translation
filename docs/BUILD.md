@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current result: 105 tests; normal run reports 101 passes + four Pillow-dependent skips; optional-Pillow run passes all 105.
+Current result: 121 tests; normal run reports 117 passes + four Pillow-dependent skips; optional-Pillow run passes all 121.
 
 ## Core corpus regeneration
 
