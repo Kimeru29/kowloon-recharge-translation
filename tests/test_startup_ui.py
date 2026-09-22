@@ -114,16 +114,16 @@ class StartupUiPatchTests(unittest.TestCase):
         self.assertEqual(RAW[0x695188:0x6951A8], result[0x695188:0x6951A8])
         self.assertEqual(RAW[0x695840:0x695860], result[0x695840:0x695860])
 
-    def test_name_keyboard_uses_official_latin_rows_with_ps2_two_byte_cell_geometry(self) -> None:
+    def test_name_keyboard_uses_ps2_adapted_latin_rows_with_two_byte_cell_geometry(self) -> None:
         result = build_startup_ui_elf(RAW)
         expected_rows = (
-            "abcde" + " " * 15,
-            "fghij" + " " * 15,
-            "klmno" + " " * 15,
-            "pqrst" + " " * 15,
-            "uvwxy" + " " * 15,
-            "z+-x/01234" + " " * 10,
-            "=.?!" + " " + "56789" + " " * 10,
+            "abcdeABCDE" + " " * 10,
+            "fghijFGHIJ" + " " * 10,
+            "klmnoKLMNO" + " " * 10,
+            "pqrstPQRST" + " " * 10,
+            "uvwxyUVWXY" + " " * 10,
+            "z+-x/Z+-X/0123456789",
+            "=.?!" + " " + "=.?!" + " " + " " * 10,
             "ABCDE" + " " * 15,
             "FGHIJ" + " " * 15,
             "KLMNO" + " " * 15,
@@ -150,6 +150,18 @@ class StartupUiPatchTests(unittest.TestCase):
         # structures, not translation strings; the port must not rewrite them.
         self.assertEqual(RAW[0x5868F0:0x586930], result[0x5868F0:0x586930])
         self.assertEqual(RAW[0x586930:0x5869BC], result[0x586930:0x5869BC])
+
+    def test_ps2_accessible_keyboard_rows_include_both_letter_cases(self) -> None:
+        result = build_startup_ui_elf(RAW)
+        visible = []
+        for index in range(7):
+            field = result[0x586650 + index * 0x30:0x586650 + (index + 1) * 0x30]
+            for logical_index in range(20):
+                storage_index = logical_index + logical_index // 5
+                visible.append(field[storage_index * 2:storage_index * 2 + 2].decode("cp932"))
+        normalized = unicodedata.normalize("NFKC", "".join(visible))
+        for char in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
+            self.assertIn(char, normalized)
 
     def test_build_is_fail_closed_and_changes_only_declared_startup_regions(self) -> None:
         result = build_startup_ui_elf(RAW)

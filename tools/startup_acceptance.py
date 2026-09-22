@@ -33,7 +33,7 @@ _ADV_PATCH_WORDS = (
     (0x14FAA4, 0x80440463),
     (0x14FAA8, 0x0080182D),
 )
-_VISIBLE_PROMPT_INDICES = (0, 1, 4, 5, 6, 7)
+_VISIBLE_PROMPT_INDICES = tuple(range(len(NAME_PROMPT_TEXTS)))
 
 
 def _check(name: str, ok: bool, detail: str | None = None) -> dict[str, Any]:
@@ -44,10 +44,23 @@ def _main_va_to_file(va: int) -> int:
     return va - _ELF_MAIN_VADDR + _ELF_MAIN_FILE_OFFSET
 
 
-def _read_wide_at_main_va(raw: bytes, va: int, expected: str) -> bool:
-    offset = _main_va_to_file(va)
+def _read_wide_at_va(raw: bytes, va: int, expected: str) -> bool:
     payload = encode_ps2_english(expected, collapse_spaces=False) + b"\x00"
-    return 0 <= offset <= len(raw) - len(payload) and raw[offset:offset + len(payload)] == payload
+
+    main_offset = _main_va_to_file(va)
+    if 0 <= main_offset <= len(raw) - len(payload):
+        if raw[main_offset:main_offset + len(payload)] == payload:
+            return True
+
+    segment = _translation_segment(raw)
+    if segment is None:
+        return False
+    p_offset, p_vaddr, p_filesz, _p_memsz = segment
+    relative = va - p_vaddr
+    if relative < 0 or relative + len(payload) > p_filesz:
+        return False
+    target_file = p_offset + relative
+    return raw[target_file:target_file + len(payload)] == payload
 
 
 def _translation_segment(raw: bytes) -> tuple[int, int, int, int] | None:
@@ -124,21 +137,21 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         detail = "prompt pointer outside ELF"
         if pointer_offset + 4 <= len(raw):
             target_va = struct.unpack_from("<I", raw, pointer_offset)[0]
-            ok = _read_wide_at_main_va(raw, target_va, NAME_PROMPT_TEXTS[index])
+            ok = _read_wide_at_va(raw, target_va, NAME_PROMPT_TEXTS[index])
             detail = f"prompt {index} does not resolve to wide {NAME_PROMPT_TEXTS[index]!r}"
         checks.append(_check(f"name_prompt_{index}", ok, detail))
 
     for name, pointer_offsets in NAME_DEFAULT_POINTER_OFFSETS.items():
         ok = all(
             offset + 4 <= len(raw)
-            and _read_wide_at_main_va(raw, struct.unpack_from("<I", raw, offset)[0], name)
+            and _read_wide_at_va(raw, struct.unpack_from("<I", raw, offset)[0], name)
             for offset in pointer_offsets
         )
         checks.append(_check(f"default_name_{name}", ok, f"default {name} pointer does not resolve to wide text"))
     for name, pointer_offsets in NAME_RUNTIME_POINTER_OFFSETS.items():
         ok = all(
             offset + 4 <= len(raw)
-            and _read_wide_at_main_va(raw, struct.unpack_from("<I", raw, offset)[0], name)
+            and _read_wide_at_va(raw, struct.unpack_from("<I", raw, offset)[0], name)
             for offset in pointer_offsets
         )
         checks.append(_check(f"runtime_name_{name}", ok, f"runtime {name} pointer does not resolve to wide text"))

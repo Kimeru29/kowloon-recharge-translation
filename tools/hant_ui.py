@@ -8,6 +8,12 @@ from tools.elf_translation_segment import (
     install_translation_segment,
 )
 from tools.localization import encode_ps2_english
+from tools.startup_ui import (
+    NAME_BLANK_STRING_OFFSET,
+    NAME_PROMPT_POINTER_TABLE_OFFSET,
+    NAME_PROMPT_TEXTS,
+    NAME_READING_PROMPT_SOURCE_OFFSETS,
+)
 
 
 HANT_POINTER_TABLE_OFFSET = 0x5C8C70
@@ -69,18 +75,28 @@ def _validate_source(raw: bytes) -> None:
             )
 
 
-def _build_payload() -> tuple[bytes, dict[int, int]]:
-    payload = bytearray()
-    offsets: dict[int, int] = {}
-    for index in sorted(HANT_ENGLISH_LINES):
-        if len(payload) & 1:
-            payload.append(0)
-        offsets[index] = len(payload)
-        payload.extend(
-            encode_ps2_english(HANT_ENGLISH_LINES[index], collapse_spaces=False)
-        )
+_NAME_READING_PROMPT_INDICES = (2, 3)
+
+
+def _append_wide(payload: bytearray, text: str) -> int:
+    if len(payload) & 1:
         payload.append(0)
-    return bytes(payload), offsets
+    offset = len(payload)
+    payload.extend(encode_ps2_english(text, collapse_spaces=False))
+    payload.append(0)
+    return offset
+
+
+def _build_payload() -> tuple[bytes, dict[int, int], dict[int, int]]:
+    payload = bytearray()
+    name_prompt_offsets: dict[int, int] = {}
+    for index in _NAME_READING_PROMPT_INDICES:
+        name_prompt_offsets[index] = _append_wide(payload, NAME_PROMPT_TEXTS[index])
+
+    hant_offsets: dict[int, int] = {}
+    for index in sorted(HANT_ENGLISH_LINES):
+        hant_offsets[index] = _append_wide(payload, HANT_ENGLISH_LINES[index])
+    return bytes(payload), name_prompt_offsets, hant_offsets
 
 
 def patch_hant_tutorial(
@@ -89,13 +105,33 @@ def patch_hant_tutorial(
     reserve_size: int = 0x100000,
 ) -> tuple[bytes, TranslationSegmentInfo]:
     _validate_source(raw)
-    payload, offsets = _build_payload()
+    blank_va = _elf_va(NAME_BLANK_STRING_OFFSET)
+    for index in _NAME_READING_PROMPT_INDICES:
+        pointer_offset = NAME_PROMPT_POINTER_TABLE_OFFSET + index * 4
+        if pointer_offset + 4 > len(raw):
+            raise ValueError("Name-reading prompt pointer table is outside executable")
+        actual = struct.unpack_from("<I", raw, pointer_offset)[0]
+        pristine_va = _elf_va(NAME_READING_PROMPT_SOURCE_OFFSETS[index])
+        if actual not in (pristine_va, blank_va):
+            raise ValueError(
+                f"Name-reading prompt {index} preimage mismatch: "
+                f"expected pristine/staged pointer {pristine_va:#x}/{blank_va:#x}, got {actual:#x}"
+            )
+
+    payload, name_prompt_offsets, hant_offsets = _build_payload()
     expanded, info = install_translation_segment(raw, payload, reserve_size=reserve_size)
     if info.segment_vaddr != TRANSLATION_SEGMENT_VADDR:
         raise ValueError("Unexpected translation-segment base")
 
     result = bytearray(expanded)
-    for index, payload_offset in offsets.items():
+    for index, payload_offset in name_prompt_offsets.items():
+        struct.pack_into(
+            "<I",
+            result,
+            NAME_PROMPT_POINTER_TABLE_OFFSET + index * 4,
+            info.segment_vaddr + payload_offset,
+        )
+    for index, payload_offset in hant_offsets.items():
         struct.pack_into(
             "<I",
             result,

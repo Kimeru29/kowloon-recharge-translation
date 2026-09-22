@@ -26,7 +26,7 @@ PS4 KSF DC maps identify official strings, but English can exceed PS2 inline fie
 
 Renderer encoding is not assumed globally. The title renderer was runtime-proven to consume two-byte glyph units. The exact official labels are now stored in a verified 40-byte title arena: `New Game` remains at the first source slot and `Load Game` is moved within the arena with its pointer updated. Name-entry keyboard cells also remain two-byte glyphs and preserve the original 20-key logical geometry.
 
-Name/profile startup prompts are a separate two-byte-glyph class. v6 packs the visible official English prompts into a verified module-local arena, repoints the existing prompt table, redirects protagonist/default names to wide strings, and suppresses reading strings to match the official English behavior. All source preimages, pointer preimages, arena bounds, and emitted wide strings are fail-closed tests.
+Name/profile startup prompts are a separate two-byte-glyph class. Six official English prompts fit a verified module-local arena; the two reading prompts overflow that arena and are relocated by v7 into the shared executable translation PT_LOAD. Protagonist/default names are redirected to wide strings. Default/runtime kana-reading values can remain blank, but the active reading-input prompts must not be blank. All source preimages, staged/final pointer preimages, arena bounds, and emitted wide strings are fail-closed tests. Static tracing also shows the PS2 name editor has two structural 3-glyph permanent-name buffers; this is tracked as an unresolved renderer/input-structure issue rather than patched as data.
 
 ## PS2 indexed graphics
 

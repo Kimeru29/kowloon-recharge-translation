@@ -172,7 +172,7 @@ This is why static byte-presence checks alone are insufficient: acceptance now v
 
 ## Name/profile wide-string relocation
 
-The prompt table at `0x586AD0` points into `m_name.c` text around `0x5869C0`. v6 packs visible official English prompts as two-byte CP932 into the verified `0x5869C0..0x586AD0` arena and repoints that table. Default/runtime protagonist name pointers are similarly redirected to wide `Habaki`, `Kuro`, `Hiyuu`, `Tatsuma`; reading strings point to a blank wide string. The original runtime name records are preserved.
+The prompt table at `0x586AD0` points into `m_name.c` text around `0x5869C0`. Six official wide English prompts fit the verified `0x5869C0..0x586AD0` arena. The two longer reading prompts do not fit there together with the rest; v7 relocates `Enter reading for last name.` and `Enter reading for first name.` into the shared translation PT_LOAD and repoints prompt entries 2/3 there. Default/runtime protagonist name pointers are redirected to wide `Habaki`, `Kuro`, `Hiyuu`, `Tatsuma`; reading-value strings remain blank. The original runtime name records are preserved.
 
 ## ADV horizontal-renderer transform
 
@@ -206,4 +206,18 @@ Evidence:
 - `local/startup-acceptance-v6.json`: **96/96** final-image checks;
 - Pillow-enabled suite: **121/121** tests pass.
 
-**v6 has not been launched. Exact visible expectations + Pablo approval remain mandatory.**
+v6 was subsequently runtime-tested after explicit approval. The opening quotation, title, name-entry English graphics, `Enter last name.` and lowercase keyboard were correct. Runtime then exposed: (1) the original two 3-glyph permanent-name fields, (2) unreachable uppercase rows because PS2 code only indexes keyboard rows 0..6, (3) a blank active reading-input state caused by v6 suppressing its prompt, and (4) an apparent freeze after completing that hidden flow.
+
+Static tracing after that run proves R1/L1 changes the field-position cursor, not a keyboard page. It also proves the 3+3 limit is embedded in buffer sizes, field split/layout, append gates, and delete logic; it is not safe to solve by changing a single limit constant. v7 therefore restores both official reading prompts and folds uppercase into rows 0..6, but intentionally leaves 3+3 unchanged pending a buffer-safe direct-Latin design.
+
+## Startup v7 static candidate
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v7.iso`
+
+- SHA-256: `f43e2e6bf92dd48c09a43093748d2dea112e361e7c3ca33ed540770c1d6d56ed`;
+- final post-ROFS ELF SHA-256: `b4b21905f920f8fb6472c198088d990f631f9d6f0ab02d3e66d05c86c3fb4432`;
+- final ELF size: 8,402,095 bytes;
+- final-image startup acceptance: **98/98**;
+- full Pillow-enabled suite: **122/122**.
+
+The two extra acceptance checks versus v6 are the restored name-reading prompt pointers/text. The exact keyboard row bytes are also verified in the final ELF, and the source suite separately asserts that the seven PS2-reachable rows contain `a-z`, `A-Z`, and `0-9`. Runtime proof is still required.

@@ -115,11 +115,14 @@ _NAME_READING_SOURCES = (
     (0x586610, "ひゆう　　　"),
     (0x586620, "たつま　　　"),
 )
-# The official English flow does not ask for kana readings.  That lets us use
-# the 64-byte reading-default arena for four wide Latin default names and the
-# existing 272-byte prompt arena for the six visible prompts.
+# The original 272-byte prompt arena cannot hold all eight wide English prompts
+# while the 64-byte reading-default arena is needed for the four wide Latin
+# default names.  This first pass therefore packs six prompts locally and stages
+# prompt indices 2/3 on the existing blank string.  The final shared translation
+# segment pass relocates those two official reading prompts out-of-line.
 _NAME_VISIBLE_PROMPT_INDICES = (0, 1, 4, 5, 6, 7)
 _NAME_READING_PROMPT_INDICES = (2, 3)
+NAME_READING_PROMPT_SOURCE_OFFSETS = {2: 0x586A00, 3: 0x586A30}
 NAME_WIDE_TEXTS = ("Habaki", "Kuro", "Hiyuu", "Tatsuma")
 NAME_DEFAULT_POINTER_OFFSETS = {
     "Habaki": (0x586630,),
@@ -278,18 +281,23 @@ _KEYBOARD_SOURCES = (
     "マミムメモ　５６７８９　々ー　　　　＝・？！　",
 )
 
-# English.bytes localizes these exact fourteen source rows to Latin lower/upper
-# alphabets plus the listed symbol/digit rows.  The PS2 input routine copies
-# exactly two bytes per selected key, so every logical cell remains a wide/JIS
-# glyph; unused legacy kana cells become wide spaces rather than ASCII bytes.
+# English.bytes supplies the Latin lower/upper character repertoire used here.
+# Static tracing proves this PS2 build only indexes row pointers 0..6; there is no
+# R1/L1 switch to rows 7..13.  The reachable seven rows therefore fold lower and
+# upper case together while preserving the PS2 two-byte/JIS cell geometry.
 _KEYBOARD_LOGICAL_ROWS = (
-    "abcde" + " " * 15,
-    "fghij" + " " * 15,
-    "klmno" + " " * 15,
-    "pqrst" + " " * 15,
-    "uvwxy" + " " * 15,
-    "z+-x/01234" + " " * 10,
-    "=.?!" + " " + "56789" + " " * 10,
+    # PS2 m_name only indexes rows 0..6.  Unlike the remaster, it has no
+    # reachable 7..13 page, so fold upper-case keys into the accessible page.
+    "abcdeABCDE" + " " * 10,
+    "fghijFGHIJ" + " " * 10,
+    "klmnoKLMNO" + " " * 10,
+    "pqrstPQRST" + " " * 10,
+    "uvwxyUVWXY" + " " * 10,
+    "z+-x/Z+-X/0123456789",
+    "=.?!" + " " + "=.?!" + " " + " " * 10,
+    # Preserve the remaster-derived second page data even though the PS2 code
+    # never indexes it; keeping it translated avoids reintroducing kana if a
+    # later control-flow patch makes the page reachable.
     "ABCDE" + " " * 15,
     "FGHIJ" + " " * 15,
     "KLMNO" + " " * 15,

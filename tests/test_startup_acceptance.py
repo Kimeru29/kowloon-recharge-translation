@@ -22,6 +22,8 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("translation_segment", names)
         self.assertIn("hant_tutorial", names)
         self.assertIn("name_prompt_0", names)
+        self.assertIn("name_prompt_2", names)
+        self.assertIn("name_prompt_3", names)
         self.assertIn("runtime_name_Habaki", names)
 
     def test_pristine_elf_fails_translated_renderer_checks(self) -> None:

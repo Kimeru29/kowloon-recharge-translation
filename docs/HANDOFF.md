@@ -63,7 +63,7 @@ v5 was launched and is **not accepted**. Runtime established these class-level f
 
 These are now modeled as reusable automator classes rather than screenshot-specific fixes.
 
-## Current candidate — startup v6, statically verified, NOT launched
+## Last runtime-tested candidate — startup v6
 
 Candidate:
 
@@ -79,7 +79,21 @@ Candidate:
 - final post-ROFS ELF SHA-256: `2dacea600e06c4db29311402ae5a1ae0880be23bfab2cfb3e8b0e1a811831922`
 - reproducible final-image startup acceptance: **96/96 checks passed** (`local/startup-acceptance-v6.json`)
 - Pillow-enabled suite: **121/121 tests pass**
-- **PCSX2 has not been launched for v6. Fresh explicit approval is required.**
+- runtime was executed after explicit approval; it passed through `Enter last name.` but exposed the name-entry defects below.
+
+## Current static candidate — startup v7
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v7.iso`
+- SHA-256: `f43e2e6bf92dd48c09a43093748d2dea112e361e7c3ca33ed540770c1d6d56ed`
+- final post-ROFS ELF SHA-256: `b4b21905f920f8fb6472c198088d990f631f9d6f0ab02d3e66d05c86c3fb4432`
+- final ELF size: 8,402,095 bytes
+- 1,143 overlays; 890 in place / 253 relocated
+- 1,143/1,143 ROFS records patched/re-resolved
+- final-image startup acceptance: **98/98**
+- Pillow-enabled suite: **122/122**
+- runtime status: **not yet tested**; use `docs/LOCALIZATION_STATUS.md` as the authoritative checklist.
+
+v7 restores both official reading prompts and makes both Latin cases reachable without altering the proven PS2 two-byte key geometry. The 3+3 name-buffer structure is intentionally unchanged.
 
 ## Startup renderer/storage classes
 
@@ -106,9 +120,13 @@ The exact official labels are now `New Game` and `Load Game`, not the clipped `N
 
 ### Name/profile flow
 
-The v5 runtime proved that these prompts/names are also a two-byte-glyph renderer. v6 therefore packs official English as wide CP932 into verified module-local arenas and repoints the existing prompt/name tables rather than writing ASCII into the original slots. The class covers `Enter last name.`, `Enter first name.`, confirmation/license messages, `Heracleion Shrine`, and protagonist/default names (`Habaki`, `Kuro`, `Hiyuu`, `Tatsuma`). Reading prompts/readings are suppressed like the official English remaster.
+The v5 runtime proved that these prompts/names are also a two-byte-glyph renderer. v6 therefore packed official English as wide CP932 into verified module-local arenas and repointed the existing prompt/name tables rather than writing ASCII into the original slots. The class covers `Enter last name.`, `Enter first name.`, confirmation/license messages, `Heracleion Shrine`, and protagonist/default names (`Habaki`, `Kuro`, `Hiyuu`, `Tatsuma`).
 
-The name keyboard is 14 fixed rows. Runtime copies exactly two bytes per selected cell, so the English keyboard preserves wide/two-byte glyphs and the original 20-key logical geometry. It now provides Latin lower/uppercase letters, digits and punctuation instead of kana.
+v6 incorrectly blanked the two reading prompts while leaving their input states active. Runtime therefore entered an unlabeled input screen. The official remaster dictionary explicitly contains `Enter reading for last name.` and `Enter reading for first name.`. v7 relocates those two prompts into the shared translation PT_LOAD. Default/runtime kana-reading display strings remain blank where the remaster data does not provide an English reading value.
+
+The keyboard data has 14 rows, but static MIPS tracing proves this PS2 input flow only indexes row pointers 0..6; R1/L1 changes the name-field cursor and does not switch to rows 7..13. v6 therefore exposed only lowercase Latin characters at runtime. v7 folds both lower- and uppercase Latin letters, digits, and punctuation into the seven reachable rows while preserving the two-byte 20-cell row geometry.
+
+The visible 3+3 name limit is also structural, not a string-capacity bug. The name-input routine has two permanent 6-byte buffers (three two-byte glyphs each), a six-position field cursor split at position 3, and delete/copy/layout branches keyed to that split. The reading buffers are separately 12 bytes each. v7 deliberately does not patch these constants until a direct-Latin/buffer-safe design is proven.
 
 ### Name-entry button graphics
 
@@ -124,7 +142,7 @@ The visible Japanese control captions are baked into `BLBRD/B_GP019.BIN`, especi
 
 ### Executable long-text / H.A.N.T class
 
-The H.A.N.T. tutorial is an executable pointer table at `0x5C8C70`; its visible strings do not safely fit their Japanese slots. The pristine ELF has a zero-sized second PT_LOAD at virtual address `0x00902F00`. v6 uses it as a reusable translation text segment, reserves a 1 MiB virtual window by moving only the heap start, packs the wide official English there, and repoints the H.A.N.T. table. This mechanism is intended for other executable-resident long strings as they are classified.
+The H.A.N.T. tutorial is an executable pointer table at `0x5C8C70`; its visible strings do not safely fit their Japanese slots. The pristine ELF has a zero-sized second PT_LOAD at virtual address `0x00902F00`. v6 activated it as a reusable translation text segment, reserves a 1 MiB virtual window by moving only the heap start, packs the wide official English there, and repoints the H.A.N.T. table. v7 reuses the same segment for the two overflow name-reading prompts as well; the mechanism remains the general class for proven executable-resident long strings.
 
 ## Current corpus/import coverage
 
@@ -175,7 +193,7 @@ PS2-only lexical proxy:
 - `tools/startup_ui.py` — title arena, wide startup prompt/name relocation and Latin keyboard
 - `tools/adv_layout.py` — fail-closed ADV vertical→horizontal renderer transform
 - `tools/elf_translation_segment.py` — reusable second-PT_LOAD English text segment
-- `tools/hant_ui.py` — H.A.N.T. tutorial pointer-table backport into translation segment
+- `tools/hant_ui.py` — shared startup translation-segment payload: H.A.N.T. tutorial plus overflow name-reading prompts
 - `tools/startup_acceptance.py` — reproducible final-ISO startup/renderer-class verifier
 - `tools/early_ui.py`, `tools/elf_strings.py` — executable UI build/slot handling
 - `tools/graphics_port.py` — optional-Pillow indexed PS2 graphics port
@@ -186,16 +204,11 @@ PS2-only lexical proxy:
 - `tools/regression.py`, `tools/check_regression.py` — cumulative accepted-artifact/identity gate
 - `tools/graphics_inventory.py` — PS4 localized bundle inventory
 
-## Exact runtime gate for v6
+## v6 runtime result and next gate
 
-Before launching v6, state the exact expected visible sequence and wait for Pablo's explicit approval. The test covers **every text-bearing screen from startup through the first old-man dialogue**. Any Japanese text, garbage prompt/name, vertical dialogue, or untranslated H.A.N.T. tutorial in that slice is a failed acceptance checkpoint and should be captured for renderer/data-path analysis.
+v6 was runtime-tested after explicit approval. It proved the opening quotation, title, English name-entry graphics, `Enter last name.` prompt, and lowercase Latin keyboard. It also exposed three blockers: the PS2-only 3+3 permanent-name geometry, inaccessible uppercase rows, and a blank active reading-input state caused by our suppressed prompts. Completing the hidden flow then appeared to freeze.
 
-## After a successful v6 runtime test
-
-1. Promote the reviewed startup renderer classes/graphics checkpoint into regression metadata as appropriate.
-2. Back up the memory card and establish a golden in-game save; prove it loads in a later build.
-3. Generalize the now-proven classes across the whole corpus, then continue dynamic exact maps, FD00 semantic templates, KSF overflow research and broad graphics.
-4. Translate the small novel PS2-only remainder using official terminology/style.
+v7 restores both official reading prompts and puts uppercase into the reachable keyboard rows. The 3+3 geometry remains an explicit known bug. Before launching v7, state its exact expected sequence and wait for Pablo's explicit approval; do not claim the freeze fixed until a valid runtime pass advances beyond the reading/confirmation flow.
 
 ## Resume procedure
 

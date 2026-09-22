@@ -6,17 +6,18 @@ This repository intentionally contains **no game image, package, executable, ext
 
 ## Current status
 
-The project can build a deterministic whole-game translation candidate from the pristine PS2 ISO. The current **startup v5** candidate adds the complete statically identified boot-to-first-dialogue slice on top of the broad script import:
+The project can build a deterministic whole-game translation candidate from the pristine PS2 ISO. The current **startup v7** candidate keeps the broad script import and the proven startup renderer/graphics work, then fixes two defects exposed by the v6 runtime test:
 
 - exact MTX: **962 files / 56,642** official English entries;
 - changed/template MTX: **7 files / 2,284** official entries;
 - exact KSF: **868** fitting official fields; 48 overflows and 4 ambiguous entries remain fail-closed;
-- startup executable UI: exact `New Game` / `Load Game`, name/profile prompts, protagonist names, Latin name-entry keyboard, and first-dungeon label;
+- startup executable UI: exact `New Game` / `Load Game`, all eight name/profile prompts, protagonist names, PS2-adapted Latin name-entry keyboard, and first-dungeon label;
 - startup graphics: official English `B_GP019` name-entry controls plus all **29** random `BLBRD/INIT_MES/TR000–TR028.TMX` quotation images;
 - current candidate: **1,143 overlay assets**, 890 in place / 253 relocated, with all 1,143 executable ROFS records re-resolved against the finished ISO;
-- startup static acceptance: **114/114 checks passed**;
-- candidate SHA-256: `f8d65c029f86ce871f9d9930f76d12b6f6a95c79c4152a0437b19ceef1fd20b5`;
-- runtime validation of v5 is still pending the explicit launch-approval gate.
+- v7 startup static acceptance: **98/98 checks passed**;
+- candidate SHA-256: `f43e2e6bf92dd48c09a43093748d2dea112e361e7c3ca33ed540770c1d6d56ed`;
+- full Pillow-enabled test suite: **122/122**;
+- v6 runtime proved the opening/title/name graphics and exposed name-entry defects; v7 still requires explicit runtime approval/proof. The structural PS2 3+3 permanent-name limit remains intentionally unresolved.
 
 Exact file identity is deliberately not treated as sufficient proof. Indirect/dynamic localization maps, KSF overflows, and ambiguous structural mappings remain Japanese until their correspondence/layout is proven.
 
