@@ -33,12 +33,58 @@ class TranslationOverlayTests(unittest.TestCase):
             self.assertEqual("exact", manifest.collisions[0].replaced_provenance)
             self.assertEqual("accepted", manifest.collisions[0].replacement_provenance)
 
+
+    def test_accepts_explicit_startup_quote_tmx_overlay_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "BLBRD" / "INIT_MES" / "TR028.TMX"
+            target.parent.mkdir(parents=True)
+            target.write_bytes(b"quote")
+
+            manifest = collect_overlay([("startup-quotes", root)])
+
+            self.assertEqual(1, len(manifest.entries))
+            entry = manifest.entries[0]
+            self.assertEqual("BLBRD/INIT_MES/TR028.TMX", entry.path)
+            self.assertEqual("BLBRD/INIT_MES/TR028.TMX", entry.embedded_path)
+
+    def test_rejects_other_top_level_tmx_overlay_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "BLBRD" / "INIT_MES" / "OTHER.TMX"
+            target.parent.mkdir(parents=True)
+            target.write_bytes(b"quote")
+
+            with self.assertRaisesRegex(ValueError, "supported embedded path"):
+                collect_overlay([("bad", root)])
+
+    def test_accepts_explicit_blbrd_bin_overlay_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "BLBRD").mkdir(parents=True)
+            (root / "BLBRD" / "B_GP019.BIN").write_bytes(b"graphics")
+
+            manifest = collect_overlay([("startup-graphics", root)])
+
+            self.assertEqual(1, len(manifest.entries))
+            entry = manifest.entries[0]
+            self.assertEqual("BLBRD/B_GP019.BIN", entry.path)
+            self.assertEqual("BLBRD/B_GP019.BIN", entry.embedded_path)
+
+    def test_rejects_bin_outside_explicit_supported_embedded_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "bad.BIN").write_bytes(b"x")
+
+            with self.assertRaisesRegex(ValueError, "supported embedded path"):
+                collect_overlay([("bad", root)])
+
     def test_rejects_paths_outside_adv_overlay_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "bad.txt").write_text("x")
 
-            with self.assertRaisesRegex(ValueError, "MTX or KSF"):
+            with self.assertRaisesRegex(ValueError, "supported embedded path"):
                 collect_overlay([("bad", root)])
 
 
@@ -66,6 +112,22 @@ class ReplacementPlanningTests(unittest.TestCase):
         self.assertEqual(1000, b.output_extent)
         self.assertEqual(3, b.output_sectors)
         self.assertEqual(3, plan.appended_sectors)
+
+
+    def test_plans_explicit_blbrd_bin_without_adv_prefix(self) -> None:
+        records = {
+            "BLBRD/B_GP019.BIN": IsoRecord("BLBRD/B_GP019.BIN", 386175, 264640, 0, 20),
+        }
+
+        plan = plan_replacements(
+            records,
+            {"BLBRD/B_GP019.BIN": 264640},
+            append_start=1000,
+        )
+
+        item = plan.by_path["BLBRD/B_GP019.BIN"]
+        self.assertFalse(item.relocated)
+        self.assertEqual(386175, item.output_extent)
 
     def test_rejects_overlay_file_missing_from_embedded_iso(self) -> None:
         with self.assertRaisesRegex(ValueError, "not found"):

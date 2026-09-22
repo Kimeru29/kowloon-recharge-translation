@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
+from tools.startup_ui import TITLE_ARENA_END, TITLE_ARENA_START, TITLE_LOAD_POINTER_OFFSET
 from tests.local_fixtures import require_local_fixture
 
 
@@ -15,11 +16,9 @@ class EarlyUiPatchTests(unittest.TestCase):
     def test_manifest_uses_official_title_and_menu_localization(self) -> None:
         actual = {(patch.offset, patch.expected): patch.text for patch in EARLY_UI_PATCHES}
 
-        self.assertEqual("NewGame", actual[(0x5CBDE8, "初めから")])
-        self.assertEqual("Load", actual[(0x5CBDF8, "続きから")])
-        by_offset = {patch.offset: patch for patch in EARLY_UI_PATCHES}
-        self.assertEqual("ps2-wide", by_offset[0x5CBDE8].encoding)
-        self.assertEqual("ps2-wide", by_offset[0x5CBDF8].encoding)
+        # Exact title labels are pointer-relocated and tested in test_startup_ui.
+        self.assertNotIn((0x5CBDE8, "初めから"), actual)
+        self.assertNotIn((0x5CBDF8, "続きから"), actual)
         self.assertEqual("Items", actual[(0x3BC7C8, "アイテム")])
         self.assertEqual("Quests", actual[(0x3BC7D8, "クエスト")])
         self.assertEqual("H.A.N.T", actual[(0x3BC7E8, "Ｈ．Ａ．Ｎ．Ｔ")])
@@ -41,7 +40,8 @@ class EarlyUiPatchTests(unittest.TestCase):
         result = build_early_ui_elf(RAW)
 
         self.assertEqual(len(RAW), len(result))
-        allowed = set()
+        allowed = set(range(TITLE_ARENA_START, TITLE_ARENA_END))
+        allowed.update(range(TITLE_LOAD_POINTER_OFFSET, TITLE_LOAD_POINTER_OFFSET + 4))
         for patch in EARLY_UI_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
 

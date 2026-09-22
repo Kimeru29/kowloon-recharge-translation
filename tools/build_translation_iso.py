@@ -171,17 +171,18 @@ def build_translation_iso(
                 else:
                     image[start:start + len(data)] = data
 
-                source_record = records_by_path[f"ADV/{rel}"]
+                manifest_entry = overlay_by_path[rel]
+                source_record = records_by_path[manifest_entry.embedded_path]
                 patch_directory_record(
                     image,
                     source_record.record_offset,
                     extent=item.output_extent if item.relocated else None,
                     size=len(data),
                 )
-                manifest_entry = overlay_by_path[rel]
                 build_rows.append(
                     {
                         "path": rel,
+                        "embedded_path": manifest_entry.embedded_path,
                         "provenance": manifest_entry.provenance,
                         "sha256": manifest_entry.sha256,
                         "size": len(data),
@@ -196,7 +197,7 @@ def build_translation_iso(
 
             rofs_updates = tuple(
                 RofsFileUpdate(
-                    path=row["path"],
+                    path=row["embedded_path"],
                     expected_size=row["input_size"],
                     expected_extent=row["input_extent"],
                     size=row["size"],
@@ -264,9 +265,9 @@ def build_translation_iso(
             out_records = {record.path: record for record in out_embedded_records}
 
             for entry in overlay.entries:
-                record = out_records.get(f"ADV/{entry.path}")
+                record = out_records.get(entry.embedded_path)
                 if record is None:
-                    raise ValueError(f"Translated output record disappeared: ADV/{entry.path}")
+                    raise ValueError(f"Translated output record disappeared: {entry.embedded_path}")
                 actual = bytes(
                     out[
                         out_payload_base + record.extent * SECTOR_SIZE:
@@ -289,7 +290,7 @@ def build_translation_iso(
             for row in build_rows:
                 # Re-resolve each finished record against its output metadata.
                 # This is the runtime lookup path the previous builder omitted.
-                find_rofs_record(actual_elf, row["path"], row["size"], row["output_extent"])
+                find_rofs_record(actual_elf, row["embedded_path"], row["size"], row["output_extent"])
         finally:
             src.close()
             out.close()

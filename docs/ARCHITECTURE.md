@@ -2,42 +2,49 @@
 
 ## Principle
 
-Every build is derived from pristine sources plus deterministic repository metadata. The project never patches the previously patched ISO as input.
+Every output is derived from pristine user-owned sources plus deterministic tooling/metadata. Never use a previously patched ISO as build input. Automatic localization is fail-closed: uncertainty produces a report/rejection, not a guessed translation.
 
 ## Layers
 
-1. **Source identity** — hashes and game IDs prove the inputs.
-2. **Corpus inventory** — compares PS2 and PS4 ADV assets and classifies source relationships independently from localization-map availability.
-3. **Format parsers/compilers** — MTX, KSF, ELF, CVM and ISO logic remain isolated modules with structural validation.
-4. **Localization importers** — official PS4 English is imported only when the correspondence can be proven. Ambiguity becomes a report item, not guessed output.
-5. **Translation manifest/regression gate** — stable accepted entries prevent later builds from silently losing translations.
-6. **Build/repack** — generated files go to ignored output trees; pristine sources stay untouched.
-
-## Import confidence tiers
-
-- **Exact/direct**: byte-identical source plus a DC map whose anchors resolve unambiguously to PS2 text spans. Automatic.
-- **Structural**: source changed but semantic/control alignment is strong enough to prove correspondence. Future phase.
-- **Template/semantic**: remaster collapsed several PS2 scripts into shared templates (notably FD00). Future phase.
-- **PS2-only**: no PS4 counterpart; manual translation queue using official terminology as context.
+1. **Source identity** — hashes and game IDs prove the PS2/PS4 inputs.
+2. **Corpus inventory** — PS2/PS4 ADV relationships and English-map availability are classified independently.
+3. **Format parsers/compilers** — MTX, KSF, TMX, ELF/ROFS, CVM and ISO9660 logic are isolated and structurally validated.
+4. **Localization importers** — exact, structural and explicit-reviewed imports emit only proven outputs.
+5. **Startup/UI backport** — executable-resident UI and localized PS4 graphics are ported through renderer-specific encodings and PS2 indexed textures.
+6. **Regression/identity gate** — accepted translations, serial and save namespace cannot silently drift.
+7. **Build/repack** — overlays are applied to the nested CVM ISO, executable ROFS metadata is updated atomically, and the finished image is re-read and verified.
 
 ## MTX
 
-The first little-endian u16 encodes the pointer-header size in 4-byte units. Pointer targets are quarter-offsets and regions remain 4-byte aligned. Text and the ASCII-like command language coexist in the data area, so imported English currently uses the game's two-byte CP932/full-width glyph path to avoid creating opcode bytes.
+The first little-endian u16 is the pointer-header size in 4-byte units. Pointer targets are quarter-offsets and rebuilt regions stay 4-byte aligned. Because MTX also uses ordinary ASCII as a command language, localized dialogue uses the PS2 two-byte CP932/full-width glyph path rather than injecting ambiguous ASCII opcode bytes.
 
 ## KSF
 
-PS4 KSF DC maps provide useful official string anchors, but the PS4 runtime externalizes localization. A byte-identical KSF does not prove the PS2 inline field can hold longer English. This phase therefore patches only provably bounded, fitting fields; relocation waits for a fuller KSF compiler.
+PS4 KSF DC maps identify official strings, but English can exceed PS2 inline field capacity. The current importer accepts only proven fixed fields whose English fits. Overflow fields stay Japanese unless there is a reviewed constrained override. A relocatable general KSF compiler is still unproven.
 
-## Save compatibility
+## Executable UI
 
-The PS2 executable uses `BISLPM-66511Save`. Ordinary memory-card saves are treated as cross-build compatibility targets. Savestates are build-specific and disposable.
+Renderer encoding is not assumed globally. The title renderer was runtime-proven to consume two-byte glyph units. The exact official labels are now stored in a verified 40-byte title arena: `New Game` remains at the first source slot and `Load Game` is moved within the arena with its pointer updated. Name-entry keyboard cells also remain two-byte glyphs and preserve the original 20-key logical geometry.
+
+Other startup prompts are fixed executable strings and use ASCII only where the corresponding renderer/data path permits it; their offsets/preimages are fail-closed tests.
+
+## PS2 indexed graphics
+
+`tools/tmx.py` handles both named TMX chunks inside `B_GPxxx.BIN` containers and standalone `TMX0` files. `tools/graphics_port.py` downsizes official PS4 RGBA artwork, quantizes it to the PS2 palette size, preserves 4/8-bit indexed layout and CLUT ordering, and rewrites only palette/pixel payloads. File/container sizes remain fixed.
+
+The first accepted graphics scope is startup-specific:
+
+- `BLBRD/B_GP019.BIN` — name-entry controls;
+- `BLBRD/INIT_MES/TR000.TMX` through `TR028.TMX` — the 29 random opening quotation images.
+
+Generated graphics remain local-only; repository code stores no copyrighted artwork.
 
 ## Runtime CVM / ROFS lookup
 
-ISO9660 directory metadata is **not** the only runtime source of truth. `SLPM_665.11` contains a ROFS file table for CVM assets. Each proven record stores the file byte size 14 bytes before the NUL-terminated basename and the sector extent 6 bytes before it. The failed v1 whole-game runtime build proved that relocating a file while updating only ISO9660 leaves the game loading stale Japanese data.
+ISO9660 is not the only runtime source of truth. `SLPM_665.11` contains a ROFS file table: for the proven records, byte size is 14 bytes before the NUL-terminated basename and sector extent is 6 bytes before it. The failed v1 runtime build proved that updating only ISO9660 leaves the game loading stale Japanese sectors.
 
-`tools/build_translation_iso.py` therefore treats the executable table and embedded ISO directory as one atomic metadata update. Every overlay asset must have exactly one ELF record matching its pristine size+extent; the final record must resolve to the same output size+extent and payload hash as ISO9660. Missing, duplicate, or mismatched records are hard failures.
+`tools/build_translation_iso.py` therefore treats embedded ISO metadata and executable ROFS metadata as one atomic update. Every overlay asset must have a unique pristine size+extent match in the ELF; the final record must resolve to the same output size/extent and payload as ISO9660. Missing, duplicate or mismatched records are hard failures.
 
-## ELF UI encodings
+## Save compatibility
 
-Do not assume all PS2 UI renderers accept single-byte ASCII simply because the executable contains ASCII elsewhere. The title renderer was runtime-proven to consume its menu labels as two-byte glyph units: replacing four Japanese CP932 glyphs with 8/9 ASCII bytes produced roughly 4/5 meaningless glyphs. Title test labels now use the two-byte CP932/full-width path. Other fixed UI fields remain renderer-specific and should not be promoted from static evidence to runtime-proven status without a visual test.
+The executable uses `BISLPM-66511Save`. Ordinary memory-card saves are the cross-build compatibility target. Savestates are considered build-specific. The serial `SLPM-66511` and save namespace are build invariants.

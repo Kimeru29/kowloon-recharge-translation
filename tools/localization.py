@@ -15,7 +15,7 @@ _PUNCTUATION = {
 }
 
 
-def encode_ps2_english(text: str) -> bytes:
+def encode_ps2_english(text: str, *, collapse_spaces: bool = True) -> bytes:
     """Encode localized English without emitting MTX ASCII opcode bytes.
 
     Kowloon's MTX scripts use ordinary ASCII for their control language.  The
@@ -26,7 +26,7 @@ def encode_ps2_english(text: str) -> bytes:
     not semantic text.
     """
 
-    normalized = re.sub(r" +", " ", text)
+    normalized = re.sub(r" +", " ", text) if collapse_spaces else text
     converted: list[str] = []
     for char in normalized:
         codepoint = ord(char)

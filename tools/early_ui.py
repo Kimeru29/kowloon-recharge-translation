@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 from tools.elf_strings import ElfFixedStringPatch, patch_fixed_strings
+from tools.startup_ui import STARTUP_FIXED_PATCHES, patch_title_labels
 
 
-# Official remaster localization values, limited to PS2 fixed C-string slots where
-# the exact English fits without relocating executable data or pointers.
-EARLY_UI_PATCHES: tuple[ElfFixedStringPatch, ...] = (
-    # Title screen.
-    # This renderer consumes two-byte PS2 glyph codes.  Single-byte ASCII was
-    # runtime-proven to collapse into four/five nonsense glyphs.  The exact
-    # remaster labels do not fit as NUL-terminated wide strings in 16 bytes, so
-    # use short, meaningful constrained forms until pointer relocation is added.
-    ElfFixedStringPatch(0x5CBDE8, 16, "初めから", "NewGame", encoding="ps2-wide"),
-    ElfFixedStringPatch(0x5CBDF8, 16, "続きから", "Load", encoding="ps2-wide"),
+# Official remaster localization values for executable-resident fixed strings.
+# Startup/name/location strings are kept in tools.startup_ui so the boot-to-DG00
+# acceptance slice is independently testable.  These are the remaining menu/UI
+# labels that already fit their PS2 fixed slots.
+MENU_UI_PATCHES: tuple[ElfFixedStringPatch, ...] = (
     # Command thumbnail / H.A.N.T.-adjacent menu table.
     ElfFixedStringPatch(0x3BC7C8, 16, "アイテム", "Items"),
     ElfFixedStringPatch(0x3BC7D8, 16, "クエスト", "Quests"),
@@ -38,6 +34,11 @@ EARLY_UI_PATCHES: tuple[ElfFixedStringPatch, ...] = (
     ElfFixedStringPatch(0x6941A0, 8, "戦闘", "Battle"),
 )
 
+# Backwards-compatible name used by the artifact builder/tests.  It now means
+# every fixed-slot executable patch; the relocated title strings are handled by
+# patch_title_labels and therefore intentionally are not members of this tuple.
+EARLY_UI_PATCHES: tuple[ElfFixedStringPatch, ...] = STARTUP_FIXED_PATCHES + MENU_UI_PATCHES
+
 
 def build_early_ui_elf(raw: bytes) -> bytes:
-    return patch_fixed_strings(raw, EARLY_UI_PATCHES)
+    return patch_fixed_strings(patch_title_labels(raw), EARLY_UI_PATCHES)

@@ -77,6 +77,11 @@ def make_nested_iso(path: Path) -> dict[str, int]:
     struct.pack_into("<I", elf, filename_offset - 6, 30)
     elf[filename_offset - 2:filename_offset] = b"\x00\xdf"
     elf[filename_offset:filename_offset + 6] = b"A.MTX\x00"
+    graphics_filename_offset = 112
+    struct.pack_into("<I", elf, graphics_filename_offset - 14, 100)
+    struct.pack_into("<I", elf, graphics_filename_offset - 6, 31)
+    elf[graphics_filename_offset - 2:graphics_filename_offset] = b"\x00\xdf"
+    elf[graphics_filename_offset:graphics_filename_offset + 12] = b"B_GP019.BIN\x00"
     image[elf_extent * SECTOR_SIZE:elf_extent * SECTOR_SIZE + len(elf)] = elf
     tail_payload = b"TAIL-PAYLOAD" + b"T" * 52
     image[tail_extent * SECTOR_SIZE:tail_extent * SECTOR_SIZE + 64] = tail_payload
@@ -94,10 +99,20 @@ def make_nested_iso(path: Path) -> dict[str, int]:
 
     embedded_base = cvm_base + HEADER_SIZE
     put_pvd(image, embedded_base, embedded_volume, 20)
-    put_dir(image, embedded_base, 20, [dir_record(b"ADV", 21, SECTOR_SIZE, directory=True)])
+    put_dir(
+        image,
+        embedded_base,
+        20,
+        [
+            dir_record(b"ADV", 21, SECTOR_SIZE, directory=True),
+            dir_record(b"BLBRD", 23, SECTOR_SIZE, directory=True),
+        ],
+    )
     put_dir(image, embedded_base, 21, [dir_record(b"DG", 22, SECTOR_SIZE, directory=True)])
     put_dir(image, embedded_base, 22, [dir_record(b"A.MTX;1", 30, 100)])
+    put_dir(image, embedded_base, 23, [dir_record(b"B_GP019.BIN;1", 31, 100)])
     image[embedded_base + 30 * SECTOR_SIZE:embedded_base + 30 * SECTOR_SIZE + 100] = b"J" * 100
+    image[embedded_base + 31 * SECTOR_SIZE:embedded_base + 31 * SECTOR_SIZE + 100] = b"G" * 100
 
     path.write_bytes(image)
     return {
@@ -154,6 +169,44 @@ class WholeIsoOverlayBuildTests(unittest.TestCase):
                 finally:
                     image.close()
 
+
+    def test_replaces_explicit_blbrd_graphics_container_and_patches_rofs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.iso"
+            output = root / "output.iso"
+            make_nested_iso(source)
+            overlay_root = root / "overlay"
+            (overlay_root / "BLBRD").mkdir(parents=True)
+            replacement = b"L" * 100
+            (overlay_root / "BLBRD" / "B_GP019.BIN").write_bytes(replacement)
+            overlay = collect_overlay([("startup-graphics", overlay_root)])
+
+            report = build_translation_iso(source, output, overlay)
+
+            self.assertEqual(0, report["appended_sectors"])
+            self.assertEqual(1, report["in_place_files"])
+            with output.open("rb") as handle:
+                image = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+                try:
+                    _, outer = index_iso(image)
+                    cvm = find_record(outer, "DATA.CVM")
+                    embedded_base = cvm.extent * SECTOR_SIZE + HEADER_SIZE
+                    _, records = index_iso(image, embedded_base)
+                    translated = find_record(records, "BLBRD/B_GP019.BIN")
+                    self.assertEqual(31, translated.extent)
+                    self.assertEqual(replacement, bytes(
+                        image[
+                            embedded_base + translated.extent * SECTOR_SIZE:
+                            embedded_base + translated.extent * SECTOR_SIZE + translated.size
+                        ]
+                    ))
+                    elf_record = find_record(outer, "SLPM_665.11")
+                    elf = bytes(image[elf_record.extent * SECTOR_SIZE:elf_record.extent * SECTOR_SIZE + elf_record.size])
+                    self.assertEqual(100, struct.unpack_from("<I", elf, 98)[0])
+                    self.assertEqual(31, struct.unpack_from("<I", elf, 106)[0])
+                finally:
+                    image.close()
 
     def test_updates_embedded_rofs_size_and_extent_in_translated_elf(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

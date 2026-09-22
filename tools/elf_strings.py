@@ -24,6 +24,8 @@ class ElfFixedStringPatch:
                 raise ValueError("ELF replacement text must be ASCII") from exc
         elif self.encoding == "ps2-wide":
             encoded = encode_ps2_english(self.text)
+        elif self.encoding == "ps2-wide-fixed":
+            encoded = encode_ps2_english(self.text, collapse_spaces=False)
         else:
             raise ValueError(f"Unsupported ELF string encoding: {self.encoding}")
         if len(encoded) >= self.capacity:

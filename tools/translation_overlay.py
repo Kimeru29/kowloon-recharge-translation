@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
+import re
 from typing import Iterable, Mapping
 
 from tools.iso9660_patch import IsoRecord, SECTOR_SIZE
@@ -15,6 +16,10 @@ class OverlayEntry:
     source_path: Path
     size: int
     sha256: str
+
+    @property
+    def embedded_path(self) -> str:
+        return resolve_embedded_path(self.path)
 
 
 @dataclass(frozen=True)
@@ -54,6 +59,29 @@ class ReplacementPlan:
         return {entry.path: entry for entry in self.entries}
 
 
+_BLBRD_BIN_RE = re.compile(r"^BLBRD/B_GP\d{3}\.BIN$", re.IGNORECASE)
+_INIT_MES_TMX_RE = re.compile(r"^BLBRD/INIT_MES/TR\d{3}\.TMX$", re.IGNORECASE)
+
+
+def resolve_embedded_path(path: str) -> str:
+    """Resolve an overlay-relative path to its DATA.CVM ISO path.
+
+    Historical MTX/KSF roots are ADV-relative.  Localized billboard containers
+    are explicit top-level BLBRD paths so binary graphics cannot accidentally be
+    written into an arbitrary embedded file.
+    """
+
+    normalized = path.replace("\\", "/")
+    suffix = Path(normalized).suffix.upper()
+    if suffix == ".TMX" and _INIT_MES_TMX_RE.fullmatch(normalized):
+        return normalized
+    if suffix in {".MTX", ".KSF"}:
+        return normalized if normalized.upper().startswith("ADV/") else f"ADV/{normalized}"
+    if suffix == ".BIN" and _BLBRD_BIN_RE.fullmatch(normalized):
+        return normalized
+    raise ValueError(f"Overlay file is not a supported embedded path: {path}")
+
+
 def _sectors(size: int) -> int:
     return (size + SECTOR_SIZE - 1) // SECTOR_SIZE
 
@@ -73,9 +101,7 @@ def collect_overlay(roots: Iterable[tuple[str, Path]]) -> OverlayManifest:
             raise ValueError(f"Overlay root does not exist or is not a directory: {root}")
         for source in sorted(path for path in root.rglob("*") if path.is_file()):
             rel = source.relative_to(root).as_posix()
-            suffix = source.suffix.upper()
-            if suffix not in {".MTX", ".KSF"}:
-                raise ValueError(f"Overlay file must be MTX or KSF: {rel}")
+            resolve_embedded_path(rel)  # validate before hashing/selecting
             data = source.read_bytes()
             entry = OverlayEntry(
                 path=rel,
@@ -116,12 +142,13 @@ def plan_replacements(
     planned: list[ReplacementPlanEntry] = []
 
     for rel in sorted(output_sizes):
-        lookup = f"ADV/{rel}".upper()
+        embedded_path = resolve_embedded_path(rel)
+        lookup = embedded_path.upper()
         record = normalized_records.get(lookup)
         if record is None:
-            raise ValueError(f"Overlay path not found in embedded ISO: ADV/{rel}")
+            raise ValueError(f"Overlay path not found in embedded ISO: {embedded_path}")
         if record.is_directory:
-            raise ValueError(f"Overlay path unexpectedly resolves to a directory: ADV/{rel}")
+            raise ValueError(f"Overlay path unexpectedly resolves to a directory: {embedded_path}")
         output_size = int(output_sizes[rel])
         if output_size <= 0:
             raise ValueError(f"Overlay output must be non-empty: {rel}")

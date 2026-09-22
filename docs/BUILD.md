@@ -3,23 +3,35 @@
 ## Local paths currently used on Pablo's Mac
 
 - PS2 archive: `/Volumes/TerraMas MAC A/Roms/PS2/Kowloon Youma Gakuenki re-charge (Japan).7z`
-- PS2 extracted ADV: `/private/tmp/khc-ps2-assets/ADV`
-- PS4 package: `/Volumes/TerraMas MAC A/Roms/PS2/khc.pkg`
-- PS4 extracted ADV: `/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV`
-- Pristine extracted PS2 ISO: `/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso`
-- Current historical early test ISO: `/private/tmp/kowloon-recharge-early-en.iso`
+- pristine PS2 ISO: `/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso`
+- PS2 ADV: `/private/tmp/khc-ps2-assets/ADV`
+- CVM payload ISO: `/private/tmp/kowloon-recharge-inspect/DATA_payload.iso`
+- PS4 PKG: `/Volumes/TerraMas MAC A/Roms/PS2/khc.pkg`
+- PS4 extracted root: `/private/tmp/khc-ps4-extracted/CUSA27034`
+- PS4 ADV: `/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV`
+- PS4 BLBRD bundle root: `/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/BLBRD`
 
-These paths are convenience defaults only and are not committed configuration. Use `config/sources.example.json` as the portable reference.
+These are local convenience paths, not committed source data.
 
 ## Tests
+
+Dependency-free suite:
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-Local proprietary fixture tests skip cleanly in a clean clone.
+Full graphics suite:
 
-## Regenerate source identity
+```bash
+uv run --with pillow python -m unittest discover -s tests -v
+```
+
+Current result: 105 tests; normal run reports 101 passes + four Pillow-dependent skips; optional-Pillow run passes all 105.
+
+## Core corpus regeneration
+
+Source identity:
 
 ```bash
 python3 -m tools.source_manifest \
@@ -31,77 +43,38 @@ python3 -m tools.source_manifest \
   --output local/source-manifest.json
 ```
 
-## Regenerate corpus inventory
+Corpus inventory:
 
 ```bash
 python3 -m tools.build_corpus_manifest \
-  --ps2-adv '/private/tmp/khc-ps2-assets/ADV' \
-  --ps4-adv '/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV' \
+  --ps2-adv /private/tmp/khc-ps2-assets/ADV \
+  --ps4-adv /private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV \
   --output local/corpus-manifest.json
 ```
 
-This also writes the lexical-run estimate used to distinguish a large PS2-only file count from the much smaller amount of apparently novel Japanese text.
-
-## Regenerate exact MTX tier
+Exact MTX:
 
 ```bash
 rm -rf local/exact-mtx
 python3 -m tools.import_exact_mtx \
-  --ps2-adv '/private/tmp/khc-ps2-assets/ADV' \
-  --ps4-adv '/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV' \
+  --ps2-adv /private/tmp/khc-ps2-assets/ADV \
+  --ps4-adv /private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV \
   --output-root local/exact-mtx \
   --report local/exact-import-report.json
 ```
 
-Current verified result: 962 files / 56,642 English entries imported; 23 files / 21,672 entries rejected fail-closed.
-
-## Regenerate conservative exact KSF tier
+Exact KSF:
 
 ```bash
 rm -rf local/exact-ksf
 python3 -m tools.import_exact_ksf \
-  --ps2-adv '/private/tmp/khc-ps2-assets/ADV' \
-  --ps4-adv '/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV' \
+  --ps2-adv /private/tmp/khc-ps2-assets/ADV \
+  --ps4-adv /private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/ADV \
   --output-root local/exact-ksf \
   --report local/ksf-report.json
 ```
 
-Current verified result: 868 fitting entries, 48 overflows left untouched, 4 ambiguous entries.
-
-## Regression gate
-
-```bash
-python3 -m tools.check_regression translations/accepted.json translations/accepted.json
-```
-
-That self-check proves schema/invariants for the committed baseline. Future build stages should emit a current accepted manifest and compare it against `translations/accepted.json`; additions are allowed, disappearance/mutation of accepted entries fails.
-
-## Existing early vertical slice
-
-The historical scripts generate local ignored artifacts:
-
-- `artifacts/DG00_00.en-fullwidth.MTX`
-- `artifacts/DG00_00.en-ascii-probe.KSF`
-- `artifacts/SLPM_665.11.en-early`
-
-and can rebuild the early test ISO with `tools/build_vertical_slice_iso.py`. The accepted hashes for those three artifacts are preserved in `translations/accepted.json`.
-
-## Runtime testing
-
-Do not start PCSX2 automatically. Before every new runtime test, describe exactly which title/menu/dialogue elements are expected to be English, which Japanese text is intentionally still present, and any rendering caveat. Wait for Pablo's explicit approval before launch.
-
-## Whole-game deterministic candidate
-
-The current generic builder is `tools/build_translation_iso.py`. Run repository CLIs as modules (`python3 -m tools.<name>`) so repository imports resolve consistently.
-
-Current overlay precedence, low to high:
-
-1. `local/exact-mtx`
-2. `local/exact-ksf`
-3. `local/structural-mtx`
-4. `local/accepted-overrides`
-
-Generate the reviewed DG00 override and ELF, then build:
+Reviewed DG00 KSF override:
 
 ```bash
 python3 -m tools.accepted_overrides \
@@ -109,45 +82,135 @@ python3 -m tools.accepted_overrides \
   --ps2-adv /private/tmp/khc-ps2-assets/ADV \
   --exact-ksf-root local/exact-ksf \
   --output-root local/accepted-overrides
+```
 
+Regenerate executable UI:
+
+```bash
 python3 -m tools.build_early_ui_elf
+```
 
+## Rebuild startup graphics
+
+Generated graphics are local-only and ignored by Git.
+
+### 1. Extract official English Texture2D PNGs
+
+Use UnityPy only as an ephemeral dependency:
+
+```bash
+uv run --with UnityPy --with pillow python - <<'PY'
+from pathlib import Path
+import UnityPy
+
+root = Path('/private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/BLBRD')
+for bundle_name, output in (
+    ('tr_en', Path('/private/tmp/tr_en_textures')),
+    ('b_gp019_en', Path('/private/tmp/gp019_en')),
+):
+    output.mkdir(parents=True, exist_ok=True)
+    env = UnityPy.load(str(root / bundle_name))
+    for obj in env.objects:
+        if obj.type.name != 'Texture2D':
+            continue
+        texture = obj.read()
+        texture.image.save(output / f'{texture.m_Name}.png')
+PY
+```
+
+Expected source sets:
+
+- `/private/tmp/tr_en_textures/TR000.png` through `TR028.png` — 29 quote images;
+- `/private/tmp/gp019_en/GP019_00.png`, `GP019_01.png` — name-entry graphics.
+
+### 2. Port them into PS2 indexed assets
+
+```bash
+rm -rf local/startup-graphics/BLBRD/INIT_MES
+uv run --with pillow python - <<'PY'
+from pathlib import Path
+import mmap
+from tools.iso9660_patch import index_iso, find_record, SECTOR_SIZE
+from tools.startup_graphics import port_name_entry_graphics, port_quote_graphic
+
+payload = Path('/private/tmp/kowloon-recharge-inspect/DATA_payload.iso')
+out = Path('local/startup-graphics')
+quotes = Path('/private/tmp/tr_en_textures')
+name_pngs = Path('/private/tmp/gp019_en')
+
+with payload.open('rb') as handle:
+    image = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+    try:
+        _, records = index_iso(image)
+        for i in range(29):
+            filename = f'TR{i:03d}.TMX'
+            rel = f'BLBRD/INIT_MES/{filename}'
+            record = find_record(records, rel)
+            raw = bytes(image[record.extent * SECTOR_SIZE:record.extent * SECTOR_SIZE + record.size])
+            localized = port_quote_graphic(raw, quotes / f'TR{i:03d}.png', name=filename)
+            target = out / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(localized)
+
+        record = find_record(records, 'BLBRD/B_GP019.BIN')
+        raw = bytes(image[record.extent * SECTOR_SIZE:record.extent * SECTOR_SIZE + record.size])
+        localized = port_name_entry_graphics(raw, name_pngs)
+        target = out / 'BLBRD/B_GP019.BIN'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(localized)
+    finally:
+        image.close()
+PY
+```
+
+All 30 outputs must keep the pristine file size. Quote fidelity evidence is stored locally in `local/startup-quotes-report.json`; current maximum mean absolute RGBA error is 0.5594/255.
+
+## Build startup v5 candidate
+
+Overlay precedence, low to high:
+
+1. `local/exact-mtx`
+2. `local/exact-ksf`
+3. `local/structural-mtx`
+4. `local/accepted-overrides`
+5. `local/startup-graphics`
+
+Build only from the pristine ISO:
+
+```bash
 python3 -m tools.build_translation_iso \
   '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
-  /private/tmp/kowloon-recharge-whole-en-candidate-v2.iso \
+  /private/tmp/kowloon-recharge-startup-en-v5.iso \
   --overlay exact-mtx local/exact-mtx \
   --overlay exact-ksf local/exact-ksf \
   --overlay structural-mtx local/structural-mtx \
   --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
   --elf artifacts/SLPM_665.11.en-early \
-  --report local/whole-build-report-v2.json
+  --report local/startup-build-v5.json
 ```
 
-Verified static result for the current v2 inputs:
+Current static build result:
 
-- SHA-256 `b549af9528236092631026929990fa3a1dc890451f6a9ecbcb443eed4734b97e`
-- 1,113 overlay files
-- 860 in place / 253 relocated
-- **1,113/1,113 executable ROFS file records patched and re-resolved against final output size/extent**
+- SHA-256: `f8d65c029f86ce871f9d9930f76d12b6f6a95c79c4152a0437b19ceef1fd20b5`
+- 1,143 overlay files
+- 890 in place / 253 relocated
+- 1,143 executable ROFS records patched and re-resolved
 - +900 embedded sectors
-- 17 shifted outer-tail files, payload-identical after shift
-- outer ISO size unchanged at 2,095,382,528 bytes
-- runtime re-test pending
+- 17 outer-tail files shifted with byte-identical payloads
+- outer ISO size unchanged: 2,095,382,528 bytes
+- startup acceptance report: `local/startup-acceptance-v5.json`, 114/114 checks
 
-The builder is deliberately fail-closed on missing paths, missing/duplicate ROFS records, pristine ROFS preimage mismatch, insufficient outer slack, directory relocation, CVM/PVD disagreement, changed overlay input hashes, translated-output hash mismatch, shifted-tail payload drift, ELF size drift, and serial/save-identity loss.
+The builder fails closed on missing/duplicate ROFS records, pristine metadata mismatch, unsupported overlay paths, insufficient outer slack, CVM/PVD disagreement, overlay hash drift, final-payload mismatch, shifted-tail drift, ELF size drift, and serial/save-identity loss.
 
-The executable ROFS table is mandatory. The failed v1 runtime candidate proved that updating only ISO9660 directory records is insufficient: `SLPM_665.11` stores each embedded file's byte size and sector extent next to its filename and the game uses those values at runtime.
-
-### Graphics inventory
-
-Graphics are not yet included in the candidate. The packed PS4 English art can be inventoried without making UnityPy a repository dependency:
+## Regression baseline
 
 ```bash
-uv run --with UnityPy python -m tools.graphics_inventory \
-  --dictionary /private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/data/AssetFileDic_en.txt \
-  --bundle-root /private/tmp/khc-ps4-extracted/CUSA27034/Media/StreamingAssets/BLBRD \
-  --output local/graphics-inventory.json \
-  --deep
+python3 -m tools.check_regression translations/accepted.json translations/accepted.json
 ```
 
-Do not add graphics to a runtime build until the PS2 TMX encoder/container repacker has round-trip tests.
+Do not promote the current startup ELF/graphics to the committed accepted baseline merely because static checks pass. Promote after the relevant runtime acceptance test succeeds.
+
+## Runtime testing
+
+Do not start PCSX2 automatically. Before each build launch, state exactly what Pablo should see and wait for explicit approval. For v5 the acceptance scope is every text-bearing screen from the opening quotation through the first old-man dialogue; any Japanese text in that interval is a failure to capture and investigate.
