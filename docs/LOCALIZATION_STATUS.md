@@ -15,8 +15,8 @@ Status meanings:
 | --- | --- | --- |
 | 29 opening quotations (`TR000`-`TR028`) | **Working / runtime-proven** | English quotation artwork renders correctly. v7 repeatedly showed the same quotation, but the 29 generated TMXs have 29 distinct hashes and the executable explicitly selects `PRNG % 29` before formatting `TR%03d.TMX`. Repetition is therefore a runtime seed/PRNG behavior to investigate, not duplicated translation assets. |
 | Pre-title memory-card status text | **Not runtime-tested** | v7 showed the Japanese stone-panel message. v8 maps the proven executable pointer-table entries to official English; the observed startup entry is `Checking memory card slot 1`. Re:charge-only clear-data entries without proven official correspondence remain Japanese/fail-closed. |
-| GP088 startup/title artwork — direct `GP088_03` counterpart | **Not runtime-tested** | v8 ports the same-name official English `b_gp088_en/GP088_03` into PS2 `B_GP088.BIN`. |
-| GP088 PS2 packed title atlas (`GP088_12`/`GP088_13`) | **Still Japanese / unresolved** | The screenshot's large Japanese title is represented by PS2-specific packed artwork. PS4 `GP088_10/11` are the corresponding JP/EN title variants, but their atlas transformation into PS2 `GP088_12/13` is not yet proven enough to automate. |
+| GP088 startup/title artwork — direct `GP088_03` counterpart | **Not runtime-tested** | v9 retains the v8 same-name official English `b_gp088_en/GP088_03` port into PS2 `B_GP088.BIN`. |
+| GP088 PS2 packed title atlas (`GP088_12`) | **Not runtime-tested** | v9 proves that the two GP088_12 Japanese title variants are repacked GP088_03 regions (Dice 0.8758 / 0.8765 after excluding the known flattened banner band), then rebuilds GP088_12 from the official English GP088_03 regions. The official English remaster omits the flattened gold `re:charge` banner, so v9 removes it rather than synthesizing missing artwork. `GP088_13` is a separate already-English blue `re:charge` badge and remains unchanged. |
 | Title `New Game` / `Load Game` | **Working / runtime-proven** | Runtime showed both exact English labels correctly. |
 | Name-entry English button graphics (`B_GP019.BIN`) | **Working / runtime-proven** | Back/Edit/Finish/Delete/Confirm controls render correctly. |
 | `Enter last name.` | **Working / runtime-proven** | Wide English prompt renders correctly. |
@@ -53,7 +53,7 @@ Status meanings:
 | Changed/template MTX | **Partially translated** | 7 files / 2,284 entries proven and imported. Consolidated FD00 remains the largest special class; only `FD00_31` is currently proven among the 26-file FD00 family. |
 | KSF | **Partially translated** | 868 fitting official entries imported; 48 overflow entries and 4 ambiguous entries remain unresolved. |
 | PS2-only text | **Still Japanese / unresolved** | Lexical proxy estimates 419 novel runs / 3,672 Japanese characters beyond reused mapped content. This is an estimator, not a dialogue-line percentage. |
-| Broad graphics beyond startup | **Still Japanese / unresolved** | Indexed PS2 graphics porting is proven for normal same-layout classes. Structurally changed atlases, including the PS2 packed GP088 title atlas, require explicit transformation proof. |
+| Broad graphics beyond startup | **Still Japanese / unresolved** | Indexed same-layout ports and a generalized fail-closed atlas-repack class are now proven. Other structurally changed atlases still require their own correspondence/layout proof before import. |
 
 ## Candidate history
 
@@ -68,35 +68,49 @@ Static verifier: 96/96. Runtime proved the quotation, title, name-entry graphics
 
 Runtime proved uppercase is now reachable and the last-name UI is substantially correct except for the intentional 3+3 structural limit. The next reading-input screen rendered only `Enter` even though the final ELF contained the complete relocated prompt, and finishing the state froze again. The startup memory-card/title screen also still showed Japanese. This run led to the libkernel heap-break discovery and the executable memory-card message classification.
 
-### v8 — current static candidate
+### v8 — historical static candidate
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v8.iso`
 - ISO SHA-256: `7431f7f44eb9ed14927f2181491b02217efe8675c64c4c07789d13ad934aa550`
 - translated ELF size: 8,403,943 bytes
 - final post-ROFS ELF SHA-256: `5c1cee88e6cb9c2aaf4710a928ce24fb013beb3a56f3fd98b94654ef1f507fdd`
 - overlays: 1,144 total; 891 in place / 253 relocated
-- executable itself relocated by the tested builder from outer extent 288 to 1,013,782 because it crossed the old sector allocation
-- embedded growth: +900 sectors; 17 shifted outer files
 - executable ROFS records: 1,144 patched/re-resolved
-- whole ISO size unchanged: 2,095,382,528 bytes
 - dependency-free suite: **126 tests OK** (6 expected skips)
 - Pillow suite: **126 tests OK** (1 owned-corpus skip)
 - final-image startup acceptance: **120/120** (`local/startup-acceptance-v8.json`)
 
-v8 adds three statically proven classes/fixes: the live libkernel heap break is moved out of the translation PT_LOAD, the proven memory-card pointer-table subset is relocated to official English, and the direct same-name GP088_03 English texture is ported. It deliberately does not guess the PS2-specific GP088_12/13 packed-title transformation or change the structural 3+3 name buffers.
+v8 fixed the live libkernel heap break, relocated the proven memory-card pointer-table subset, and ported direct GP088_03 English art. It was not launched before v9 superseded it.
 
-## Runtime gate for v8
+### v9 — current static candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v9.iso`
+- ISO SHA-256: `6770862cbde8edf301afdef7778d440c0d2eab99806d732724afc6ef5a279d76`
+- translated ELF size: 8,403,943 bytes
+- final post-ROFS ELF SHA-256: `5c1cee88e6cb9c2aaf4710a928ce24fb013beb3a56f3fd98b94654ef1f507fdd`
+- overlays: 1,144 total; 891 in place / 253 relocated
+- executable relocated from outer extent 288 to 1,013,782
+- embedded growth: +900 sectors; 17 shifted outer files
+- executable ROFS records: 1,144 patched/re-resolved
+- whole ISO size unchanged: 2,095,382,528 bytes
+- dependency-free suite: **130 tests OK** (8 expected skips)
+- Pillow suite: **130 tests OK** (1 owned-corpus skip)
+- final-image startup acceptance: **121/121** (`local/startup-acceptance-v9.json`)
+
+v9 adds the generalized `RegionTransfer` atlas-repack renderer class and applies it to GP088_12. The pristine GP088_03→GP088_12 relationship is fail-closed at Dice ≥0.82; the actual source scores are 0.8758 and 0.8765 with the flattened banner band excluded. The generated PS2 GP088_12 contains only the two official-English vertical title variants, `Kowloon High School Chronicle` and `Huanglong High School Chronicle`; no Japanese title pixels or reconstructed banner art are retained.
+
+## Runtime gate for v9
 
 Do not launch PCSX2 automatically. Before launch, state the exact expected visual sequence and wait for Pablo's explicit approval.
 
-The minimum v8 regression scope is:
+The minimum v9 regression scope is:
 
 1. an English opening quotation appears; the same quotation may repeat because seed behavior is not yet classified, but any Japanese quote is a failure;
 2. the memory-card stone-panel message observed in v7 should now read `Checking memory card slot 1` rather than Japanese;
-3. GP088_03 should use official English art where that texture is visible; the known PS2-specific GP088_12/13 title atlas may still display Japanese and must be captured rather than treated as solved;
+3. the red-sky/title sequence must no longer show the large Japanese Kowloon title: where GP088_12 is used, the packed art should be the vertical English `Kowloon High School Chronicle` / `Huanglong High School Chronicle` variants. The old flattened gold `re:charge` banner is intentionally absent; a separate blue `re:charge` badge is already English if that asset appears;
 4. `New Game` / `Load Game` remain correct;
-5. `Enter last name.` remains correct, and both lowercase and uppercase Latin letters remain selectable; the 3+3 name-field limit is still expected;
-6. the corrupted `Enter` screen must now show the full `Enter reading for last name.` prompt;
-7. the next active reading prompt must show full `Enter reading for first name.`;
+5. `Enter last name.` remains correct, and both lowercase and uppercase Latin letters remain selectable; the 3+3 name-field limit (`Hab` / `Kur`) is still expected and is not a v9 regression;
+6. the next reading-input screen must show the full `Enter reading for last name.` instead of only `Enter`;
+7. subsequent name/reading prompts must remain complete, including `Enter first name.` and `Enter reading for first name.` when reached;
 8. finishing the reading flow must advance to `Is this fine?` / `Yes / No` instead of freezing;
-9. if it advances, continue through license verification, `Heracleion Shrine`, H.A.N.T., choices, and the first old-man dialogue; any Japanese, corrupted/truncated text, or vertical English dialogue is a failed checkpoint.
+9. if it advances, continue through license verification, `Heracleion Shrine`, H.A.N.T., choices, and the first old-man dialogue; any Japanese in the tested startup slice, corrupted/truncated text, freeze, or vertical English dialogue is a failed checkpoint.

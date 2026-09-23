@@ -231,7 +231,9 @@ The startup stone-panel message belongs to a 27-entry executable pointer table a
 
 ## GP088 startup/title graphics
 
-The red-sky/title startup scene uses `BLBRD/B_GP088.BIN`. The official English bundle `b_gp088_en` has a direct same-name/same-purpose counterpart for `GP088_03`; v8 ports that texture through the normal indexed-TMX pipeline while preserving container size. The large Japanese logo seen in the v7 screenshot is also represented by the PS2-specific packed `GP088_12/13` atlas. PS4 `GP088_10/11` are clearly the JP/EN title-color variants, but the transformation into the PS2 packed atlas is structurally different and is not yet automated without further proof.
+The red-sky/title startup scene uses `BLBRD/B_GP088.BIN`. The official English bundle `b_gp088_en` has a direct same-name/same-purpose counterpart for `GP088_03`. Static tracing also proved that title-state records instantiate sprite `(88,12)` twice and group 88 index 12 resolves directly to `BLBRD/GRP088/GP088_12`, so GP088_12 is a real startup renderer asset rather than a visual guess.
+
+GP088_12 repacks the same two vertical title variants found in GP088_03. Alpha-layout alignment proves source boxes `(300,0)-(355,410)` and `(365,0)-(425,410)` at offsets `(-223,+14)` and `(-87,+14)`; with the flattened banner band `y=245..324` excluded, Dice scores are 0.8758 and 0.8765. v9 promotes that relationship into the generic `RegionTransfer` atlas-repack class. The original gold `re:charge` banner is flattened together with Japanese glyphs and has no clean source texture; the official English remaster GP088 art omits that banner, so v9 rebuilds GP088_12 transparently from only the official-English GP088_03 title regions rather than synthesizing missing art. GP088_13 is already an English `re:charge` badge and is unchanged.
 
 ## Startup v8 static candidate
 
@@ -248,3 +250,17 @@ Candidate: `/private/tmp/kowloon-recharge-startup-en-v8.iso`
 - Pillow-enabled suite: **126 tests OK** (1 owned-corpus skip).
 
 The final-image verifier now checks the live libkernel heap break, all eight name prompts, the proven memory-card English pointers/text, 31 startup graphics including B_GP088, H.A.N.T., ADV layout, ROFS resolution and the DG00 text/choice slice. Runtime proof remains mandatory.
+
+
+## Startup v9 static candidate
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v9.iso`
+
+- SHA-256: `6770862cbde8edf301afdef7778d440c0d2eab99806d732724afc6ef5a279d76`;
+- same 1,144-overlay / 891-in-place / 253-relocated plan as v8;
+- final ELF size 8,403,943 bytes, post-ROFS SHA-256 `5c1cee88e6cb9c2aaf4710a928ce24fb013beb3a56f3fd98b94654ef1f507fdd`;
+- final-image startup acceptance: **121/121**, including a named GP088_12 chunk check;
+- dependency-free suite: **130 tests OK** (8 expected skips);
+- Pillow-enabled suite: **130 tests OK** (1 owned-corpus skip).
+
+Runtime proof remains mandatory; no PCSX2 launch has been performed for v8 or v9.

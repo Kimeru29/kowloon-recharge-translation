@@ -91,21 +91,21 @@ Runtime proved that folding uppercase into the seven PS2-reachable keyboard rows
 
 Static tracing after this run found the freeze/truncation root cause: v6/v7 moved the startup heap instruction and ELF heap metadata to `0x00A02F00`, but libkernel's live `sbrk` heap-break word at file offset `0x650014` still contained `0x00902F00`, the translation PT_LOAD base. Normal allocations could therefore overwrite the relocated prompt/H.A.N.T. payload in RAM.
 
-## Current static candidate — startup v8
+## Current static candidate — startup v9
 
-- path: `/private/tmp/kowloon-recharge-startup-en-v8.iso`
-- SHA-256: `7431f7f44eb9ed14927f2181491b02217efe8675c64c4c07789d13ad934aa550`
+- path: `/private/tmp/kowloon-recharge-startup-en-v9.iso`
+- SHA-256: `6770862cbde8edf301afdef7778d440c0d2eab99806d732724afc6ef5a279d76`
 - final post-ROFS ELF SHA-256: `5c1cee88e6cb9c2aaf4710a928ce24fb013beb3a56f3fd98b94654ef1f507fdd`
 - final ELF size: 8,403,943 bytes
 - 1,144 overlays; 891 in place / 253 relocated
-- executable itself relocated from outer extent 288 to 1,013,782 through the tested builder path because it crossed the previous sector allocation
+- executable relocated from outer extent 288 to 1,013,782 through the tested builder path
 - 1,144/1,144 ROFS records patched/re-resolved
-- final-image startup acceptance: **120/120**
-- dependency-free suite: **126 tests OK** (6 expected skips)
-- Pillow-enabled suite: **126 tests OK** (1 owned-corpus skip)
+- final-image startup acceptance: **121/121**
+- dependency-free suite: **130 tests OK** (8 expected skips)
+- Pillow-enabled suite: **130 tests OK** (1 owned-corpus skip)
 - runtime status: **not yet tested**; use `docs/LOCALIZATION_STATUS.md` as the authoritative checklist.
 
-v8 patches all known heap ownership sites, relocates the proven memory-card pointer-table subset to official English, and ports the direct same-name official `GP088_03` title texture. The PS2-specific packed `GP088_12/13` title atlas and structural 3+3 name buffers remain deliberately unresolved.
+v9 retains the v8 heap/memory-card fixes and adds the proven structural GP088_12 title-atlas repack. The two pristine GP088_03→GP088_12 transforms score 0.8758/0.8765 Dice after excluding the flattened banner band. The generated packed atlas uses only official-English `Kowloon High School Chronicle` / `Huanglong High School Chronicle` title regions; the official English remaster omits the old flattened gold `re:charge` banner. Structural 3+3 name storage remains unresolved.
 
 ## Startup renderer/storage classes
 
@@ -209,8 +209,9 @@ PS2-only lexical proxy:
 - `tools/memory_card_ui.py` — fail-closed memory-card pointer-table correspondence + official English encoding
 - `tools/startup_acceptance.py` — reproducible final-ISO startup/renderer-class verifier
 - `tools/early_ui.py`, `tools/elf_strings.py` — executable UI build/slot handling
-- `tools/graphics_port.py` — optional-Pillow indexed PS2 graphics port
-- `tools/startup_graphics.py` — quote, B_GP019, and proven direct B_GP088 startup graphics transforms
+- `tools/graphics_port.py` — optional-Pillow indexed PS2 graphics port, including raw-RGBA atlas output
+- `tools/graphics_layout.py` — generic fail-closed region-transfer / alpha-layout proof for structurally changed atlases
+- `tools/startup_graphics.py` — quote, B_GP019, direct GP088, and structural GP088_12 startup graphics transforms
 - `tools/translation_overlay.py` — overlay path policy/precedence and relocation planning; supports ADV scripts plus explicit startup BLBRD assets
 - `tools/elf_rofs.py` — executable ROFS lookup/patching
 - `tools/build_translation_iso.py` — nested CVM/ISO builder + final-image/ROFS verification
@@ -221,7 +222,7 @@ PS2-only lexical proxy:
 
 v7 was runtime-tested after explicit approval. It proved uppercase reachability and kept the accepted startup/name-entry surfaces, but the relocated reading prompt was truncated to `Enter` and finishing the state froze. Static reverse engineering identified the stale libkernel heap-break collision described above.
 
-v8 is statically verified with the allocator fix plus the proven memory-card UI and direct GP088_03 backport. Before launching v8, state the exact checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval. Do not claim the freeze fixed until runtime advances beyond the reading/confirmation flow.
+v9 is statically verified with the allocator fix, proven memory-card UI, direct GP088_03 backport, and structural GP088_12 English atlas. Before launching v9, state the exact checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval. Do not claim the freeze fixed until runtime advances beyond the reading/confirmation flow.
 
 ## Resume procedure
 

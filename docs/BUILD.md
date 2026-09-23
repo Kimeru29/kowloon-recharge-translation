@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v8 result: 126 tests; the dependency-free run passes with 6 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v9 result: 130 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -350,3 +350,38 @@ Current v8 static result:
 - Pillow-enabled suite: **126 tests OK** (1 owned-corpus skip).
 
 Do not launch v8 automatically. Follow the exact runtime checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval before launching PCSX2.
+
+
+## Build startup v9 candidate
+
+v9 supersedes the unlaunched v8 candidate by adding a proven structural GP088_12 atlas repack. Regenerate `local/startup-graphics/BLBRD/B_GP088.BIN` with the same `port_title_startup_graphics` command above; the function now validates the pristine GP088_03→GP088_12 alpha layout and rebuilds GP088_12 from official-English GP088_03 regions.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v9.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v9.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v9.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v9.json
+```
+
+Current v9 static result:
+
+- ISO SHA-256: `6770862cbde8edf301afdef7778d440c0d2eab99806d732724afc6ef5a279d76`;
+- final post-ROFS ELF SHA-256: `5c1cee88e6cb9c2aaf4710a928ce24fb013beb3a56f3fd98b94654ef1f507fdd`;
+- 1,144 overlays; 891 in place / 253 relocated; 1,144 ROFS records patched;
+- +900 embedded sectors; 17 shifted outer files; whole ISO remains 2,095,382,528 bytes;
+- final-image startup verifier: **121/121**;
+- dependency-free suite: **130 tests OK** (8 expected skips);
+- Pillow-enabled suite: **130 tests OK** (1 owned-corpus skip).
+
+Do not launch v9 automatically. Follow the exact runtime checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval before launching PCSX2.

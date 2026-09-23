@@ -304,6 +304,40 @@ def verify_startup_candidate(candidate, startup_graphics_root) -> dict[str, Any]
                 )
             )
 
+            # Keep the structurally repacked title atlas independently visible in
+            # acceptance reports even though the whole B_GP088 container is also
+            # compared byte-for-byte above.
+            from tools.tmx import find_tmx_entry
+
+            gp088_expected_path = startup_graphics_root / "BLBRD/B_GP088.BIN"
+            packed_ok = gp088_expected_path.is_file()
+            packed_detail = f"missing expected GP088 container {gp088_expected_path}"
+            if packed_ok:
+                expected_gp088 = gp088_expected_path.read_bytes()
+                gp088_record = find_record(embedded_records, "BLBRD/B_GP088.BIN")
+                actual_gp088 = bytes(
+                    image[
+                        embedded_base + gp088_record.extent * SECTOR_SIZE:
+                        embedded_base + gp088_record.extent * SECTOR_SIZE + gp088_record.size
+                    ]
+                )
+                try:
+                    expected_entry = find_tmx_entry(expected_gp088, "GRP088/GP088_12.TMX")
+                    actual_entry = find_tmx_entry(actual_gp088, "GRP088/GP088_12.TMX")
+                except ValueError as exc:
+                    packed_ok = False
+                    packed_detail = str(exc)
+                else:
+                    expected_chunk = expected_gp088[
+                        expected_entry.base_offset:expected_entry.base_offset + expected_entry.chunk_size
+                    ]
+                    actual_chunk = actual_gp088[
+                        actual_entry.base_offset:actual_entry.base_offset + actual_entry.chunk_size
+                    ]
+                    packed_ok = actual_chunk == expected_chunk
+                    packed_detail = "finished GP088_12 packed title differs from generated English atlas"
+            checks.append(_check("graphics_gp088_12_packed_title", packed_ok, packed_detail))
+
             dg00_mtx_record = find_record(embedded_records, "ADV/DG/DG00_00.MTX")
             dg00_mtx = bytes(
                 image[

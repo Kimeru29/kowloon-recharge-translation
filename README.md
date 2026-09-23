@@ -6,20 +6,20 @@ This repository intentionally contains **no game image, package, executable, ext
 
 ## Current status
 
-The project can build a deterministic whole-game translation candidate from the pristine PS2 ISO. The current **startup v8** candidate keeps the broad script import and fixes the v7 runtime translation-segment collision while expanding the proven startup UI/graphics classes:
+The project can build a deterministic whole-game translation candidate from the pristine PS2 ISO. The current **startup v9** candidate keeps the broad script import and the v8 allocator/memory-card fixes, then promotes the PS2-specific GP088 packed title atlas into a proven structural graphics class:
 
 - exact MTX: **962 files / 56,642** official English entries;
 - changed/template MTX: **7 files / 2,284** official entries;
 - exact KSF: **868** fitting official fields; 48 overflows and 4 ambiguous entries remain fail-closed;
 - startup executable UI: exact title/name/profile text, PS2-adapted Latin keyboard, H.A.N.T. long text, and a proven subset of memory-card messages relocated to official English;
-- startup graphics: official English `B_GP019`, direct `B_GP088/GP088_03`, and all **29** `BLBRD/INIT_MES/TR000–TR028.TMX` quotation images;
-- v7 runtime proved uppercase reachability but exposed a translation-PT_LOAD/heap collision: libkernel's live `sbrk` break still started at `0x00902F00`, corrupting the relocated reading prompt and then freezing the flow;
-- v8 moves that runtime heap break to `0x00A02F00` along with the other heap metadata;
+- startup graphics: official English `B_GP019`, direct `B_GP088/GP088_03`, structurally repacked English `B_GP088/GP088_12`, and all **29** `BLBRD/INIT_MES/TR000–TR028.TMX` quotation images;
+- v7 runtime proved uppercase reachability but exposed a translation-PT_LOAD/heap collision; v8 moves libkernel's live `sbrk` break to `0x00A02F00` with the other heap metadata;
+- v9 proves the GP088_03→GP088_12 atlas relationship with two fail-closed alpha-layout transforms (Dice ≈0.876 each) and rebuilds the packed atlas from official English art;
 - current candidate: **1,144 overlay assets**, 891 in place / 253 relocated, with all 1,144 executable ROFS records re-resolved;
-- v8 startup final-image acceptance: **120/120 checks passed**;
-- candidate SHA-256: `7431f7f44eb9ed14927f2181491b02217efe8675c64c4c07789d13ad934aa550`;
-- full Pillow-enabled test suite: **126 tests OK** (one owned-corpus skip);
-- runtime proof for v8 is still required. The 3+3 permanent-name structure and PS2-specific packed GP088 title atlas remain explicit unresolved items.
+- v9 startup final-image acceptance: **121/121 checks passed**;
+- candidate SHA-256: `6770862cbde8edf301afdef7778d440c0d2eab99806d732724afc6ef5a279d76`;
+- full Pillow-enabled test suite: **130 tests OK** (one owned-corpus skip);
+- runtime proof for v9 is still required. The structural 3+3 permanent-name storage remains an explicit unresolved runtime limitation.
 
 Exact file identity is deliberately not treated as sufficient proof. Indirect/dynamic localization maps, KSF overflows, ambiguous structural mappings, and unproven graphics-atlas transformations remain untouched until correspondence/layout is proven.
 

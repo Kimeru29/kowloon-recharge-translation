@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from tools.graphics_port import port_png_into_container, port_png_into_standalone_tmx
+from tools.graphics_port import port_png_into_container, port_png_into_standalone_tmx, port_rgba_into_container
 from tools.tmx import decode_tmx_rgba, find_tmx_entry, parse_standalone_tmx
 from tests.test_tmx import make_container
 
@@ -42,6 +42,20 @@ class GraphicsPortTests(unittest.TestCase):
         pixels = decode_tmx_rgba(out, entry)
         self.assertEqual({(12, 34, 56, 255)}, {tuple(pixels[i:i+4]) for i in range(0, len(pixels), 4)})
         self.assertEqual(b"TAIL", out[-4:])
+
+    def test_ports_rgba_bytes_into_container_without_temp_png(self) -> None:
+        blob = make_container(width=4, height=2)
+        rgba = bytes((21, 43, 65, 255)) * 8
+        out = port_rgba_into_container(
+            blob,
+            "GRP999/GP999_00.TMX",
+            rgba,
+            source_size=(4, 2),
+        )
+        self.assertEqual(len(blob), len(out))
+        entry = find_tmx_entry(out, "GRP999/GP999_00.TMX")
+        pixels = decode_tmx_rgba(out, entry)
+        self.assertEqual({(21, 43, 65, 255)}, {tuple(pixels[i:i+4]) for i in range(0, len(pixels), 4)})
 
 
 if __name__ == "__main__":

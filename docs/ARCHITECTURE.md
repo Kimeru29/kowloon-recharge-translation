@@ -38,9 +38,10 @@ The first accepted graphics scope is startup-specific:
 
 - `BLBRD/B_GP019.BIN` — name-entry controls;
 - `BLBRD/B_GP088.BIN` / `GP088_03` — direct same-layout official English startup/title texture;
+- `BLBRD/B_GP088.BIN` / `GP088_12` — structurally repacked title atlas derived from proven GP088_03 regions;
 - `BLBRD/INIT_MES/TR000.TMX` through `TR028.TMX` — the 29 opening quotation images.
 
-Structurally changed atlases are a separate class. In particular, PS2 `GP088_12/13` packs title artwork differently from the remaster's `GP088_10/11`; no automated import is accepted until that transform is proven.
+Structurally changed atlases use the generic fail-closed `tools.graphics_layout` class: declarative source rectangles plus coordinate offsets are validated against the pristine target by alpha-mask Dice overlap before localized regions are repacked. GP088_12 is the first accepted instance: two GP088_03 regions map at `(-223,+14)` and `(-87,+14)`, scoring 0.8758/0.8765 after excluding the known flattened banner band. Unproven atlas layouts remain rejected.
 
 Generated graphics remain local-only; repository code stores no copyrighted artwork.
 
