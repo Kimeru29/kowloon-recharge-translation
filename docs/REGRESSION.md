@@ -6,7 +6,7 @@ The project is cumulative: once a translation is accepted, later builds must not
 
 `translations/accepted.json` stores stable IDs, source/output hashes and provenance rather than copyrighted script content. It currently records the historical accepted DG00 MTX, constrained DG00 KSF, and the previously accepted early-UI ELF checkpoint.
 
-v5 and v6 were runtime-tested and both failed the full startup acceptance scope. v6 advanced farther and proved several startup surfaces, but failed in name entry (3+3 geometry, inaccessible uppercase rows, hidden reading prompt, then apparent freeze). Neither candidate is promoted as the complete startup checkpoint. v7 static verification is additive evidence only; promotion still requires the relevant runtime acceptance.
+v5, v6 and v7 were runtime-tested and all failed the full startup acceptance scope. v7 proved the uppercase-keyboard adaptation but exposed a translation-segment/heap collision: the full relocated reading prompt rendered only as `Enter`, then the flow froze. Static tracing found libkernel's live heap break still overlapping the translation PT_LOAD. v8 fixes that allocator invariant and expands startup coverage, but remains static evidence only until runtime acceptance.
 
 ## Gate semantics
 
@@ -32,11 +32,11 @@ The generic builder validates the completed nested image, not only intermediate 
 - every overlay payload in the finished ISO hashes to its generated overlay input;
 - the 17 shifted outer-tail files remain byte-identical;
 - `SLPM_665.11` may grow/relocate only through the tested builder path and retains `SLPM-66511` + `BISLPM-66511Save`;
-- every one of the **1,143** overlay assets has a unique executable ROFS record that re-resolves to its final size/extent;
+- every one of the **1,144** overlay assets has a unique executable ROFS record that re-resolves to its final size/extent;
 - startup graphics retain the exact pristine file size, differ from pristine content, and hash exactly to their local generated overlay;
-- `tools/startup_acceptance.py` independently reopens the final ISO and checks title/name wide-pointer paths, Latin keyboard, ADV horizontal renderer instructions, active translation PT_LOAD, H.A.N.T. relocated pointers/text, 30 startup graphics + ROFS records, DG00 English/removal assertions and DG00 KSF choices.
+- `tools/startup_acceptance.py` independently reopens the final ISO and checks title/name wide-pointer paths, Latin keyboard, ADV horizontal renderer instructions, active translation PT_LOAD, H.A.N.T. relocated pointers/text, 31 startup graphics + ROFS records, DG00 English/removal assertions and DG00 KSF choices.
 
-Historical v6 final-image acceptance was **96/96** despite the later runtime failure; this is why static acceptance is necessary but not sufficient. v7 final-image acceptance is **98/98** (`local/startup-acceptance-v7.json`), adding both reading prompts; the exact PS2-adapted keyboard bytes are also verified and the unit suite asserts uppercase reachability.
+Historical v6 (**96/96**) and v7 (**98/98**) final-image acceptance both preceded runtime failures; this is why static acceptance is necessary but not sufficient. v8 final-image acceptance is **120/120** (`local/startup-acceptance-v8.json`). It additionally verifies libkernel's live heap break is outside the translation PT_LOAD, the proven memory-card English pointer subset, and the B_GP088 startup graphic alongside the prior renderer/data checks.
 
 ## Save compatibility smoke test
 

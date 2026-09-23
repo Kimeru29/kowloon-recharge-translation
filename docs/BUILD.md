@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current result after the v7 name-entry regression work: 122 tests; the optional-Pillow run passes all 122.
+Current v8 result: 126 tests; the dependency-free run passes with 6 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -284,3 +284,69 @@ Current v7 static result:
 - Pillow-enabled tests: **122/122**.
 
 Do not launch v7 automatically. Follow the exact runtime checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval before launching PCSX2.
+
+## Build startup v8 candidate
+
+v8 is the successor to the runtime-tested v7 build. It fixes the translation-PT_LOAD/runtime-heap collision, relocates the proven memory-card executable-text subset to official English, and adds the direct same-layout `B_GP088/GP088_03` English texture. The structural 3+3 name buffers and PS2-specific `GP088_12/13` packed title atlas remain unchanged.
+
+Before the ISO build, regenerate the direct GP088 overlay from the owned PS4 localized PNG extraction:
+
+```bash
+uv run --with pillow python - <<'PY'
+from pathlib import Path
+import mmap
+from tools.iso9660_patch import index_iso, find_record, SECTOR_SIZE
+from tools.startup_graphics import port_title_startup_graphics
+
+payload = Path('/private/tmp/kowloon-recharge-inspect/DATA_payload.iso')
+target = Path('local/startup-graphics/BLBRD/B_GP088.BIN')
+pngs = Path('/private/tmp/khc-ps4-en-textures/b_gp088_en')
+with payload.open('rb') as handle:
+    image = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+    try:
+        _, records = index_iso(image)
+        record = find_record(records, 'BLBRD/B_GP088.BIN')
+        raw = bytes(image[record.extent * SECTOR_SIZE:record.extent * SECTOR_SIZE + record.size])
+        localized = port_title_startup_graphics(raw, pngs)
+    finally:
+        image.close()
+target.parent.mkdir(parents=True, exist_ok=True)
+target.write_bytes(localized)
+PY
+```
+
+Build and verify only from the pristine ISO:
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v8.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v8.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v8.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v8.json
+```
+
+Current v8 static result:
+
+- ISO SHA-256: `7431f7f44eb9ed14927f2181491b02217efe8675c64c4c07789d13ad934aa550`;
+- 1,144 overlay files; 891 in place / 253 relocated;
+- translated ELF size: 8,403,943 bytes;
+- final post-ROFS ELF SHA-256: `5c1cee88e6cb9c2aaf4710a928ce24fb013beb3a56f3fd98b94654ef1f507fdd`;
+- the translated executable outgrew its original outer allocation and was relocated by the tested builder from extent 288 to 1,013,782;
+- 1,144 executable ROFS records patched/re-resolved;
+- +900 embedded sectors; 17 shifted outer files;
+- whole ISO remains 2,095,382,528 bytes;
+- final-image startup verifier: **120/120**;
+- dependency-free suite: **126 tests OK** (6 expected skips);
+- Pillow-enabled suite: **126 tests OK** (1 owned-corpus skip).
+
+Do not launch v8 automatically. Follow the exact runtime checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval before launching PCSX2.

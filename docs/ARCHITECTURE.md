@@ -26,7 +26,9 @@ PS4 KSF DC maps identify official strings, but English can exceed PS2 inline fie
 
 Renderer encoding is not assumed globally. The title renderer was runtime-proven to consume two-byte glyph units. The exact official labels are now stored in a verified 40-byte title arena: `New Game` remains at the first source slot and `Load Game` is moved within the arena with its pointer updated. Name-entry keyboard cells also remain two-byte glyphs and preserve the original 20-key logical geometry.
 
-Name/profile startup prompts are a separate two-byte-glyph class. Six official English prompts fit a verified module-local arena; the two reading prompts overflow that arena and are relocated by v7 into the shared executable translation PT_LOAD. Protagonist/default names are redirected to wide strings. Default/runtime kana-reading values can remain blank, but the active reading-input prompts must not be blank. All source preimages, staged/final pointer preimages, arena bounds, and emitted wide strings are fail-closed tests. Static tracing also shows the PS2 name editor has two structural 3-glyph permanent-name buffers; this is tracked as an unresolved renderer/input-structure issue rather than patched as data.
+Name/profile startup prompts are a separate two-byte-glyph class. Six official English prompts fit a verified module-local arena; the two reading prompts overflow that arena and are relocated into the shared executable translation PT_LOAD. Protagonist/default names are redirected to wide strings. Default/runtime kana-reading values can remain blank, but active reading-input prompts cannot. Static tracing also shows the PS2 name editor has two structural 3-glyph permanent-name buffers; this is tracked as an unresolved renderer/input-structure issue rather than patched as data.
+
+The translation PT_LOAD owns a 1 MiB VA window starting at `0x00902F00`. Reserving that window requires moving not only startup/ELF heap metadata but also libkernel's live `sbrk` break word at file offset `0x650014`; v7 runtime proved that omitting this third owner lets the allocator corrupt relocated strings. v8 treats all three as one fail-closed allocator invariant. The same segment is the generic storage class for proven executable-resident long text, currently name-reading prompts, H.A.N.T., and a proven subset of memory-card UI messages.
 
 ## PS2 indexed graphics
 
@@ -35,7 +37,10 @@ Name/profile startup prompts are a separate two-byte-glyph class. Six official E
 The first accepted graphics scope is startup-specific:
 
 - `BLBRD/B_GP019.BIN` — name-entry controls;
-- `BLBRD/INIT_MES/TR000.TMX` through `TR028.TMX` — the 29 random opening quotation images.
+- `BLBRD/B_GP088.BIN` / `GP088_03` — direct same-layout official English startup/title texture;
+- `BLBRD/INIT_MES/TR000.TMX` through `TR028.TMX` — the 29 opening quotation images.
+
+Structurally changed atlases are a separate class. In particular, PS2 `GP088_12/13` packs title artwork differently from the remaster's `GP088_10/11`; no automated import is accepted until that transform is proven.
 
 Generated graphics remain local-only; repository code stores no copyrighted artwork.
 

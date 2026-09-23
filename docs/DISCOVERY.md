@@ -135,6 +135,8 @@ All 29 English textures are now ported to same-size PS2 TMX files. `local/startu
 - all output sizes unchanged;
 - maximum mean absolute RGBA error versus the downscaled official image: **0.5594/255**.
 
+v7 runtime repeatedly showed the same quotation, but this is not an overlay duplication: the 29 generated TMXs have 29 distinct SHA-256 values. Static MIPS tracing at `0x2AD0B8` calls the game PRNG, divides by `0x1D`, and uses the remainder as the `TR%03d` index. Repetition is therefore a seed/runtime-behavior question, not a localization asset defect.
+
 ## Indexed TMX graphics format/tooling
 
 Proven PS2 indexed formats:
@@ -187,7 +189,11 @@ Reverse engineering connected the script record writer and renderer:
 
 ## Executable translation segment / H.A.N.T. tutorial
 
-The H.A.N.T. startup tutorial pointer table is at `0x5C8C70`. The pristine ELF's second PT_LOAD is zero-sized at virtual address `0x00902F00`; v6 activates it as a reusable translated-text segment. It appends the English payload, reserves a 1 MiB VA window, moves the heap start from `0x00902F00` to `0x00A02F00`, and repoints tutorial entries to wide official English. Exact program-header and heap-instruction preimages are enforced.
+The H.A.N.T. startup tutorial pointer table is at `0x5C8C70`. The pristine ELF's second PT_LOAD is zero-sized at virtual address `0x00902F00`; localization activates it as a reusable translated-text segment and reserves a 1 MiB VA window through `0x00A02F00`.
+
+v7 runtime exposed an allocator invariant that the original implementation missed. The startup heap instruction and ELF heap metadata had been moved to `0x00A02F00`, but libkernel's live `sbrk` break word at file offset `0x650014` still contained `0x00902F00`. The allocator routine at `0x387E60` reads/advances that word, so normal allocations could overwrite the translation PT_LOAD. This explains the v7 reading prompt degrading from the statically correct full string to visible `Enter` and the later freeze. v8 validates and moves all known heap ownership sites to `0x00A02F00`.
+
+The shared segment now carries H.A.N.T., the two overflow name-reading prompts, and the proven subset of executable memory-card UI strings. Exact program-header, heap, source-string and pointer preimages are enforced.
 
 ## Startup v6 static candidate
 
@@ -210,14 +216,35 @@ v6 was subsequently runtime-tested after explicit approval. The opening quotatio
 
 Static tracing after that run proves R1/L1 changes the field-position cursor, not a keyboard page. It also proves the 3+3 limit is embedded in buffer sizes, field split/layout, append gates, and delete logic; it is not safe to solve by changing a single limit constant. v7 therefore restores both official reading prompts and folds uppercase into rows 0..6, but intentionally leaves 3+3 unchanged pending a buffer-safe direct-Latin design.
 
-## Startup v7 static candidate
+## Startup v7 runtime result
 
 Candidate: `/private/tmp/kowloon-recharge-startup-en-v7.iso`
 
 - SHA-256: `f43e2e6bf92dd48c09a43093748d2dea112e361e7c3ca33ed540770c1d6d56ed`;
-- final post-ROFS ELF SHA-256: `b4b21905f920f8fb6472c198088d990f631f9d6f0ab02d3e66d05c86c3fb4432`;
-- final ELF size: 8,402,095 bytes;
-- final-image startup acceptance: **98/98**;
-- full Pillow-enabled suite: **122/122**.
+- static acceptance: **98/98**.
 
-The two extra acceptance checks versus v6 are the restored name-reading prompt pointers/text. The exact keyboard row bytes are also verified in the final ELF, and the source suite separately asserts that the seven PS2-reachable rows contain `a-z`, `A-Z`, and `0-9`. Runtime proof is still required.
+Runtime proved the uppercase-folding design: lowercase and uppercase are visible/selectable in the seven reachable rows. The original 3+3 permanent-name geometry remained. The next reading-input screen rendered only `Enter` even though the full official prompt was present in the final ELF, and finishing that state froze. The same run also exposed Japanese memory-card/title startup content.
+
+## Memory-card executable UI
+
+The startup stone-panel message belongs to a 27-entry executable pointer table at file offset `0x407440`. The observed entry is the PS2 memory-card-slot-1 checking state. `English.bytes` contains a structurally aligned official memory-card sequence (`Checking memory card slot 1`, `Loading...`, `Data loaded`, save/format/error prompts, etc.). v8 relocates only the proven corresponding entries into the shared translation segment. Eight re:charge-specific clear-data entries without proven official counterparts remain untouched.
+
+## GP088 startup/title graphics
+
+The red-sky/title startup scene uses `BLBRD/B_GP088.BIN`. The official English bundle `b_gp088_en` has a direct same-name/same-purpose counterpart for `GP088_03`; v8 ports that texture through the normal indexed-TMX pipeline while preserving container size. The large Japanese logo seen in the v7 screenshot is also represented by the PS2-specific packed `GP088_12/13` atlas. PS4 `GP088_10/11` are clearly the JP/EN title-color variants, but the transformation into the PS2 packed atlas is structurally different and is not yet automated without further proof.
+
+## Startup v8 static candidate
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v8.iso`
+
+- SHA-256: `7431f7f44eb9ed14927f2181491b02217efe8675c64c4c07789d13ad934aa550`;
+- final post-ROFS ELF SHA-256: `5c1cee88e6cb9c2aaf4710a928ce24fb013beb3a56f3fd98b94654ef1f507fdd`;
+- final ELF size: 8,403,943 bytes;
+- 1,144 overlays; 891 in place / 253 relocated;
+- translated ELF relocated by the tested builder from outer extent 288 to 1,013,782;
+- 1,144 executable ROFS records patched/re-resolved;
+- final-image startup acceptance: **120/120**;
+- dependency-free suite: **126 tests OK** (6 expected skips);
+- Pillow-enabled suite: **126 tests OK** (1 owned-corpus skip).
+
+The final-image verifier now checks the live libkernel heap break, all eight name prompts, the proven memory-card English pointers/text, 31 startup graphics including B_GP088, H.A.N.T., ADV layout, ROFS resolution and the DG00 text/choice slice. Runtime proof remains mandatory.

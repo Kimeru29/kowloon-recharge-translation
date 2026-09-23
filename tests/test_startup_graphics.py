@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from tests.test_tmx import make_container
-from tools.startup_graphics import port_name_entry_graphics, port_quote_graphic
+from tools.startup_graphics import port_name_entry_graphics, port_quote_graphic, port_title_startup_graphics
 from tools.tmx import decode_tmx_rgba, find_tmx_entry, parse_standalone_tmx
 
 try:
@@ -27,6 +27,20 @@ class StartupGraphicsTests(unittest.TestCase):
         entry = parse_standalone_tmx(out, "TR028.TMX")
         rgba = decode_tmx_rgba(out, entry)
         self.assertEqual({(11, 22, 33, 255)}, {tuple(rgba[i:i+4]) for i in range(0, len(rgba), 4)})
+
+
+    def test_ports_direct_title_logo_counterpart_into_same_size_container(self) -> None:
+        container = make_container(width=4, height=2)
+        container = container.replace(b"GRP999/GP999_00.TMX", b"GRP088/GP088_03.TMX")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            Image.new("RGBA", (8, 4), (9, 8, 7, 255)).save(root / "GP088_03.png")
+            out = port_title_startup_graphics(container, root)
+
+        self.assertEqual(len(container), len(out))
+        entry = find_tmx_entry(out, "GRP088/GP088_03.TMX")
+        rgba = decode_tmx_rgba(out, entry)
+        self.assertEqual({(9, 8, 7, 255)}, {tuple(rgba[i:i+4]) for i in range(0, len(rgba), 4)})
 
     def test_ports_both_name_entry_pngs_into_same_size_container(self) -> None:
         # Build a synthetic two-entry container using the real container parser's

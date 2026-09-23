@@ -6,6 +6,7 @@ from hashlib import sha256
 
 from tools.hant_ui import HANT_ENGLISH_LINES, HANT_POINTER_TABLE_OFFSET
 from tools.localization import encode_ps2_english
+from tools.memory_card_ui import MEMORY_CARD_MESSAGES, MEMORY_CARD_POINTER_TABLE_OFFSET, encode_memory_card_english
 from tools.startup_ui import (
     KEYBOARD_ROW_PATCHES,
     NAME_DEFAULT_POINTER_OFFSETS,
@@ -20,6 +21,7 @@ from tools.startup_ui import (
 
 STARTUP_GRAPHICS_PATHS: tuple[str, ...] = (
     "BLBRD/B_GP019.BIN",
+    "BLBRD/B_GP088.BIN",
     *(f"BLBRD/INIT_MES/TR{index:03d}.TMX" for index in range(29)),
 )
 
@@ -27,6 +29,8 @@ _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
 _SECOND_PH_OFFSET = 0x54
 _TRANSLATION_VADDR = 0x00902F00
+_RUNTIME_HEAP_BREAK_OFFSET = 0x650014
+_EXPECTED_RUNTIME_HEAP_START = 0x00A02F00
 _ADV_PATCH_WORDS = (
     (0x14FA60, 0x80430465),
     (0x14FA68, 0x00031843),
@@ -172,6 +176,17 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
 
     segment = _translation_segment(raw)
     checks.append(_check("translation_segment", segment is not None, "translation PT_LOAD is not active/valid"))
+    heap_break_ok = (
+        _RUNTIME_HEAP_BREAK_OFFSET + 4 <= len(raw)
+        and struct.unpack_from("<I", raw, _RUNTIME_HEAP_BREAK_OFFSET)[0] == _EXPECTED_RUNTIME_HEAP_START
+    )
+    checks.append(
+        _check(
+            "runtime_heap_break",
+            heap_break_ok,
+            "libkernel heap break still overlaps the translation PT_LOAD",
+        )
+    )
     hant_ok = segment is not None
     if segment is not None:
         p_offset, p_vaddr, p_filesz, _p_memsz = segment
@@ -191,6 +206,25 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
                 hant_ok = False
                 break
     checks.append(_check("hant_tutorial", hant_ok, "H.A.N.T pointers do not resolve to translated wide text"))
+
+    for index, (_source_offset, _source, english) in MEMORY_CARD_MESSAGES.items():
+        ok = segment is not None
+        detail = f"memory-card entry {index} does not resolve to official English"
+        if segment is not None:
+            p_offset, p_vaddr, p_filesz, _p_memsz = segment
+            pointer_offset = MEMORY_CARD_POINTER_TABLE_OFFSET + index * 4
+            if pointer_offset + 4 > len(raw):
+                ok = False
+            else:
+                target_va = struct.unpack_from("<I", raw, pointer_offset)[0]
+                relative = target_va - p_vaddr
+                expected = encode_memory_card_english(english) + b"\x00"
+                if relative < 0 or relative + len(expected) > p_filesz:
+                    ok = False
+                else:
+                    target_file = p_offset + relative
+                    ok = raw[target_file:target_file + len(expected)] == expected
+        checks.append(_check(f"memory_card_{index}", ok, detail))
     return checks
 
 

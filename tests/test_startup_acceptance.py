@@ -20,7 +20,9 @@ class StartupAcceptanceTests(unittest.TestCase):
         names = {check["name"] for check in checks}
         self.assertIn("adv_horizontal_layout", names)
         self.assertIn("translation_segment", names)
+        self.assertIn("runtime_heap_break", names)
         self.assertIn("hant_tutorial", names)
+        self.assertIn("memory_card_1", names)
         self.assertIn("name_prompt_0", names)
         self.assertIn("name_prompt_2", names)
         self.assertIn("name_prompt_3", names)
@@ -35,9 +37,10 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("name_prompt_0", failed_names)
 
     def test_startup_graphics_manifest_is_complete_and_stable(self) -> None:
-        self.assertEqual(30, len(STARTUP_GRAPHICS_PATHS))
+        self.assertEqual(31, len(STARTUP_GRAPHICS_PATHS))
         self.assertEqual("BLBRD/B_GP019.BIN", STARTUP_GRAPHICS_PATHS[0])
-        self.assertEqual("BLBRD/INIT_MES/TR000.TMX", STARTUP_GRAPHICS_PATHS[1])
+        self.assertEqual("BLBRD/B_GP088.BIN", STARTUP_GRAPHICS_PATHS[1])
+        self.assertEqual("BLBRD/INIT_MES/TR000.TMX", STARTUP_GRAPHICS_PATHS[2])
         self.assertEqual("BLBRD/INIT_MES/TR028.TMX", STARTUP_GRAPHICS_PATHS[-1])
 
 

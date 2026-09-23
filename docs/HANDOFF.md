@@ -81,19 +81,31 @@ Candidate:
 - Pillow-enabled suite: **121/121 tests pass**
 - runtime was executed after explicit approval; it passed through `Enter last name.` but exposed the name-entry defects below.
 
-## Current static candidate — startup v7
+## v7 runtime result — improved name entry, still failed
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v7.iso`
 - SHA-256: `f43e2e6bf92dd48c09a43093748d2dea112e361e7c3ca33ed540770c1d6d56ed`
-- final post-ROFS ELF SHA-256: `b4b21905f920f8fb6472c198088d990f631f9d6f0ab02d3e66d05c86c3fb4432`
-- final ELF size: 8,402,095 bytes
-- 1,143 overlays; 890 in place / 253 relocated
-- 1,143/1,143 ROFS records patched/re-resolved
-- final-image startup acceptance: **98/98**
-- Pillow-enabled suite: **122/122**
+- static acceptance: **98/98**
+
+Runtime proved that folding uppercase into the seven PS2-reachable keyboard rows works. The structural 3+3 name limit remained visible as expected. The next reading-input screen, however, rendered only `Enter` even though the final ELF contained the full relocated `Enter reading for last name.` string, and finishing that state froze again. The pre-title memory-card/status panel and packed title artwork also still contained Japanese.
+
+Static tracing after this run found the freeze/truncation root cause: v6/v7 moved the startup heap instruction and ELF heap metadata to `0x00A02F00`, but libkernel's live `sbrk` heap-break word at file offset `0x650014` still contained `0x00902F00`, the translation PT_LOAD base. Normal allocations could therefore overwrite the relocated prompt/H.A.N.T. payload in RAM.
+
+## Current static candidate — startup v8
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v8.iso`
+- SHA-256: `7431f7f44eb9ed14927f2181491b02217efe8675c64c4c07789d13ad934aa550`
+- final post-ROFS ELF SHA-256: `5c1cee88e6cb9c2aaf4710a928ce24fb013beb3a56f3fd98b94654ef1f507fdd`
+- final ELF size: 8,403,943 bytes
+- 1,144 overlays; 891 in place / 253 relocated
+- executable itself relocated from outer extent 288 to 1,013,782 through the tested builder path because it crossed the previous sector allocation
+- 1,144/1,144 ROFS records patched/re-resolved
+- final-image startup acceptance: **120/120**
+- dependency-free suite: **126 tests OK** (6 expected skips)
+- Pillow-enabled suite: **126 tests OK** (1 owned-corpus skip)
 - runtime status: **not yet tested**; use `docs/LOCALIZATION_STATUS.md` as the authoritative checklist.
 
-v7 restores both official reading prompts and makes both Latin cases reachable without altering the proven PS2 two-byte key geometry. The 3+3 name-buffer structure is intentionally unchanged.
+v8 patches all known heap ownership sites, relocates the proven memory-card pointer-table subset to official English, and ports the direct same-name official `GP088_03` title texture. The PS2-specific packed `GP088_12/13` title atlas and structural 3+3 name buffers remain deliberately unresolved.
 
 ## Startup renderer/storage classes
 
@@ -142,7 +154,7 @@ The visible Japanese control captions are baked into `BLBRD/B_GP019.BIN`, especi
 
 ### Executable long-text / H.A.N.T class
 
-The H.A.N.T. tutorial is an executable pointer table at `0x5C8C70`; its visible strings do not safely fit their Japanese slots. The pristine ELF has a zero-sized second PT_LOAD at virtual address `0x00902F00`. v6 activated it as a reusable translation text segment, reserves a 1 MiB virtual window by moving only the heap start, packs the wide official English there, and repoints the H.A.N.T. table. v7 reuses the same segment for the two overflow name-reading prompts as well; the mechanism remains the general class for proven executable-resident long strings.
+The H.A.N.T. tutorial is an executable pointer table at `0x5C8C70`; its visible strings do not safely fit their Japanese slots. The pristine ELF has a zero-sized second PT_LOAD at virtual address `0x00902F00`. The localization activates it as a reusable translation segment with a 1 MiB reserved VA window and moves the heap start to `0x00A02F00`. v7 runtime proved that moving only the startup heap instruction/ELF metadata was insufficient: libkernel's live `sbrk` break at file `0x650014` still pointed at the segment and corrupted it. v8 patches all three heap ownership sites. The shared segment now carries H.A.N.T., the two overflow name-reading prompts, and the proven memory-card English pointer-table subset.
 
 ## Current corpus/import coverage
 
@@ -193,22 +205,23 @@ PS2-only lexical proxy:
 - `tools/startup_ui.py` — title arena, wide startup prompt/name relocation and Latin keyboard
 - `tools/adv_layout.py` — fail-closed ADV vertical→horizontal renderer transform
 - `tools/elf_translation_segment.py` — reusable second-PT_LOAD English text segment
-- `tools/hant_ui.py` — shared startup translation-segment payload: H.A.N.T. tutorial plus overflow name-reading prompts
+- `tools/hant_ui.py` — shared startup translation-segment payload: H.A.N.T., overflow name-reading prompts, and proven memory-card text
+- `tools/memory_card_ui.py` — fail-closed memory-card pointer-table correspondence + official English encoding
 - `tools/startup_acceptance.py` — reproducible final-ISO startup/renderer-class verifier
 - `tools/early_ui.py`, `tools/elf_strings.py` — executable UI build/slot handling
 - `tools/graphics_port.py` — optional-Pillow indexed PS2 graphics port
-- `tools/startup_graphics.py` — quote and B_GP019 startup graphics transforms
+- `tools/startup_graphics.py` — quote, B_GP019, and proven direct B_GP088 startup graphics transforms
 - `tools/translation_overlay.py` — overlay path policy/precedence and relocation planning; supports ADV scripts plus explicit startup BLBRD assets
 - `tools/elf_rofs.py` — executable ROFS lookup/patching
 - `tools/build_translation_iso.py` — nested CVM/ISO builder + final-image/ROFS verification
 - `tools/regression.py`, `tools/check_regression.py` — cumulative accepted-artifact/identity gate
 - `tools/graphics_inventory.py` — PS4 localized bundle inventory
 
-## v6 runtime result and next gate
+## Latest runtime result and next gate
 
-v6 was runtime-tested after explicit approval. It proved the opening quotation, title, English name-entry graphics, `Enter last name.` prompt, and lowercase Latin keyboard. It also exposed three blockers: the PS2-only 3+3 permanent-name geometry, inaccessible uppercase rows, and a blank active reading-input state caused by our suppressed prompts. Completing the hidden flow then appeared to freeze.
+v7 was runtime-tested after explicit approval. It proved uppercase reachability and kept the accepted startup/name-entry surfaces, but the relocated reading prompt was truncated to `Enter` and finishing the state froze. Static reverse engineering identified the stale libkernel heap-break collision described above.
 
-v7 restores both official reading prompts and puts uppercase into the reachable keyboard rows. The 3+3 geometry remains an explicit known bug. Before launching v7, state its exact expected sequence and wait for Pablo's explicit approval; do not claim the freeze fixed until a valid runtime pass advances beyond the reading/confirmation flow.
+v8 is statically verified with the allocator fix plus the proven memory-card UI and direct GP088_03 backport. Before launching v8, state the exact checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval. Do not claim the freeze fixed until runtime advances beyond the reading/confirmation flow.
 
 ## Resume procedure
 

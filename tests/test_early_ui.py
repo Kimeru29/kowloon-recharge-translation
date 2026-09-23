@@ -77,9 +77,11 @@ class EarlyUiPatchTests(unittest.TestCase):
         for off in (0x14FA60, 0x14FA68, 0x14FAA4, 0x14FAA8):
             allowed.update(range(off, off + 4))
         allowed.update(range(HANT_POINTER_TABLE_OFFSET, HANT_POINTER_TABLE_OFFSET + 17 * 4))
+        allowed.update(range(0x407440, 0x4074AC))
         # ELF program header / heap metadata used by the appended translation segment.
         allowed.update(range(0x54, 0x54 + 32))
         allowed.update(range(0x250, 0x254))
+        allowed.update(range(0x650014, 0x650018))
         allowed.update(range(0x8030BC, 0x8030C0))
 
         differences = {index for index, (before, after) in enumerate(zip(RAW, result[:len(RAW)])) if before != after}
