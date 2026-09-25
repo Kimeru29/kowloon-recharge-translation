@@ -86,6 +86,10 @@ Runtime proved the title renderer consumes two-byte glyph units: writing 8/9 sin
 
 Static reverse engineering then found a safe 40-byte source arena at `0x5CBDE8..0x5CBE10`. The current startup patch stores exact two-byte `New Game` and `Load Game`; `Load Game` moves to `0x5CBDFC` and its pointer is repointed. The third title pointer and following blank string remain untouched.
 
+v11 ownership tracing ties the title menu backing to the bounded `m_title.c` sprite table rather than the generic text renderer. File `0x5CBE60..0x5CBFB4` is exactly 17 20-byte `(group,index,depth,x,y)` records from groups 88/91, copied and instantiated by the title-state constructor. Records 11 and 12, at `0x5CBF3C` and `0x5CBF50`, are the only two `(88,12)` instances and resolve to `GRP088/GP088_12.TMX`. They are placed at `(64,296)` and `(376,296)`, while the two title-label anchors are `(68,299)` and `(380,299)`: the same `+4,+3` inset for both menu choices. The title state initializes both backing instances with X scale 0, attaches the same scale-animation helper to them immediately before constructing the two label objects, and later presents both at X scale 1.
+
+A fuller trace also disproved the earlier `(2,0x8E)` backing hypothesis. The label renderer does create one `(2,0x8E)` sprite before its `(2,0x8C)` glyph loop, but state 3 repeatedly updates that object's X coordinate as text reveal advances. It is therefore a moving reveal marker, not the static `New Game` / `Load Game` backing. Task 5 must operate on the paired `(88,12)` / `GP088_12` owner and preserve neighboring title records. Full bounded evidence is recorded in ignored `local/title-layout-v11.json`.
+
 ## Name/profile startup flow
 
 Executable data contains the pre-dialogue prompts, protagonist/default names and name keyboard. Proven startup patches cover:
