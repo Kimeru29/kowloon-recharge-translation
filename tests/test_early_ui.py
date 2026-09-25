@@ -22,6 +22,8 @@ from tools.startup_ui import (
     TITLE_LOAD_POINTER_OFFSET,
 )
 from tools.hant_ui import (
+    HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
+    HANT_CONTROLLER_METADATA_RECORDS,
     HANT_POINTER_TABLE_OFFSET,
     HANT_TUTORIAL_DESCRIPTOR_OFFSET,
     HANT_WRAPPED_LINES,
@@ -82,10 +84,13 @@ class EarlyUiPatchTests(unittest.TestCase):
         allowed.update(range(0x577C68, 0x577C70))
         for patch in EARLY_UI_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
-        # ADV DG horizontal-layout patch and the H.A.N.T tutorial descriptor are declared runtime patches.
+        # ADV DG horizontal-layout patch and the two proven H.A.N.T leaf descriptors are runtime patches.
         for off, _expected, _replacement in ADV_DG_LAYOUT_PATCHES:
             allowed.update(range(off, off + 4))
         allowed.update(range(HANT_TUTORIAL_DESCRIPTOR_OFFSET, HANT_TUTORIAL_DESCRIPTOR_OFFSET + 4))
+        allowed.update(
+            range(HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET + 4)
+        )
         allowed.update(range(0x407440, 0x4074AC))
         for offsets in MEMORY_CARD_POINTER_ALIASES.values():
             for off in offsets:
@@ -150,6 +155,16 @@ class EarlyUiPatchTests(unittest.TestCase):
             target_file = p_offset + target_va - p_vaddr
             expected = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
             self.assertEqual(expected, result[target_file:target_file + len(expected)])
+
+        metadata_va = struct.unpack_from("<I", result, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET)[0]
+        self.assertGreaterEqual(metadata_va, p_vaddr)
+        self.assertLess(metadata_va, p_vaddr + p_filesz)
+        metadata_file = p_offset + metadata_va - p_vaddr
+        actual_metadata = tuple(
+            struct.unpack_from("<hhhh", result, metadata_file + index * 8)
+            for index in range(len(HANT_CONTROLLER_METADATA_RECORDS))
+        )
+        self.assertEqual(HANT_CONTROLLER_METADATA_RECORDS, actual_metadata)
 
         self.assertEqual(
             RAW[HANT_POINTER_TABLE_OFFSET:HANT_POINTER_TABLE_OFFSET + 17 * 4],

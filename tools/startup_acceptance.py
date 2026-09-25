@@ -7,7 +7,11 @@ from hashlib import sha256
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES
 from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells
 from tools.hant_ui import (
+    HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
+    HANT_CONTROLLER_METADATA_OFFSET,
+    HANT_CONTROLLER_METADATA_RECORDS,
     HANT_POINTER_TABLE_OFFSET,
+    HANT_PRISTINE_CONTROLLER_METADATA_RECORDS,
     HANT_TUTORIAL_DESCRIPTOR_OFFSET,
     HANT_WRAPPED_LINES,
 )
@@ -286,36 +290,70 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
     else:
         table_hash = sha256(raw[HANT_POINTER_TABLE_OFFSET:HANT_POINTER_TABLE_OFFSET + 17 * 4]).hexdigest()
         table_pristine = table_hash == _HANT_POINTER_TABLE_SHA256
-        descriptor_in_segment = False
-        if segment is not None and HANT_TUTORIAL_DESCRIPTOR_OFFSET + 4 <= len(raw):
+        metadata_size = len(HANT_PRISTINE_CONTROLLER_METADATA_RECORDS) * 8
+        expected_pristine_metadata = b"".join(
+            struct.pack("<hhhh", *record) for record in HANT_PRISTINE_CONTROLLER_METADATA_RECORDS
+        )
+        metadata_pristine = (
+            HANT_CONTROLLER_METADATA_OFFSET + metadata_size <= len(raw)
+            and raw[HANT_CONTROLLER_METADATA_OFFSET:HANT_CONTROLLER_METADATA_OFFSET + metadata_size]
+            == expected_pristine_metadata
+        )
+
+        text_descriptor_in_segment = False
+        metadata_descriptor_in_segment = False
+        text_payload_ok = False
+        metadata_payload_ok = False
+        if segment is not None:
             p_offset, p_vaddr, p_filesz, _p_memsz = segment
-            table_va = struct.unpack_from("<I", raw, HANT_TUTORIAL_DESCRIPTOR_OFFSET)[0]
-            descriptor_in_segment = p_vaddr <= table_va < p_vaddr + p_filesz
-            if descriptor_in_segment:
-                table_file = p_offset + (table_va - p_vaddr)
-                table_bytes = (len(HANT_WRAPPED_LINES) + 1) * 4
-                if table_file + table_bytes <= p_offset + p_filesz:
-                    hant_wrapped_ok = True
-                    for row_index, english in enumerate(HANT_WRAPPED_LINES):
-                        if measured_hant_cells(english) > HANT_LAYOUT_PROFILE.max_cells:
-                            hant_wrapped_ok = False
-                            break
-                        target_va = struct.unpack_from("<I", raw, table_file + row_index * 4)[0]
-                        expected = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
-                        relative = target_va - p_vaddr
-                        if relative < 0 or relative + len(expected) > p_filesz:
-                            hant_wrapped_ok = False
-                            break
-                        target_file = p_offset + relative
-                        if raw[target_file:target_file + len(expected)] != expected:
-                            hant_wrapped_ok = False
-                            break
-                    if hant_wrapped_ok:
-                        eof_va = struct.unpack_from(
-                            "<I", raw, table_file + len(HANT_WRAPPED_LINES) * 4
-                        )[0]
-                        hant_wrapped_ok = eof_va == _HANT_EOF_VA
-        hant_inventory_ok = table_pristine and descriptor_in_segment
+            if HANT_TUTORIAL_DESCRIPTOR_OFFSET + 4 <= len(raw):
+                table_va = struct.unpack_from("<I", raw, HANT_TUTORIAL_DESCRIPTOR_OFFSET)[0]
+                text_descriptor_in_segment = p_vaddr <= table_va < p_vaddr + p_filesz
+                if text_descriptor_in_segment:
+                    table_file = p_offset + (table_va - p_vaddr)
+                    table_bytes = (len(HANT_WRAPPED_LINES) + 1) * 4
+                    if table_file + table_bytes <= p_offset + p_filesz:
+                        text_payload_ok = True
+                        for row_index, english in enumerate(HANT_WRAPPED_LINES):
+                            if measured_hant_cells(english) > HANT_LAYOUT_PROFILE.max_cells:
+                                text_payload_ok = False
+                                break
+                            target_va = struct.unpack_from("<I", raw, table_file + row_index * 4)[0]
+                            expected = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
+                            relative = target_va - p_vaddr
+                            if relative < 0 or relative + len(expected) > p_filesz:
+                                text_payload_ok = False
+                                break
+                            target_file = p_offset + relative
+                            if raw[target_file:target_file + len(expected)] != expected:
+                                text_payload_ok = False
+                                break
+                        if text_payload_ok:
+                            eof_va = struct.unpack_from(
+                                "<I", raw, table_file + len(HANT_WRAPPED_LINES) * 4
+                            )[0]
+                            text_payload_ok = eof_va == _HANT_EOF_VA
+
+            if HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET + 4 <= len(raw):
+                metadata_va = struct.unpack_from("<I", raw, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET)[0]
+                metadata_descriptor_in_segment = p_vaddr <= metadata_va < p_vaddr + p_filesz
+                if metadata_descriptor_in_segment:
+                    metadata_file = p_offset + (metadata_va - p_vaddr)
+                    expected_metadata = b"".join(
+                        struct.pack("<hhhh", *record) for record in HANT_CONTROLLER_METADATA_RECORDS
+                    )
+                    metadata_payload_ok = (
+                        metadata_file + len(expected_metadata) <= p_offset + p_filesz
+                        and raw[metadata_file:metadata_file + len(expected_metadata)] == expected_metadata
+                    )
+
+        hant_inventory_ok = (
+            table_pristine
+            and metadata_pristine
+            and text_descriptor_in_segment
+            and metadata_descriptor_in_segment
+        )
+        hant_wrapped_ok = text_payload_ok and metadata_payload_ok
 
     for source_offset, pointer_offsets, source_text in _HANT_UNRESOLVED_SIGNATURES:
         expected_va = _ELF_MAIN_VADDR + source_offset - _ELF_MAIN_FILE_OFFSET
@@ -343,7 +381,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         _check(
             "hant_wrapped_layout_payload",
             hant_wrapped_ok,
-            "wrapped H.A.N.T rows do not resolve within the proven 21-cell layout",
+            "wrapped H.A.N.T rows/icon metadata do not resolve within the proven 26-cell layout",
         )
     )
     checks.append(

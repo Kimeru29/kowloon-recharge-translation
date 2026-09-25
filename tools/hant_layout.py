@@ -9,19 +9,21 @@ class HantLayoutProfile:
     glyph_advance: float
     line_spacing: float
     controller_gap_cells: int
+    max_rows: int = 16
 
 
 # Static renderer trace for the H.A.N.T. text page:
 # - row staging copies at most 0x40 bytes; PS2 English is two bytes/glyph
 #   (32-cell hard storage ceiling),
-# - ordinary style-0 glyph quads advance 20 logical pixels,
+# - style-0 font record VA 0x005D77D0 is 16x18, so ordinary glyphs advance
+#   16 logical pixels at the 1.0 scale used by this page,
 # - text rows begin at X=85 in a 512-wide logical canvas,
 # - row Y is 131 + 21*n.
 # The visual width is therefore the tighter constraint:
-# floor((512 - 85) / 20) == 21 cells.
+# floor((512 - 85) / 16) == 26 cells.
 HANT_LAYOUT_PROFILE = HantLayoutProfile(
-    max_cells=21,
-    glyph_advance=20.0,
+    max_cells=26,
+    glyph_advance=16.0,
     line_spacing=21.0,
     controller_gap_cells=5,
 )

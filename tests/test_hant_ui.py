@@ -9,7 +9,12 @@ from tools.hant_inventory import inventory_hant_text
 from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells
 from tools.hant_ui import (
     HANT_ENGLISH_LINES,
+    HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
+    HANT_CONTROLLER_METADATA_OFFSET,
+    HANT_CONTROLLER_METADATA_RECORDS,
+    HANT_CONTROLLER_SPANS_BY_ROW,
     HANT_POINTER_TABLE_OFFSET,
+    HANT_PRISTINE_CONTROLLER_METADATA_RECORDS,
     HANT_TUTORIAL_DESCRIPTOR_OFFSET,
     HANT_WRAPPED_LINES,
     patch_hant_tutorial,
@@ -45,6 +50,15 @@ class HantTutorialTests(unittest.TestCase):
         table_file = _segment_file_offset(info, table_va)
 
         self.assertEqual(16, len(HANT_WRAPPED_LINES))
+        self.assertEqual("", HANT_WRAPPED_LINES[1])
+        self.assertEqual(
+            {8: (10, 15), 11: (6, 11), 14: (10, 15)},
+            HANT_CONTROLLER_SPANS_BY_ROW,
+        )
+        self.assertEqual(
+            ((0, 5, 170, 180), (38, 1, 102, 242), (0, 0, 169, 305), (-1, -1, -1, -1)),
+            HANT_CONTROLLER_METADATA_RECORDS,
+        )
         for index, english in enumerate(HANT_WRAPPED_LINES):
             self.assertLessEqual(measured_hant_cells(english), HANT_LAYOUT_PROFILE.max_cells)
             target_va = struct.unpack_from("<I", result, table_file + index * 4)[0]
@@ -57,11 +71,26 @@ class HantTutorialTests(unittest.TestCase):
         eof_va = struct.unpack_from("<I", result, table_file + len(HANT_WRAPPED_LINES) * 4)[0]
         self.assertEqual(0x795FBC, eof_va)
 
-        # The pristine 17-entry tutorial table becomes immutable provenance;
-        # only the descriptor is redirected to the wrapped table.
+        metadata_va = struct.unpack_from("<I", result, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET)[0]
+        self.assertGreaterEqual(metadata_va, info.segment_vaddr)
+        self.assertLess(metadata_va, info.segment_vaddr + info.payload_size)
+        metadata_file = _segment_file_offset(info, metadata_va)
+        actual_metadata = tuple(
+            struct.unpack_from("<hhhh", result, metadata_file + index * 8)
+            for index in range(len(HANT_CONTROLLER_METADATA_RECORDS))
+        )
+        self.assertEqual(HANT_CONTROLLER_METADATA_RECORDS, actual_metadata)
+
+        # The pristine 17-entry tutorial table and icon metadata become immutable
+        # provenance; only their proven leaf descriptors are redirected.
         self.assertEqual(
             RAW[HANT_POINTER_TABLE_OFFSET:HANT_POINTER_TABLE_OFFSET + 17 * 4],
             result[HANT_POINTER_TABLE_OFFSET:HANT_POINTER_TABLE_OFFSET + 17 * 4],
+        )
+        metadata_size = len(HANT_PRISTINE_CONTROLLER_METADATA_RECORDS) * 8
+        self.assertEqual(
+            RAW[HANT_CONTROLLER_METADATA_OFFSET:HANT_CONTROLLER_METADATA_OFFSET + metadata_size],
+            result[HANT_CONTROLLER_METADATA_OFFSET:HANT_CONTROLLER_METADATA_OFFSET + metadata_size],
         )
 
     def test_wrapping_preserves_established_tutorial_wording_and_punctuation(self) -> None:
@@ -71,7 +100,7 @@ class HantTutorialTests(unittest.TestCase):
             HANT_ENGLISH_LINES[7].strip(),
             *(HANT_ENGLISH_LINES[index].strip() for index in (9, 10, 12, 13, 14)),
         ))
-        self.assertEqual(expected, " ".join(HANT_WRAPPED_LINES))
+        self.assertEqual(expected, " ".join(line for line in HANT_WRAPPED_LINES if line))
 
     def test_unresolved_hant_candidates_remain_pristine(self) -> None:
         result, _info = patch_hant_tutorial(RAW)
@@ -108,6 +137,16 @@ class HantTutorialTests(unittest.TestCase):
         tampered = bytearray(RAW)
         tampered[HANT_TUTORIAL_DESCRIPTOR_OFFSET] ^= 1
         with self.assertRaisesRegex(ValueError, "H.A.N.T tutorial descriptor"):
+            patch_hant_tutorial(bytes(tampered))
+
+        tampered = bytearray(RAW)
+        tampered[HANT_CONTROLLER_METADATA_OFFSET + 4] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T controller metadata"):
+            patch_hant_tutorial(bytes(tampered))
+
+        tampered = bytearray(RAW)
+        tampered[HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T controller metadata descriptor"):
             patch_hant_tutorial(bytes(tampered))
 
 
