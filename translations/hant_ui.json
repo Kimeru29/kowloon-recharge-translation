@@ -1,0 +1,206 @@
+[
+  {
+    "key": "hant_tutorial_00",
+    "source_offset": 6064832,
+    "pointer_offsets": [
+      6065264
+    ],
+    "source_text": "　　　＜Ｈ．Ａ．Ｎ．Ｔについて＞",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 0 at 0x5c8c70 -> 0x5c8ac0; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_01",
+    "source_offset": 6905912,
+    "pointer_offsets": [
+      6065268
+    ],
+    "source_text": "",
+    "official_english": null,
+    "classification": "control",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 1 at 0x5c8c74; control/sentinel target 0x696038"
+  },
+  {
+    "key": "hant_tutorial_02",
+    "source_offset": 6064880,
+    "pointer_offsets": [
+      6065272
+    ],
+    "source_text": "Ｈ．Ａ．Ｎ．Ｔは、",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 2 at 0x5c8c78 -> 0x5c8af0; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_03",
+    "source_offset": 6064912,
+    "pointer_offsets": [
+      6065276
+    ],
+    "source_text": "探索をサポートする小型情報端末です。",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 3 at 0x5c8c7c -> 0x5c8b10; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_04",
+    "source_offset": 6064960,
+    "pointer_offsets": [
+      6065280
+    ],
+    "source_text": "≪操作方法≫や≪情報≫の確認ができます。",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 4 at 0x5c8c80 -> 0x5c8b40; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_05",
+    "source_offset": 6905912,
+    "pointer_offsets": [
+      6065284
+    ],
+    "source_text": "",
+    "official_english": null,
+    "classification": "control",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 5 at 0x5c8c84; control/sentinel target 0x696038"
+  },
+  {
+    "key": "hant_tutorial_06",
+    "source_offset": 6905912,
+    "pointer_offsets": [
+      6065288
+    ],
+    "source_text": "",
+    "official_english": null,
+    "classification": "control",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 6 at 0x5c8c88; control/sentinel target 0x696038"
+  },
+  {
+    "key": "hant_tutorial_07",
+    "source_offset": 6065008,
+    "pointer_offsets": [
+      6065292
+    ],
+    "source_text": "　　　Ｈ．Ａ．Ｎ．Ｔの起動方法",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 7 at 0x5c8c8c -> 0x5c8b70; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_08",
+    "source_offset": 6065040,
+    "pointer_offsets": [
+      6065296
+    ],
+    "source_text": "　　　￣￣￣￣￣￣￣￣￣￣￣￣",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 8 at 0x5c8c90 -> 0x5c8b90; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_09",
+    "source_offset": 6065072,
+    "pointer_offsets": [
+      6065300
+    ],
+    "source_text": "　ＳＥＬＥＣＴボタンを押して",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 9 at 0x5c8c94 -> 0x5c8bb0; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_10",
+    "source_offset": 6065104,
+    "pointer_offsets": [
+      6065304
+    ],
+    "source_text": "コマンドサムネイルを呼び出します。",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 10 at 0x5c8c98 -> 0x5c8bd0; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_11",
+    "source_offset": 6905912,
+    "pointer_offsets": [
+      6065308
+    ],
+    "source_text": "",
+    "official_english": null,
+    "classification": "control",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 11 at 0x5c8c9c; control/sentinel target 0x696038"
+  },
+  {
+    "key": "hant_tutorial_12",
+    "source_offset": 6065152,
+    "pointer_offsets": [
+      6065312
+    ],
+    "source_text": "次に、　方向キーで",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 12 at 0x5c8ca0 -> 0x5c8c00; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_13",
+    "source_offset": 6065184,
+    "pointer_offsets": [
+      6065316
+    ],
+    "source_text": "「Ｈ．Ａ．Ｎ．Ｔ」を選択し",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 13 at 0x5c8ca4 -> 0x5c8c20; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_14",
+    "source_offset": 6065216,
+    "pointer_offsets": [
+      6065320
+    ],
+    "source_text": "　ボタンを押すと起動させることができます。",
+    "official_english": null,
+    "classification": "unresolved",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 14 at 0x5c8ca8 -> 0x5c8c40; official English corpus unavailable"
+  },
+  {
+    "key": "hant_tutorial_15",
+    "source_offset": 6905912,
+    "pointer_offsets": [
+      6065324
+    ],
+    "source_text": "",
+    "official_english": null,
+    "classification": "control",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 15 at 0x5c8cac; control/sentinel target 0x696038"
+  },
+  {
+    "key": "hant_tutorial_16",
+    "source_offset": 6905916,
+    "pointer_offsets": [
+      6065328
+    ],
+    "source_text": "EOF",
+    "official_english": null,
+    "classification": "control",
+    "owner": "hant_tutorial",
+    "evidence": "tutorial pointer-table slot 16 at 0x5c8cb0; control/sentinel target 0x69603c"
+  }
+]

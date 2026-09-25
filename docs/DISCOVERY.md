@@ -203,6 +203,10 @@ v7 runtime exposed an allocator invariant that the original implementation misse
 
 The shared segment now carries H.A.N.T., the two overflow name-reading prompts, and the proven subset of executable memory-card UI strings. Exact program-header, heap, source-string and pointer preimages are enforced.
 
+v11 Task 6 adds a bounded ownership inventory before expanding H.A.N.T. translation. The `0x5C8C70` table is exactly 17 slots: text at indices `0,2,3,4,7,8,9,10,12,13,14`, and blank/EOF control slots at `1,5,6,11,15,16`. A main-executable pointer scan also surfaces 10 additional CP932 strings containing the fullwidth `Ｈ．Ａ．Ｎ．Ｔ` token outside that table; they remain ownership candidates rather than being silently treated as tutorial text. Generic occurrences of words such as `情報` are not enough evidence by themselves.
+
+The official remaster `English.bytes` corpus was not present at its expected local extraction path during this inventory pass. Following the fail-closed rule, text entries are therefore recorded as `unresolved` with `official_english: null`; no new English mapping is inferred from memory or from the already-patched runtime strings. The committed `translations/hant_ui.json` contains only the 17 proven tutorial slots, while the broader candidate evidence is kept in ignored `local/hant-inventory-v11.json`. The documented PS2 `方向キー` / remaster `方向ボタン` semantic join is implemented but only activates when a matching official corpus row is supplied.
+
 ## Startup v6 static candidate
 
 Candidate: `/private/tmp/kowloon-recharge-startup-en-v6.iso`
