@@ -7,6 +7,7 @@ from pathlib import Path
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
 from tools.menu_ui import MENU_LABELS
+from tools.hant_inventory import inventory_hant_text
 from tools.startup_ui import (
     NAME_BLANK_STRING_OFFSET,
     NAME_PROMPT_ARENA_END,
@@ -29,7 +30,11 @@ from tools.hant_ui import (
     HANT_TUTORIAL_DESCRIPTOR_OFFSET,
     HANT_WRAPPED_LINES,
 )
-from tools.memory_card_ui import MEMORY_CARD_POINTER_ALIASES
+from tools.memory_card_ui import (
+    MEMORY_CARD_MESSAGES,
+    MEMORY_CARD_POINTER_ALIASES,
+    MEMORY_CARD_POINTER_TABLE_OFFSET,
+)
 from tools.elf_translation_segment import TRANSLATION_SEGMENT_VADDR
 from tools.localization import encode_ps2_english
 from tests.local_fixtures import require_local_fixture
@@ -98,7 +103,9 @@ class EarlyUiPatchTests(unittest.TestCase):
         allowed.update(
             range(HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET + 4)
         )
-        allowed.update(range(0x407440, 0x4074AC))
+        for index in MEMORY_CARD_MESSAGES:
+            off = MEMORY_CARD_POINTER_TABLE_OFFSET + index * 4
+            allowed.update(range(off, off + 4))
         for offsets in MEMORY_CARD_POINTER_ALIASES.values():
             for off in offsets:
                 allowed.update(range(off, off + 4))
@@ -116,6 +123,51 @@ class EarlyUiPatchTests(unittest.TestCase):
         differences = {index for index, (before, after) in enumerate(zip(RAW, result[:len(RAW)])) if before != after}
         self.assertTrue(differences)
         self.assertTrue(differences <= allowed)
+
+    def test_unresolved_menu_sources_and_aliases_match_pristine_fixture(self) -> None:
+        result = build_early_ui_elf(RAW)
+
+        unresolved = [spec for spec in MENU_LABELS if spec.storage == "pristine"]
+        self.assertTrue(unresolved)
+        for spec in unresolved:
+            with self.subTest(key=spec.key):
+                self.assertEqual(
+                    RAW[spec.source_offset:spec.source_offset + spec.capacity],
+                    result[spec.source_offset:spec.source_offset + spec.capacity],
+                )
+                for pointer_offset in spec.pointer_offsets:
+                    self.assertEqual(
+                        RAW[pointer_offset:pointer_offset + 4],
+                        result[pointer_offset:pointer_offset + 4],
+                    )
+
+    def test_unresolved_hant_candidates_match_pristine_fixture_except_cross_owned_sources(self) -> None:
+        result = build_early_ui_elf(RAW)
+        entries = inventory_hant_text(RAW, None)
+        candidates = [
+            entry
+            for entry in entries
+            if entry.owner == "executable_hant_candidate" and entry.classification == "unresolved"
+        ]
+        self.assertTrue(candidates)
+        cross_owned_sources = {
+            spec.source_offset for spec in MENU_LABELS if spec.storage == "fixed-slot"
+        }
+
+        for entry in candidates:
+            with self.subTest(key=entry.key):
+                for pointer_offset in entry.pointer_offsets:
+                    self.assertEqual(
+                        RAW[pointer_offset:pointer_offset + 4],
+                        result[pointer_offset:pointer_offset + 4],
+                    )
+                if entry.source_offset in cross_owned_sources:
+                    continue
+                source = entry.source_text.encode("cp932") + b"\x00"
+                self.assertEqual(
+                    RAW[entry.source_offset:entry.source_offset + len(source)],
+                    result[entry.source_offset:entry.source_offset + len(source)],
+                )
 
     def test_composite_build_includes_widened_title_backing(self) -> None:
         result = build_early_ui_elf(RAW)
@@ -218,15 +270,17 @@ class EarlyUiPatchTests(unittest.TestCase):
             result[HANT_POINTER_TABLE_OFFSET:HANT_POINTER_TABLE_OFFSET + 17 * 4],
         )
 
-    def test_unfit_or_unmapped_slots_are_intentionally_unchanged(self) -> None:
+    def test_compact_menu_source_slots_remain_pristine_when_relocated_or_unresolved(self) -> None:
         result = build_early_ui_elf(RAW)
+        by_key = {spec.key: spec for spec in MENU_LABELS}
 
-        # Official remaster string is 19 ASCII bytes and cannot fit this 16-byte C-string slot.
-        self.assertEqual(RAW[0x3BC888:0x3BC898], result[0x3BC888:0x3BC898])
-        # No matching official remaster dictionary entry was found for this PS2-only label.
-        self.assertEqual(RAW[0x3BC858:0x3BC868], result[0x3BC858:0x3BC868])
-        # "Report card" cannot fit the compact 8-byte runtime slot.
-        self.assertEqual(RAW[0x694190:0x694198], result[0x694190:0x694198])
+        for key in ("return_above_ground", "report_card", "media"):
+            spec = by_key[key]
+            with self.subTest(key=key):
+                self.assertEqual(
+                    RAW[spec.source_offset:spec.source_offset + spec.capacity],
+                    result[spec.source_offset:spec.source_offset + spec.capacity],
+                )
 
 
 if __name__ == "__main__":

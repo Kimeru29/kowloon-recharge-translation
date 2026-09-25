@@ -16,6 +16,7 @@ from tools.hant_ui import (
     HANT_WRAPPED_LINES,
 )
 from tools.localization import encode_ps2_english
+from tools.menu_ui import MENU_LABELS
 from tools.title_layout import TITLE_BACKING_SCALE_X
 from tools.memory_card_ui import (
     MEMORY_CARD_MESSAGES,
@@ -102,6 +103,84 @@ def _read_wide_at_va(raw: bytes, va: int, expected: str) -> bool:
         return False
     target_file = p_offset + relative
     return raw[target_file:target_file + len(payload)] == payload
+
+
+def _menu_source_slot(spec) -> bytes:
+    encoded = spec.source_text.encode("cp932")
+    return encoded + b"\x00" * (spec.capacity - len(encoded))
+
+
+def _menu_source_va(spec) -> int:
+    return _ELF_MAIN_VADDR + spec.source_offset - _ELF_MAIN_FILE_OFFSET
+
+
+def _verify_menu_semantics(
+    raw: bytes,
+    segment: tuple[int, int, int, int] | None,
+) -> tuple[bool, bool, bool]:
+    fixed_ok = True
+    relocated_ok = segment is not None
+    pristine_ok = True
+
+    for spec in MENU_LABELS:
+        source_end = spec.source_offset + spec.capacity
+        if source_end > len(raw):
+            if spec.storage == "fixed-slot":
+                fixed_ok = False
+            elif spec.storage == "relocated":
+                relocated_ok = False
+            else:
+                pristine_ok = False
+            continue
+
+        source_va = _menu_source_va(spec)
+        aliases_in_bounds = all(offset + 4 <= len(raw) for offset in spec.pointer_offsets)
+
+        if spec.storage == "fixed-slot":
+            if spec.selected_english is None:
+                fixed_ok = False
+                continue
+            replacement = spec.selected_english.encode("ascii")
+            expected_slot = replacement + b"\x00" * (spec.capacity - len(replacement))
+            aliases_ok = aliases_in_bounds and all(
+                struct.unpack_from("<I", raw, offset)[0] == source_va
+                for offset in spec.pointer_offsets
+            )
+            if raw[spec.source_offset:source_end] != expected_slot or not aliases_ok:
+                fixed_ok = False
+            continue
+
+        if spec.storage == "relocated":
+            if raw[spec.source_offset:source_end] != _menu_source_slot(spec):
+                relocated_ok = False
+                continue
+            if spec.selected_english is None or not aliases_in_bounds or not spec.pointer_offsets:
+                relocated_ok = False
+                continue
+            targets = {struct.unpack_from("<I", raw, offset)[0] for offset in spec.pointer_offsets}
+            if len(targets) != 1 or segment is None:
+                relocated_ok = False
+                continue
+            target_va = targets.pop()
+            p_offset, p_vaddr, p_filesz, _p_memsz = segment
+            expected = spec.selected_english.encode("ascii") + b"\x00"
+            relative = target_va - p_vaddr
+            if relative < 0 or relative + len(expected) > p_filesz:
+                relocated_ok = False
+                continue
+            target_file = p_offset + relative
+            if raw[target_file:target_file + len(expected)] != expected:
+                relocated_ok = False
+            continue
+
+        aliases_ok = aliases_in_bounds and all(
+            struct.unpack_from("<I", raw, offset)[0] == source_va
+            for offset in spec.pointer_offsets
+        )
+        if raw[spec.source_offset:source_end] != _menu_source_slot(spec) or not aliases_ok:
+            pristine_ok = False
+
+    return fixed_ok, relocated_ok, pristine_ok
 
 
 def _translation_segment(raw: bytes) -> tuple[int, int, int, int] | None:
@@ -270,6 +349,29 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
 
     segment = _translation_segment(raw)
     checks.append(_check("translation_segment", segment is not None, "translation PT_LOAD is not active/valid"))
+
+    menu_fixed_ok, menu_relocated_ok, menu_pristine_ok = _verify_menu_semantics(raw, segment)
+    checks.append(
+        _check(
+            "menu_semantic_fixed_labels",
+            menu_fixed_ok,
+            "one or more fixed command labels or their semantic pointer aliases are stale",
+        )
+    )
+    checks.append(
+        _check(
+            "menu_relocated_labels",
+            menu_relocated_ok,
+            "one or more long command labels do not resolve through all proven aliases into the translation segment",
+        )
+    )
+    checks.append(
+        _check(
+            "menu_unresolved_pristine",
+            menu_pristine_ok,
+            "one or more unresolved/pristine command labels or pointer aliases changed",
+        )
+    )
     heap_break_ok = (
         _RUNTIME_HEAP_BREAK_OFFSET + 4 <= len(raw)
         and struct.unpack_from("<I", raw, _RUNTIME_HEAP_BREAK_OFFSET)[0] == _EXPECTED_RUNTIME_HEAP_START

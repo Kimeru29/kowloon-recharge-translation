@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tests.local_fixtures import require_local_fixture
 from tools.early_ui import build_early_ui_elf
+from tools.menu_ui import MENU_LABELS
 from tools.startup_acceptance import STARTUP_GRAPHICS_PATHS, verify_startup_elf
 
 ELF = require_local_fixture(Path(__file__).parents[1] / "fixtures" / "elf" / "SLPM_665.11")
@@ -34,6 +35,9 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("name_prompt_3", names)
         self.assertIn("runtime_name_Habaki", names)
         self.assertIn("title_english_backing_geometry", names)
+        self.assertIn("menu_semantic_fixed_labels", names)
+        self.assertIn("menu_relocated_labels", names)
+        self.assertIn("menu_unresolved_pristine", names)
 
     def test_pristine_elf_fails_translated_renderer_checks(self) -> None:
         checks = verify_startup_elf(RAW)
@@ -47,6 +51,30 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("name_flow_skip_reading", failed_names)
         self.assertIn("memory_card_1_boot_aliases", failed_names)
         self.assertIn("title_english_backing_geometry", failed_names)
+        self.assertIn("menu_semantic_fixed_labels", failed_names)
+        self.assertIn("menu_relocated_labels", failed_names)
+        self.assertNotIn("menu_unresolved_pristine", failed_names)
+
+    def test_menu_acceptance_fails_closed_per_semantic_storage_class(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        fixed = next(spec for spec in MENU_LABELS if spec.storage == "fixed-slot")
+        relocated = next(spec for spec in MENU_LABELS if spec.storage == "relocated")
+        unresolved = next(spec for spec in MENU_LABELS if spec.storage == "pristine")
+
+        cases = (
+            ("menu_semantic_fixed_labels", fixed.source_offset),
+            ("menu_semantic_fixed_labels", fixed.pointer_offsets[0]),
+            ("menu_relocated_labels", relocated.source_offset),
+            ("menu_relocated_labels", relocated.pointer_offsets[0]),
+            ("menu_unresolved_pristine", unresolved.source_offset),
+            ("menu_unresolved_pristine", unresolved.pointer_offsets[0]),
+        )
+        for name, offset in cases:
+            with self.subTest(name=name, offset=f"{offset:#x}"):
+                tampered = bytearray(translated)
+                tampered[offset] ^= 1
+                check = next(check for check in verify_startup_elf(bytes(tampered)) if check["name"] == name)
+                self.assertFalse(check["ok"])
 
     def test_v10_adv_patch_does_not_satisfy_v11_dg_layout_acceptance(self) -> None:
         old = bytearray(RAW)
