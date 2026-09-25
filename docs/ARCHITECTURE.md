@@ -44,6 +44,10 @@ ADV dialogue is a renderer-specific layout class. The record fields at `+0x463` 
 
 The v11 English transform therefore does not alter the source fields, FPU constants, glyph renderer, or reveal callback. It swaps only the completed coordinate argument registers immediately before the coordinate helper: the byte-position formula becomes X and the line formula becomes Y. `ADV_DG_LAYOUT_PATCHES` is the single fail-closed mutation table consumed by the patcher, mutation-boundary tests, composite startup build tests, and final-image acceptance. This preserves the existing signed two-byte-glyph `/2` normalization exactly once and avoids the v6-v10 sequencing bug where normalization occurred after the coordinate had already been copied into the FPU.
 
+## v11 candidate verification contract
+
+The v11 build composes all executable text relocations into one translation PT_LOAD and verifies the completed ISO after ROFS rewrite. The measured candidate uses 1,144 overlays (891 in place, 253 relocated), patches 1,144 executable ROFS records, and produces an 8,403,944-byte final ELF with SHA-256 `9771bd9c031d7bcdb5e716c458d059feac6bdb2e31dd2fca6f4de7ca7f38e088`. The finished 2,095,382,528-byte ISO hashes to `4150414b817fe54cf90ac28887568a37c6910995d7f8bc46e6887a6c4f6ef516` and an independent pristine rebuild is byte-for-byte identical. Final-image acceptance is **130/130**; the dependency-free and Pillow-enabled suites both execute **177 tests** (8 and 1 expected skips respectively). These are static/deterministic guarantees, not runtime presentation proof.
+
 ## PS2 indexed graphics
 
 `tools/tmx.py` handles both named TMX chunks inside `B_GPxxx.BIN` containers and standalone `TMX0` files. `tools/graphics_port.py` downsizes official PS4 RGBA artwork, quantizes it to the PS2 palette size, preserves 4/8-bit indexed layout and CLUT ordering, and rewrites only palette/pixel payloads. File/container sizes remain fixed.

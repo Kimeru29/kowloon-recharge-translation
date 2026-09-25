@@ -150,11 +150,11 @@ The visible Japanese control captions are baked into `BLBRD/B_GP019.BIN`, especi
 
 ### ADV dialogue layout
 
-`DG/DG00_00.MTX` remains the opening dialogue proof. v5 showed that the localized two-byte English itself was present, but the Japanese ADV renderer displayed it vertically. Static code/data tracing proved the script compiler stores line index in record field `+0x463` and byte position in `+0x465`, while the renderer used `+0x463` as X and `+0x465/2` as Y. v6 performs a fail-closed four-instruction renderer transform so X uses `+0x465/2` and Y uses `+0x463`. This is a renderer-class patch and therefore applies to ADV dialogue generally, not only DG00.
+`DG/DG00_00.MTX` remains the opening dialogue proof. v5 showed that the localized two-byte English itself was present, but the Japanese ADV renderer displayed it vertically. v11 ownership tracing proves file `0x14FA60` / VA `0x24F9E0` is the live coordinate constructor while `0x14EDA0` / VA `0x24ED20` is only the reveal-progress gate. The v6-v10 transform targeted the right constructor but normalized the byte position after it had already been copied into the FPU. v11 leaves both source fields and the progress callback pristine and swaps only the completed coordinate output registers immediately before the coordinate helper, so X receives `+0x465/2` and Y receives `+0x463`.
 
 ### Executable long-text / H.A.N.T class
 
-The H.A.N.T. tutorial is an executable pointer table at `0x5C8C70`; its visible strings do not safely fit their Japanese slots. The pristine ELF has a zero-sized second PT_LOAD at virtual address `0x00902F00`. The localization activates it as a reusable translation segment with a 1 MiB reserved VA window and moves the heap start to `0x00A02F00`. v7 runtime proved that moving only the startup heap instruction/ELF metadata was insufficient: libkernel's live `sbrk` break at file `0x650014` still pointed at the segment and corrupted it. v8 patches all three heap ownership sites. The shared segment now carries H.A.N.T., the two overflow name-reading prompts, and the proven memory-card English pointer-table subset.
+The H.A.N.T. tutorial is an executable pointer table at `0x5C8C70`; its visible strings do not safely fit their Japanese slots. The pristine ELF has a zero-sized second PT_LOAD at virtual address `0x00902F00`. The localization activates it as a reusable translation segment with a 1 MiB reserved VA window and moves all proven heap owners to `0x00A02F00`. v11 measures the mode-4 tutorial at 26 visible glyph cells per row, keeps the pristine 17-slot table as provenance, emits a 16-row-plus-EOF translated table, and moves the independent controller metadata to the reflowed English holes. The shared allocator also owns the two overflow name-reading prompts, the proven memory-card subset, and the proven long command labels `Return above ground` and `Report card`; unresolved owners remain pristine.
 
 ## Current corpus/import coverage
 
@@ -205,9 +205,11 @@ PS2-only lexical proxy:
 - `tools/startup_ui.py` — title arena, wide startup prompt/name relocation, Latin keyboard, and fail-closed English name-flow bypass
 - `tools/adv_layout.py` — fail-closed ADV vertical→horizontal renderer transform
 - `tools/elf_translation_segment.py` — reusable second-PT_LOAD English text segment
-- `tools/hant_ui.py` — shared startup translation-segment payload: H.A.N.T., overflow name-reading prompts, and proven memory-card text
+- `tools/executable_text.py` — deterministic shared executable-text allocator with unique key/pointer ownership
+- `tools/hant_layout.py`, `tools/hant_ui.py` — 26-cell H.A.N.T. wrapping, translated table/controller metadata, and shared relocation payload
+- `tools/menu_ui.py` — semantic command-label manifest, fixed labels, proven long-label relocation, unresolved preservation
 - `tools/memory_card_ui.py` — fail-closed memory-card pointer-table + boot-handler alias correspondence and official English encoding
-- `tools/startup_acceptance.py` — reproducible final-ISO startup/renderer-class verifier, including memory-card aliases and name-flow instruction invariants
+- `tools/startup_acceptance.py` — reproducible final-ISO startup/renderer-class verifier, including v11 title/ADV/H.A.N.T./menu invariants
 - `tools/early_ui.py`, `tools/elf_strings.py` — executable UI build/slot handling
 - `tools/graphics_port.py` — optional-Pillow indexed PS2 graphics port, including raw-RGBA atlas output
 - `tools/graphics_layout.py` — generic fail-closed region-transfer / alpha-layout proof for structurally changed atlases
@@ -220,11 +222,11 @@ PS2-only lexical proxy:
 
 ## Latest runtime result and next gate
 
-v10 is now the latest supervised runtime checkpoint. Candidate: `/private/tmp/kowloon-recharge-startup-en-v10.iso`, SHA-256 `24d425433af97b1617e820cac05aa2a4d9389aa9fa19c1767a57eb763812da8e`. Its static baseline remains 123/123 final-image checks, 134 tests in both suites, and a deterministic pristine rebuild.
+v10 remains the latest supervised runtime checkpoint. v11 is now the current static/deterministic candidate at `/private/tmp/kowloon-recharge-startup-en-v11.iso`, SHA-256 `4150414b817fe54cf90ac28887568a37c6910995d7f8bc46e6887a6c4f6ef516`. Its final post-ROFS ELF SHA-256 is `9771bd9c031d7bcdb5e716c458d059feac6bdb2e31dd2fca6f4de7ca7f38e088`; final-image acceptance is **130/130**; both suites execute **177 tests** (8 dependency-free skips, 1 Pillow skip); and an independent pristine rebuild is byte-for-byte identical.
 
-The accepted v10 runtime observation proved the startup/name flow now advances into the first old-man scene. Opening quotations can vary across restarts; `New Game` / `Load Game` text itself is correct; the name-flow blocker is gone; and the first old-man DG00 content is English. It also exposed the presentation work that defines v11: the title labels overrun the original purple backing, first-old-man English still renders vertically, H.A.N.T. is only partially translated and clips, and menu labels are a mix of translated-but-awkward and unresolved entries. The structural 3+3 permanent-name behavior remains unchanged and is out of scope for v11.
+The v11 pass statically fixes the v10 presentation classes without changing the accepted startup/name-flow contract: the title backing is widened through the proven paired GP088_12 owner, the live ADV/DG constructor owns the horizontal coordinate swap, H.A.N.T. wraps at the measured 26-cell visible width with independently relocated controller metadata, and command labels are keyed by semantic pointer-table ownership. `Return above ground` and `Report card` are the only new relocated command labels; unresolved `メディア` remains intentionally Japanese.
 
-Do not infer additional runtime success from the fact that v10 reached dialogue. In particular, rows not explicitly observed remain at their prior evidence level. v11 now proceeds renderer-first: prove the live ADV consumer, title backing owner, H.A.N.T. ownership/layout, and menu semantics before mutating those classes. PCSX2 remains gated until the final v11 static/deterministic checks pass and Pablo explicitly approves the stated visual checklist.
+Runtime proof is still required. Use the exact eight-point v11 checklist in `docs/LOCALIZATION_STATUS.md` and do not launch PCSX2 until Pablo explicitly approves it. The structural 3+3 permanent-name limit remains out of scope, and cross-build memory-card save compatibility still needs a real create/load test.
 
 ## Resume procedure
 

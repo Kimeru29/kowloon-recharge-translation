@@ -88,7 +88,7 @@ Static reverse engineering then found a safe 40-byte source arena at `0x5CBDE8..
 
 v11 ownership tracing ties the title menu backing to the bounded `m_title.c` sprite table rather than the generic text renderer. File `0x5CBE60..0x5CBFB4` is exactly 17 20-byte `(group,index,depth,x,y)` records from groups 88/91, copied and instantiated by the title-state constructor. Records 11 and 12, at `0x5CBF3C` and `0x5CBF50`, are the only two `(88,12)` instances and resolve to `GRP088/GP088_12.TMX`. They are placed at `(64,296)` and `(376,296)`, while the two title-label anchors are `(68,299)` and `(380,299)`: the same `+4,+3` inset for both menu choices. The title state initializes both backing instances with X scale 0, attaches the same scale-animation helper to them immediately before constructing the two label objects, and later presents both at X scale 1.
 
-A fuller trace also disproved the earlier `(2,0x8E)` backing hypothesis. The label renderer does create one `(2,0x8E)` sprite before its `(2,0x8C)` glyph loop, but state 3 repeatedly updates that object's X coordinate as text reveal advances. It is therefore a moving reveal marker, not the static `New Game` / `Load Game` backing. Task 5 must operate on the paired `(88,12)` / `GP088_12` owner and preserve neighboring title records. Full bounded evidence is recorded in ignored `local/title-layout-v11.json`.
+A fuller trace also disproved the earlier `(2,0x8E)` backing hypothesis. The label renderer does create one `(2,0x8E)` sprite before its `(2,0x8C)` glyph loop, but state 3 repeatedly updates that object's X coordinate as text reveal advances. It is therefore a moving reveal marker, not the static `New Game` / `Load Game` backing. v11 Task 5 operates on the paired `(88,12)` / `GP088_12` owner and preserves neighboring title records. Full bounded evidence is recorded in ignored `local/title-layout-v11.json`.
 
 ## Name/profile startup flow
 
@@ -191,7 +191,7 @@ Reverse engineering connected the script record writer and the ADV glyph-layout 
 
 v11 Task 2 traced the ownership chain rather than classifying by field pattern alone. The script-byte dispatcher at VA `0x215860` routes ordinary text through `0x24E690`; that driver calls wrapper `0x24E8A0`, which calls constructor `0x24F660`. The constructor computes glyph coordinates around `0x24F9E0`, creates the glyph/sprite objects, and registers callback `0x24E920`. The `0x24ED20` consumer lives inside that callback and compares line/position fields against reveal-progress state. Therefore exactly one known consumer is the ADV/DG layout owner: file `0x14FA60` / VA `0x24F9E0`; file `0x14EDA0` / VA `0x24ED20` is the progress gate.
 
-The v6-v10 four-word patch targeted the correct constructor but contains a concrete sequencing defect. It changes the first load to `+0x465` and places `sra v1,v1,1` at VA `0x24F9E8`, **after** VA `0x24F9E4` has already copied `v1` into `f0` with `mtc1`. The float X calculation therefore receives the unhalved byte position. This explains why the static `adv_horizontal_layout` check could pass while the v10 DG00 runtime presentation remained wrong. Task 3 must fix the proven constructor sequence and must not mutate the `0x24ED20` progress gate.
+The v6-v10 four-word patch targeted the correct constructor but contains a concrete sequencing defect. It changes the first load to `+0x465` and places `sra v1,v1,1` at VA `0x24F9E8`, **after** VA `0x24F9E4` has already copied `v1` into `f0` with `mtc1`. The float X calculation therefore receives the unhalved byte position. This explains why the static `adv_horizontal_layout` check could pass while the v10 DG00 runtime presentation remained wrong. v11 Task 3 fixes the proven constructor output sequence and does not mutate the `0x24ED20` progress gate.
 
 `tools/adv_layout.py` fail-closes on the exact consumer and ownership-chain preimages. Detailed local evidence is emitted to ignored `local/adv-renderer-ownership-v11.json`.
 
@@ -318,4 +318,21 @@ Runtime evidence now establishes the v10 presentation baseline. Proven observati
 
 v11 Task 2 resolves the two-consumer ambiguity. Proven static ownership is: file `0x14FA60` / VA `0x24F9E0` is the ADV/DG glyph-layout constructor path, while file `0x14EDA0` / VA `0x24ED20` is the registered glyph-progress gate. The call/data chain is `0x215860` script-byte dispatcher → `0x24E690` message driver → `0x24E8A0` wrapper → `0x24F660` constructor; the constructor registers `0x24E920`, which contains the progress consumer. Exactly one consumer is therefore classified `dg_dialogue`.
 
-The v10 runtime failure does not disprove that ownership: the old four-word patch itself is malformed. Its `/2` normalization at VA `0x24F9E8` executes after `mtc1` at VA `0x24F9E4`, so the float X calculation still receives unhalved byte positions. Task 3 is cleared to patch only the proven `0x24F9E0` layout sequence and leave the progress gate unchanged.
+The v10 runtime failure does not disprove that ownership: the old four-word patch itself is malformed. Its `/2` normalization at VA `0x24F9E8` executes after `mtc1` at VA `0x24F9E4`, so the float X calculation still receives unhalved byte positions. v11 Task 3 patches only the proven `0x24F9E0` layout output sequence and leaves the progress gate unchanged.
+
+
+## Startup v11 static/deterministic candidate
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v11.iso`
+
+- SHA-256: `4150414b817fe54cf90ac28887568a37c6910995d7f8bc46e6887a6c4f6ef516`;
+- translated ELF SHA-256 before ROFS rewrite: `edfca4471122c3f05c35c23a0d8c728ff45cc207b021ea2efca8af02c7003fac`;
+- final ELF size 8,403,944 bytes, post-ROFS SHA-256 `9771bd9c031d7bcdb5e716c458d059feac6bdb2e31dd2fca6f4de7ca7f38e088`;
+- 1,144 overlays; 891 in place / 253 relocated; 1,144 executable ROFS records patched/re-resolved;
+- +900 embedded sectors; 17 shifted outer files; final ISO size remains 2,095,382,528 bytes;
+- final-image startup acceptance: **130/130** (`local/startup-acceptance-v11.json`);
+- dependency-free suite: **177 tests OK** (8 expected skips);
+- Pillow-enabled suite: **177 tests OK** (1 owned-corpus skip);
+- independent repeat build has the same SHA-256 and is byte-for-byte identical by `cmp`.
+
+The v11 executable now encodes the proven renderer ownership rather than the v10 presentation symptoms: the ADV/DG constructor swaps only the completed coordinate outputs; the title keeps exact `New Game` / `Load Game` strings and widens only the paired GP088_12 backing animation target to `17/9`; the mode-4 H.A.N.T. tutorial reflows to the proven 26-cell visual width and moves its independent controller metadata with the English holes; and command labels use semantic pointer-table ownership, relocating only `Return above ground` and `Report card`. `メディア` remains intentionally Japanese because its action owner is known but no exact accepted official English mapping is available. None of these v11 presentation fixes is runtime-proven yet.

@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v10 result: 134 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11 result: 177 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -424,3 +424,41 @@ Current v10 static result:
 - deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v10-repeat.iso` has the same SHA-256 and `cmp` reports byte-for-byte identity.
 
 Do not launch v10 automatically. Follow the exact v10 runtime checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval before launching PCSX2.
+
+
+## Build startup v11 candidate
+
+v11 is the renderer/layout pass built on the runtime-tested v10 flow. It keeps the same overlay corpus and fixes the four presentation classes isolated by v10: title backing geometry, the live ADV/DG coordinate owner, H.A.N.T. wrapping/controller metadata, and semantic command-menu ownership. The build remains fail-closed and is produced only from the pristine ISO.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11.json
+```
+
+Measured v11 static result:
+
+- translated ELF SHA-256 before ISO ROFS rewrite: `edfca4471122c3f05c35c23a0d8c728ff45cc207b021ea2efca8af02c7003fac`;
+- final post-ROFS ELF SHA-256: `9771bd9c031d7bcdb5e716c458d059feac6bdb2e31dd2fca6f4de7ca7f38e088`;
+- translated/final ELF size: 8,403,944 bytes; outer extent relocated from 288 to 1,013,782;
+- ISO SHA-256: `4150414b817fe54cf90ac28887568a37c6910995d7f8bc46e6887a6c4f6ef516`;
+- 1,144 overlays; 891 in place / 253 relocated; 1,144 ROFS records patched/re-resolved;
+- +900 embedded sectors; 17 shifted outer files; whole ISO remains 2,095,382,528 bytes;
+- final-image startup verifier: **130/130**;
+- dependency-free suite: **177 tests OK** (8 expected skips);
+- Pillow-enabled suite: **177 tests OK** (1 owned-corpus skip);
+- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-repeat.iso` has the same SHA-256 and `cmp` reports byte-for-byte identity.
+
+Do not launch v11 automatically. The exact supervised runtime checklist is in `docs/LOCALIZATION_STATUS.md`; PCSX2 remains blocked until Pablo explicitly approves that launch.

@@ -17,7 +17,7 @@ Status meanings:
 | Pre-title memory-card status text | **Translated but buggy** | The log-confirmed v8 runtime still showed the Japanese stone-panel message. Static tracing proved the boot path uses two handler-local aliases at `0x4077F0` (`H_BootMcardChk`) and `0x4078D0` (`H_EmptyMcardChk`) that v8/v9 did not repoint. v10 moves both aliases with table entry 1 to official `Checking memory card slot 1`; runtime proof pending. |
 | GP088 startup/title artwork — direct `GP088_03` counterpart | **Not runtime-tested** | v9 retains the v8 same-name official English `b_gp088_en/GP088_03` port into PS2 `B_GP088.BIN`. |
 | GP088 PS2 packed title atlas (`GP088_12`) | **Not runtime-tested** | v9 proves that the two GP088_12 Japanese title variants are repacked GP088_03 regions (Dice 0.8758 / 0.8765 after excluding the known flattened banner band), then rebuilds GP088_12 from the official English GP088_03 regions. The official English remaster omits the flattened gold `re:charge` banner, so v9 removes it rather than synthesizing missing artwork. `GP088_13` is a separate already-English blue `re:charge` badge and remains unchanged. |
-| Title `New Game` / `Load Game` | **Translated but buggy** | v10 runtime proved the exact English labels are correct, but they extend well beyond the original purple backing. The strings stay authoritative; v11 must fix title backing/layout geometry rather than shorten them. |
+| Title `New Game` / `Load Game` | **Not runtime-tested** | v10 runtime proved the exact strings but exposed the undersized purple backing. v11 statically ties the backing to the paired GP088_12 title objects and widens only their animation target to `17/9`; `title_english_backing_geometry` passes in the final ISO. The resized presentation still needs PCSX2 observation. |
 | Name-entry English button graphics (`B_GP019.BIN`) | **Working / runtime-proven** | Back/Edit/Finish/Delete/Confirm controls render correctly. |
 | `Enter last name.` | **Working / runtime-proven** | Wide English prompt renders correctly. |
 | Lowercase Latin keyboard | **Working / runtime-proven** | Runtime accepts lowercase Latin input. |
@@ -31,19 +31,18 @@ Status meanings:
 | `Is this fine?` / `Yes / No` | **Not runtime-tested** | Official English is statically present. v10 preserves the normal-name confirmation; an affirmative result now routes directly through the existing post-reading/finalization path instead of opening the kana-reading editor. |
 | License-ID messages | **Not runtime-tested** | `Verifying license ID...` and `ID verification complete.` are statically present. |
 | `Heracleion Shrine` | **Not runtime-tested** | Statically translated as wide executable text. |
-| H.A.N.T. tutorial | **Translated but buggy** | v10 runtime reached H.A.N.T. content and showed that localization is only partial; translated lines can clip. Current tooling covers only the startup tutorial table, so v11 must inventory H.A.N.T.-owned text and establish renderer-specific wrapping/layout. |
-| ADV horizontal dialogue renderer | **Translated but buggy** | v10 runtime proves the first old-man DG00 dialogue is still vertical despite the existing four-instruction transform. The current patch is therefore insufficient for the live visible DG path; v11 must prove ownership of both known coordinate consumers before changing the live one. |
-| First old-man DG00 English dialogue | **Translated but buggy** | v10 runtime reached the first old-man scene and proved the DG00 dialogue content is English. Content is runtime-proven; presentation is not: the text still uses the vertical Japanese layout. |
+| H.A.N.T. tutorial | **Not runtime-tested** | v10 runtime exposed partial/clipped localization. v11 keeps the pristine 17-slot owner, reflows the mode-4 tutorial to the proven 26-cell visible width, preserves the 16-row/EOF shape, and relocates controller metadata with its English gaps. All three H.A.N.T. v11 acceptance checks pass; runtime presentation is pending. |
+| ADV horizontal dialogue renderer | **Not runtime-tested** | v10 runtime proved the old transform still rendered vertically. v11 traces the live constructor/progress-gate ownership and swaps only the completed coordinate output registers at the constructor, preserving the `/2` normalization and callback. `adv_dg_horizontal_layout` passes in the final ISO; runtime proof is pending. |
+| First old-man DG00 English dialogue | **Not runtime-tested** | The DG00 English content itself was runtime-proven in v10; only its presentation failed. v11 applies the newly proven horizontal renderer rule, but that presentation change has not yet been observed in PCSX2. |
 | DG00 English choices | **Not runtime-tested** | Reviewed KSF overrides/imports remain present; the accepted v10 observation did not explicitly promote this row. |
-| Command/menu labels | **Translated but buggy** | v10 runtime shows a mixed state: several labels are translated but semantically awkward, while some remain unresolved. v11 will replace fit-driven patches with a semantic manifest and leave unproven labels pristine. |
+| Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
 
 | Surface | Status | Evidence / next action |
 | --- | --- | --- |
-| `Return above ground` | **Still Japanese / unresolved** | Exact official English is known, but the current compact executable slot cannot hold it safely. |
-| `Report card` | **Still Japanese / unresolved** | Exact official English is known, but it does not fit the proven fixed slot. |
 | `メディア` | **Still Japanese / unresolved** | No exact official dictionary mapping has been proven for this PS2-only label. |
+| Additional pointer-backed H.A.N.T. candidates outside the tutorial | **Still Japanese / unresolved** | Ownership candidates are inventoried, but the expected local `English.bytes` extraction was unavailable during the proof pass; no mapping is guessed. |
 | Re:charge-only memory-card clear-data messages | **Still Japanese / unresolved** | Eight pointer-table entries have no proven official remaster counterpart and remain untouched. |
 
 ## Corpus-level translation coverage
@@ -144,3 +143,35 @@ The minimum v10 regression scope was:
 10. the first old-man dialogue must be horizontal English, including `Old man's voice`, `Hey, over here.`, `Old merchant Salah`, `This is the Heracleion temple.`, `First, it would be a good idea to`, and `check H.A.N.T.`.
 
 Any Japanese in the tested startup slice, corrupted/clipped text, appearance of the reading editor, freeze, wrong name state, or vertical English dialogue is a failed checkpoint.
+
+
+### v11 — static/deterministic candidate, awaiting supervised runtime
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11.iso`
+- ISO SHA-256: `4150414b817fe54cf90ac28887568a37c6910995d7f8bc46e6887a6c4f6ef516`
+- translated ELF SHA-256 before ROFS rewrite: `edfca4471122c3f05c35c23a0d8c728ff45cc207b021ea2efca8af02c7003fac`
+- final post-ROFS ELF SHA-256: `9771bd9c031d7bcdb5e716c458d059feac6bdb2e31dd2fca6f4de7ca7f38e088`
+- translated/final ELF size: 8,403,944 bytes
+- overlays: 1,144 total; 891 in place / 253 relocated
+- executable relocated from outer extent 288 to 1,013,782
+- embedded growth: +900 sectors; 17 shifted outer files
+- executable ROFS records: 1,144 patched/re-resolved
+- whole ISO size unchanged: 2,095,382,528 bytes
+- dependency-free suite: **177 tests OK** (8 expected skips)
+- Pillow suite: **177 tests OK** (1 owned-corpus skip)
+- final-image startup acceptance: **130/130** (`local/startup-acceptance-v11.json`)
+- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-repeat.iso` has the same SHA-256 and is byte-for-byte identical (`cmp`)
+- runtime status: **not yet tested**; do not promote any v11 presentation surface from static evidence alone.
+
+#### Exact v11 supervised runtime checklist
+
+1. v10 boot/name flow still progresses without the kana-reading screen or freeze.
+2. memory-card/startup/title graphics retain accepted English behavior.
+3. `New Game` / `Load Game` fit fully inside the resized purple backing.
+4. H.A.N.T. tutorial/help pages show complete official English without clipping.
+5. menu labels match their proven actions and fit; unresolved labels remain intentionally Japanese rather than guessed.
+6. first old-man speaker/body dialogue is horizontal and readable, with PS2 scene art retained.
+7. at least one later translated dialogue page uses the same horizontal renderer rule without clipping.
+8. any vertical English, clipped translated text, wrong menu semantic, unexpected Japanese in a proven H.A.N.T. entry, or v10 regression fails the candidate.
+
+PCSX2 must not be launched until Pablo explicitly approves this checklist.
