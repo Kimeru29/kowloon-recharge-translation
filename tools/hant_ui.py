@@ -1,21 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 import struct
 
-from tools.elf_translation_segment import (
-    TRANSLATION_SEGMENT_VADDR,
-    TranslationSegmentInfo,
-    install_translation_segment,
-)
+from tools.elf_translation_segment import TranslationSegmentInfo
+from tools.executable_text import RelocatedText, install_executable_text
 from tools.hant_layout import HANT_LAYOUT_PROFILE, wrap_hant_text
 from tools.localization import encode_ps2_english
-from tools.memory_card_ui import (
-    MEMORY_CARD_MESSAGES,
-    MEMORY_CARD_POINTER_ALIASES,
-    MEMORY_CARD_POINTER_TABLE_OFFSET,
-    encode_memory_card_english,
-    validate_memory_card_sources,
-)
+from tools.memory_card_ui import relocated_memory_card_entries
 from tools.startup_ui import (
     NAME_BLANK_STRING_OFFSET,
     NAME_PROMPT_POINTER_TABLE_OFFSET,
@@ -267,58 +259,50 @@ def _validate_source(raw: bytes) -> None:
 _NAME_READING_PROMPT_INDICES = (2, 3)
 
 
-def _append_encoded(payload: bytearray, encoded: bytes) -> int:
-    if len(payload) & 1:
-        payload.append(0)
-    offset = len(payload)
-    payload.extend(encoded)
-    payload.append(0)
-    return offset
+def _encoded_wide(text: str) -> bytes:
+    return encode_ps2_english(text, collapse_spaces=False) + b"\x00"
 
 
-def _append_wide(payload: bytearray, text: str) -> int:
-    return _append_encoded(payload, encode_ps2_english(text, collapse_spaces=False))
+def _controller_metadata_bytes() -> bytes:
+    return b"".join(struct.pack("<hhhh", *record) for record in HANT_CONTROLLER_METADATA_RECORDS)
 
 
-def _align_payload(payload: bytearray, alignment: int) -> None:
-    if alignment <= 0 or alignment & (alignment - 1):
-        raise ValueError("payload alignment must be a positive power of two")
-    while len(payload) & (alignment - 1):
-        payload.append(0)
-
-
-def _build_payload() -> tuple[bytes, dict[int, int], int, int, dict[int, int]]:
-    payload = bytearray()
-    name_prompt_offsets: dict[int, int] = {}
+def _base_relocated_entries(raw: bytes) -> tuple[RelocatedText, ...]:
+    entries: list[RelocatedText] = []
     for index in _NAME_READING_PROMPT_INDICES:
-        name_prompt_offsets[index] = _append_wide(payload, NAME_PROMPT_TEXTS[index])
+        entries.append(
+            RelocatedText(
+                key=f"name_prompt_{index}",
+                encoded=_encoded_wide(NAME_PROMPT_TEXTS[index]),
+                pointer_offsets=(NAME_PROMPT_POINTER_TABLE_OFFSET + index * 4,),
+            )
+        )
 
-    hant_row_offsets = [_append_wide(payload, text) for text in HANT_WRAPPED_LINES]
-    _align_payload(payload, 4)
-    hant_table_offset = len(payload)
-    for row_offset in hant_row_offsets:
-        payload.extend(struct.pack("<I", TRANSLATION_SEGMENT_VADDR + row_offset))
-    payload.extend(struct.pack("<I", _HANT_EOF_VA))
+    entries.extend(
+        RelocatedText(f"hant_row_{index}", _encoded_wide(text), ())
+        for index, text in enumerate(HANT_WRAPPED_LINES)
+    )
+    # The translated table is patched with the final row VAs after the one PT_LOAD
+    # installation. Its 68-byte placeholder preserves the old payload geometry.
+    entries.append(
+        RelocatedText(
+            "hant_table",
+            b"\x00" * ((len(HANT_WRAPPED_LINES) + 1) * 4),
+            (HANT_TUTORIAL_DESCRIPTOR_OFFSET,),
+        )
+    )
+    entries.append(
+        RelocatedText(
+            "hant_controller_metadata",
+            _controller_metadata_bytes(),
+            (HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,),
+        )
+    )
+    entries.extend(relocated_memory_card_entries(raw))
+    return tuple(entries)
 
-    _align_payload(payload, 4)
-    hant_metadata_offset = len(payload)
-    for record in HANT_CONTROLLER_METADATA_RECORDS:
-        payload.extend(struct.pack("<hhhh", *record))
 
-    memory_card_offsets: dict[int, int] = {}
-    for index in sorted(MEMORY_CARD_MESSAGES):
-        english = MEMORY_CARD_MESSAGES[index][2]
-        memory_card_offsets[index] = _append_encoded(payload, encode_memory_card_english(english))
-    return bytes(payload), name_prompt_offsets, hant_table_offset, hant_metadata_offset, memory_card_offsets
-
-
-def patch_hant_tutorial(
-    raw: bytes,
-    *,
-    reserve_size: int = 0x100000,
-) -> tuple[bytes, TranslationSegmentInfo]:
-    _validate_source(raw)
-    validate_memory_card_sources(raw)
+def _validate_name_prompt_preimages(raw: bytes) -> None:
     blank_va = _elf_va(NAME_BLANK_STRING_OFFSET)
     for index in _NAME_READING_PROMPT_INDICES:
         pointer_offset = NAME_PROMPT_POINTER_TABLE_OFFSET + index * 4
@@ -332,41 +316,36 @@ def patch_hant_tutorial(
                 f"expected pristine/staged pointer {pristine_va:#x}/{blank_va:#x}, got {actual:#x}"
             )
 
-    payload, name_prompt_offsets, hant_table_offset, hant_metadata_offset, memory_card_offsets = _build_payload()
-    expanded, info = install_translation_segment(raw, payload, reserve_size=reserve_size)
-    if info.segment_vaddr != TRANSLATION_SEGMENT_VADDR:
-        raise ValueError("Unexpected translation-segment base")
 
-    result = bytearray(expanded)
-    for index, payload_offset in name_prompt_offsets.items():
-        struct.pack_into(
-            "<I",
-            result,
-            NAME_PROMPT_POINTER_TABLE_OFFSET + index * 4,
-            info.segment_vaddr + payload_offset,
-        )
+def patch_hant_tutorial(
+    raw: bytes,
+    *,
+    reserve_size: int = 0x100000,
+    extra_entries: Sequence[RelocatedText] = (),
+) -> tuple[bytes, TranslationSegmentInfo]:
+    """Install all proven shared executable text through one translation PT_LOAD.
 
-    struct.pack_into(
-        "<I",
-        result,
-        HANT_TUTORIAL_DESCRIPTOR_OFFSET,
-        info.segment_vaddr + hant_table_offset,
-    )
-    struct.pack_into(
-        "<I",
-        result,
-        HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
-        info.segment_vaddr + hant_metadata_offset,
-    )
+    ``extra_entries`` lets the composite early-UI build append independently
+    validated relocation classes (currently long command-menu labels) without a
+    second translation-segment installation. The default preserves the exact
+    pre-Task-9 name/H.A.N.T./memory-card payload for byte-regression tests.
+    """
 
-    for index, payload_offset in memory_card_offsets.items():
-        target_va = info.segment_vaddr + payload_offset
-        struct.pack_into(
-            "<I",
-            result,
-            MEMORY_CARD_POINTER_TABLE_OFFSET + index * 4,
-            target_va,
-        )
-        for alias_offset in MEMORY_CARD_POINTER_ALIASES.get(index, ()):
-            struct.pack_into("<I", result, alias_offset, target_va)
-    return bytes(result), info
+    _validate_source(raw)
+    _validate_name_prompt_preimages(raw)
+
+    entries = (*_base_relocated_entries(raw), *tuple(extra_entries))
+    installed = install_executable_text(raw, entries, reserve_size=reserve_size)
+
+    table_va = installed.target_vas["hant_table"]
+    metadata_va = installed.target_vas["hant_controller_metadata"]
+    if table_va & 3 or metadata_va & 3:
+        raise ValueError("H.A.N.T structured translation payload lost word alignment")
+
+    result = bytearray(installed.raw)
+    table_file = installed.info.file_offset + (table_va - installed.info.segment_vaddr)
+    for index in range(len(HANT_WRAPPED_LINES)):
+        struct.pack_into("<I", result, table_file + index * 4, installed.target_vas[f"hant_row_{index}"])
+    struct.pack_into("<I", result, table_file + len(HANT_WRAPPED_LINES) * 4, _HANT_EOF_VA)
+
+    return bytes(result), installed.info

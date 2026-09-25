@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import struct
 
+from tools.executable_text import RelocatedText
 from tools.localization import encode_ps2_english
 
 MEMORY_CARD_POINTER_TABLE_OFFSET = 0x407440
@@ -85,3 +86,24 @@ def validate_memory_card_sources(raw: bytes) -> None:
                     f"Memory-card pointer alias preimage mismatch for entry {index} at {alias_offset:#x}: "
                     f"expected {expected:#x}, got {alias:#x}"
                 )
+
+
+def relocated_memory_card_entries(raw: bytes) -> tuple[RelocatedText, ...]:
+    """Return validated memory-card translations in stable pointer-table order."""
+
+    validate_memory_card_sources(raw)
+    entries: list[RelocatedText] = []
+    for index in sorted(MEMORY_CARD_MESSAGES):
+        _source_offset, _source, english = MEMORY_CARD_MESSAGES[index]
+        pointers = (
+            MEMORY_CARD_POINTER_TABLE_OFFSET + index * 4,
+            *MEMORY_CARD_POINTER_ALIASES.get(index, ()),
+        )
+        entries.append(
+            RelocatedText(
+                key=f"memory_card_{index}",
+                encoded=encode_memory_card_english(english) + b"\x00",
+                pointer_offsets=pointers,
+            )
+        )
+    return tuple(entries)

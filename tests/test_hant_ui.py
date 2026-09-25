@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import struct
 import unittest
 from pathlib import Path
@@ -31,6 +32,31 @@ def _segment_file_offset(info, va: int) -> int:
 
 
 class HantTutorialTests(unittest.TestCase):
+    def test_generic_relocation_refactor_preserves_task8_payload_geometry(self) -> None:
+        result, info = patch_hant_tutorial(RAW)
+
+        self.assertEqual(2679, info.payload_size)
+        self.assertEqual(
+            "1921fb7a9fe657961f64a78e51515c9973bede9ff7a43c637c1789b048c3d8f9",
+            hashlib.sha256(result).hexdigest(),
+        )
+        self.assertEqual(
+            info.segment_vaddr,
+            struct.unpack_from("<I", result, NAME_PROMPT_POINTER_TABLE_OFFSET + 2 * 4)[0],
+        )
+        self.assertEqual(
+            info.segment_vaddr + 58,
+            struct.unpack_from("<I", result, NAME_PROMPT_POINTER_TABLE_OFFSET + 3 * 4)[0],
+        )
+        self.assertEqual(
+            info.segment_vaddr + 732,
+            struct.unpack_from("<I", result, HANT_TUTORIAL_DESCRIPTOR_OFFSET)[0],
+        )
+        self.assertEqual(
+            info.segment_vaddr + 800,
+            struct.unpack_from("<I", result, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET)[0],
+        )
+
     def test_repoints_tutorial_descriptor_to_wrapped_translation_table(self) -> None:
         result, info = patch_hant_tutorial(RAW)
         self.assertGreater(len(result), len(RAW))

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from tests.local_fixtures import require_local_fixture
-from tools.menu_ui import MENU_LABELS, MenuLabelSpec, patch_menu_labels
+from tools.menu_ui import MENU_LABELS, MenuLabelSpec, patch_menu_labels, relocated_menu_entries
 
 ELF = require_local_fixture(Path(__file__).parents[1] / "fixtures" / "elf" / "SLPM_665.11")
 RAW = ELF.read_bytes()
@@ -102,6 +102,15 @@ class MenuUiTests(unittest.TestCase):
         }
         self.assertEqual(expected, {spec.key: spec.pointer_offsets for spec in MENU_LABELS})
 
+    def test_relocated_entry_builder_uses_only_proven_long_labels(self) -> None:
+        entries = relocated_menu_entries(RAW)
+        self.assertEqual(("menu_return_above_ground", "menu_report_card"), tuple(entry.key for entry in entries))
+        self.assertEqual(b"Return above ground\x00", entries[0].encoded)
+        self.assertEqual((0x3BC8F4,), entries[0].pointer_offsets)
+        self.assertEqual(b"Report card\x00", entries[1].encoded)
+        self.assertEqual((0x3BC8B8,), entries[1].pointer_offsets)
+        self.assertNotIn("menu_media", {entry.key for entry in entries})
+
     def test_relocated_targets_patch_only_proven_pointer_words_and_preserve_sources(self) -> None:
         targets = {
             "return_above_ground": 0x00910000,
@@ -130,6 +139,8 @@ class MenuUiTests(unittest.TestCase):
         tampered[0x3BC8F4] ^= 1
         with self.assertRaisesRegex(ValueError, "pointer preimage mismatch"):
             patch_menu_labels(bytes(tampered), {"return_above_ground": 0x00910000})
+        with self.assertRaisesRegex(ValueError, "pointer preimage mismatch"):
+            relocated_menu_entries(bytes(tampered))
 
         with self.assertRaisesRegex(ValueError, "not relocation-owned"):
             patch_menu_labels(RAW, {"media": 0x00910000})

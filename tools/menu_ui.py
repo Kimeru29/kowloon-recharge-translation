@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from tools.elf_strings import ElfFixedStringPatch, patch_fixed_strings
+from tools.executable_text import RelocatedText
 
 
 _ELF_MAIN_FILE_OFFSET = 0x80
@@ -130,16 +131,20 @@ def _validate_manifest() -> None:
 _validate_manifest()
 
 
+def _validate_source_slot(raw: bytes, spec: MenuLabelSpec) -> None:
+    end = spec.source_offset + spec.capacity
+    if end > len(raw):
+        raise ValueError(f"Menu source slot is outside executable: {spec.key}")
+    expected = spec.source_text.encode("cp932")
+    if len(expected) >= spec.capacity:
+        raise ValueError(f"Menu source text does not fit declared slot: {spec.key}")
+    if raw[spec.source_offset:spec.source_offset + len(expected)] != expected or raw[spec.source_offset + len(expected)] != 0:
+        raise ValueError(f"Menu source preimage mismatch: {spec.key}")
+
+
 def _validate_source_slots(raw: bytes) -> None:
     for spec in MENU_LABELS:
-        end = spec.source_offset + spec.capacity
-        if end > len(raw):
-            raise ValueError(f"Menu source slot is outside executable: {spec.key}")
-        expected = spec.source_text.encode("cp932")
-        if len(expected) >= spec.capacity:
-            raise ValueError(f"Menu source text does not fit declared slot: {spec.key}")
-        if raw[spec.source_offset:spec.source_offset + len(expected)] != expected or raw[spec.source_offset + len(expected)] != 0:
-            raise ValueError(f"Menu source preimage mismatch: {spec.key}")
+        _validate_source_slot(raw, spec)
 
 
 def fixed_menu_patches() -> tuple[ElfFixedStringPatch, ...]:
@@ -149,6 +154,36 @@ def fixed_menu_patches() -> tuple[ElfFixedStringPatch, ...]:
         if spec.storage == "fixed-slot" and spec.selected_english is not None
     )
 
+
+
+def relocated_menu_entries(raw: bytes) -> tuple[RelocatedText, ...]:
+    """Return only relocation-proven long labels after validating their owners."""
+
+    entries: list[RelocatedText] = []
+    for spec in MENU_LABELS:
+        if spec.storage != "relocated":
+            continue
+        _validate_source_slot(raw, spec)
+        expected_va = _source_va(spec.source_offset)
+        for pointer_offset in spec.pointer_offsets:
+            if pointer_offset < 0 or pointer_offset + 4 > len(raw):
+                raise ValueError(f"Menu pointer is outside executable: {spec.key}")
+            actual_va = int.from_bytes(raw[pointer_offset:pointer_offset + 4], "little")
+            if actual_va != expected_va:
+                raise ValueError(
+                    f"Menu pointer preimage mismatch for {spec.key} at {pointer_offset:#x}: "
+                    f"expected {expected_va:#x}, got {actual_va:#x}"
+                )
+        if spec.selected_english is None:
+            raise ValueError(f"Relocated menu label has no selected English: {spec.key}")
+        entries.append(
+            RelocatedText(
+                key=f"menu_{spec.key}",
+                encoded=spec.selected_english.encode("ascii") + b"\x00",
+                pointer_offsets=spec.pointer_offsets,
+            )
+        )
+    return tuple(entries)
 
 def patch_menu_labels(
     raw: bytes,

@@ -10,6 +10,7 @@ from tools.memory_card_ui import (
     MEMORY_CARD_MESSAGES,
     MEMORY_CARD_POINTER_TABLE_OFFSET,
     encode_memory_card_english,
+    relocated_memory_card_entries,
     validate_memory_card_sources,
 )
 
@@ -18,6 +19,19 @@ RAW = ELF.read_bytes()
 
 
 class MemoryCardUiTests(unittest.TestCase):
+    def test_generic_entries_preserve_pointer_table_order_and_boot_aliases(self) -> None:
+        entries = relocated_memory_card_entries(RAW)
+        self.assertEqual(
+            tuple(sorted(MEMORY_CARD_MESSAGES)),
+            tuple(int(entry.key.removeprefix("memory_card_")) for entry in entries),
+        )
+        slot1 = next(entry for entry in entries if entry.key == "memory_card_1")
+        self.assertEqual(
+            (MEMORY_CARD_POINTER_TABLE_OFFSET + 4, 0x4077F0, 0x4078D0),
+            slot1.pointer_offsets,
+        )
+        self.assertTrue(slot1.encoded.endswith(b"\x00"))
+
     def test_proven_startup_memory_card_messages_relocate_to_translation_segment(self) -> None:
         result, info = patch_hant_tutorial(RAW)
         for index, (_source_offset, _source, english) in MEMORY_CARD_MESSAGES.items():

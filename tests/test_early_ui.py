@@ -102,6 +102,10 @@ class EarlyUiPatchTests(unittest.TestCase):
         for offsets in MEMORY_CARD_POINTER_ALIASES.values():
             for off in offsets:
                 allowed.update(range(off, off + 4))
+        for spec in MENU_LABELS:
+            if spec.storage == "relocated":
+                for off in spec.pointer_offsets:
+                    allowed.update(range(off, off + 4))
         allowed.update(range(NAME_FLOW_STATE9_FLAG_OFFSET, NAME_FLOW_STATE9_FLAG_OFFSET + 4))
         # ELF program header / heap metadata used by the appended translation segment.
         allowed.update(range(0x54, 0x54 + 32))
@@ -119,6 +123,42 @@ class EarlyUiPatchTests(unittest.TestCase):
         self.assertAlmostEqual(17.0 / 9.0, scale_x, places=6)
         self.assertEqual(1.0, scale_y)
         self.assertEqual(0x2787D748, struct.unpack_from("<I", result, 0x1AC600)[0])
+
+
+    def test_composite_build_relocates_only_proven_long_menu_labels(self) -> None:
+        result = build_early_ui_elf(RAW)
+        segment = struct.unpack_from("<IIIIIIII", result, 0x54)
+        segment_file = segment[1]
+        segment_va = segment[2]
+        segment_size = segment[4]
+        by_key = {spec.key: spec for spec in MENU_LABELS}
+        self.assertEqual(2712, segment_size)
+
+        for key, expected in (("return_above_ground", b"Return above ground\x00"), ("report_card", b"Report card\x00")):
+            spec = by_key[key]
+            self.assertEqual(
+                RAW[spec.source_offset:spec.source_offset + spec.capacity],
+                result[spec.source_offset:spec.source_offset + spec.capacity],
+            )
+            targets = {struct.unpack_from("<I", result, off)[0] for off in spec.pointer_offsets}
+            self.assertEqual(1, len(targets))
+            target_va = targets.pop()
+            self.assertGreaterEqual(target_va, segment_va)
+            self.assertLess(target_va, segment_va + segment_size)
+            expected_offset = {"return_above_ground": 0xA78, "report_card": 0xA8C}[key]
+            self.assertEqual(segment_va + expected_offset, target_va)
+            target_file = segment_file + target_va - segment_va
+            self.assertEqual(expected, result[target_file:target_file + len(expected)])
+
+        media = by_key["media"]
+        self.assertEqual(
+            RAW[media.source_offset:media.source_offset + media.capacity],
+            result[media.source_offset:media.source_offset + media.capacity],
+        )
+        self.assertEqual(
+            RAW[media.pointer_offsets[0]:media.pointer_offsets[0] + 4],
+            result[media.pointer_offsets[0]:media.pointer_offsets[0] + 4],
+        )
 
     def test_composite_build_includes_startup_pointer_relocation(self) -> None:
         result = build_early_ui_elf(RAW)
