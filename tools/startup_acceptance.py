@@ -7,6 +7,7 @@ from hashlib import sha256
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES
 from tools.hant_ui import HANT_ENGLISH_LINES, HANT_POINTER_TABLE_OFFSET
 from tools.localization import encode_ps2_english
+from tools.title_layout import TITLE_BACKING_SCALE_X
 from tools.memory_card_ui import (
     MEMORY_CARD_MESSAGES,
     MEMORY_CARD_POINTER_ALIASES,
@@ -135,6 +136,41 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             _check("title_new_pointer", False, "title pointer table outside ELF"),
             _check("title_load_pointer", False, "title pointer table outside ELF"),
         ))
+
+    title_geometry_ok = False
+    title_geometry_detail = "title English backing geometry is missing or stale"
+    if (
+        len(raw) >= 0x6989C8
+        and len(raw) >= 0x1AC604
+        and len(raw) >= 0x5CBFB4
+        and len(raw) >= TITLE_POINTER_TABLE_OFFSET + 8
+    ):
+        new_ptr, load_ptr = struct.unpack_from("<II", raw, TITLE_POINTER_TABLE_OFFSET)
+        scale_x, scale_y = struct.unpack_from("<ff", raw, 0x6989C0)
+        backing_calls = (
+            struct.unpack_from("<I", raw, 0x1AC5C0)[0],
+            struct.unpack_from("<I", raw, 0x1AC5E0)[0],
+        )
+        third_call = struct.unpack_from("<I", raw, 0x1AC600)[0]
+        title_records_hash = sha256(raw[0x5CBE60:0x5CBFB4]).hexdigest()
+        title_geometry_ok = (
+            raw[TITLE_NEW_GAME_START:TITLE_NEW_GAME_START + len(new_game)] == new_game
+            and raw[TITLE_LOAD_START:TITLE_LOAD_START + len(load_game)] == load_game
+            and new_ptr == _ELF_MAIN_VADDR + TITLE_NEW_GAME_START - _ELF_MAIN_FILE_OFFSET
+            and load_ptr == _ELF_MAIN_VADDR + TITLE_LOAD_START - _ELF_MAIN_FILE_OFFSET
+            and struct.pack("<f", scale_x) == struct.pack("<f", TITLE_BACKING_SCALE_X)
+            and scale_y == 1.0
+            and backing_calls == (0x2787D750, 0x2787D750)
+            and third_call == 0x2787D748
+            and title_records_hash == "fbb685e638f950a844c169bec567f7102943e4a9b7ef1916f02b2b0dcb530422"
+        )
+    checks.append(
+        _check(
+            "title_english_backing_geometry",
+            title_geometry_ok,
+            title_geometry_detail,
+        )
+    )
 
     for index in _VISIBLE_PROMPT_INDICES:
         pointer_offset = NAME_PROMPT_POINTER_TABLE_OFFSET + index * 4

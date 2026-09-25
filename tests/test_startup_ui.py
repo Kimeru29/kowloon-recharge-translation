@@ -56,6 +56,14 @@ class StartupUiPatchTests(unittest.TestCase):
         self.assertEqual(RAW[0x5CBE58:0x5CBE5C], result[0x5CBE58:0x5CBE5C])
         self.assertEqual(RAW[0x5CBE10:0x5CBE50], result[0x5CBE10:0x5CBE50])
 
+    def test_startup_build_includes_widened_title_backing(self) -> None:
+        result = build_startup_ui_elf(RAW)
+
+        scale_x, scale_y = struct.unpack_from("<ff", result, 0x6989C0)
+        self.assertAlmostEqual(17.0 / 9.0, scale_x, places=6)
+        self.assertEqual(1.0, scale_y)
+        self.assertEqual(0x2787D748, struct.unpack_from("<I", result, 0x1AC600)[0])
+
     def test_startup_manifest_covers_every_known_pre_dialogue_runtime_string(self) -> None:
         by_offset = {patch.offset: patch for patch in STARTUP_FIXED_PATCHES}
         expected = {
@@ -187,6 +195,8 @@ class StartupUiPatchTests(unittest.TestCase):
 
         allowed = set(range(TITLE_ARENA_START, TITLE_ARENA_END))
         allowed.update(range(TITLE_LOAD_POINTER_OFFSET, TITLE_LOAD_POINTER_OFFSET + 4))
+        allowed.update(range(0x6989C0, 0x6989C4))
+        allowed.update(range(0x1AC600, 0x1AC604))
         allowed.update(range(0x5865F0, 0x586630))
         allowed.update(range(0x586630, 0x586650))
         allowed.update(range(0x5869C0, 0x586AF0))

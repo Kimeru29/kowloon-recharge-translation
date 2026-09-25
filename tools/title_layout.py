@@ -83,6 +83,19 @@ _TITLE_REVEAL_MARKER_WORDS: tuple[tuple[int, int], ...] = (
     (0x19A2DC, 0x2405008C),  # per-glyph index 0x8C
 )
 
+# Runtime/title-renderer geometry: four pristine Japanese glyphs advance 16 px
+# each inside a 72 px panel with 4 px side padding.  The exact eight-glyph
+# official English labels therefore need 136 px while preserving that padding.
+TITLE_BACKING_SCALE_X = 17.0 / 9.0  # 136 / 72
+_TITLE_BACKING_TARGET_VECTOR_OFFSET = 0x6989C0
+_TITLE_THIRD_OBJECT_TARGET_VECTOR_OFFSET = 0x6989B8
+_TITLE_BACKING_TARGET_VECTOR_PREIMAGE = struct.pack("<ff", 1.0, 1.0)
+_TITLE_THIRD_OBJECT_TARGET_VECTOR_PREIMAGE = struct.pack("<ff", 1.0, 1.0)
+_TITLE_BACKING_VECTOR_CALL_WORD = 0x2787D750  # addiu a3,gp,-0x28b0
+_TITLE_THIRD_OBJECT_VECTOR_CALL_WORD = 0x2787D748   # addiu a3,gp,-0x28b8
+_TITLE_BACKING_VECTOR_CALL_OFFSETS = (0x1AC5C0, 0x1AC5E0)
+_TITLE_THIRD_OBJECT_VECTOR_CALL_OFFSET = 0x1AC600
+
 
 @dataclass(frozen=True)
 class TitleLayoutRecord:
@@ -231,3 +244,34 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
             "proven: group 2/index 0x8E is not a static backing; the label state machine mutates its X coordinate during reveal before creating per-glyph group 2/index 0x8C sprites",
         ),
     )
+
+def patch_title_layout(raw: bytes) -> bytes:
+    """Widen only the two proven title-label backing instances.
+
+    The first two scale animations share the gp-relative ``(1,1)`` target at
+    0x798940.  The third animation belongs to an unrelated title-state object.  Redirect the
+    footer to the adjacent pristine ``(1,1)`` vector, then change the now-unique
+    backing target to ``(17/9,1)``.  This keeps the animation behavior and Y
+    scale intact while preserving the original four-pixel text padding.
+    """
+
+    # Reuse the complete Task-4 ownership proof as the structural preimage.
+    inspect_title_layout(raw)
+
+    if raw[_TITLE_BACKING_TARGET_VECTOR_OFFSET:_TITLE_BACKING_TARGET_VECTOR_OFFSET + 8] != _TITLE_BACKING_TARGET_VECTOR_PREIMAGE:
+        raise ValueError("title layout patch preimage mismatch for backing target vector")
+    if raw[_TITLE_THIRD_OBJECT_TARGET_VECTOR_OFFSET:_TITLE_THIRD_OBJECT_TARGET_VECTOR_OFFSET + 8] != _TITLE_THIRD_OBJECT_TARGET_VECTOR_PREIMAGE:
+        raise ValueError("title layout patch preimage mismatch for third-object target vector")
+
+    for offset in _TITLE_BACKING_VECTOR_CALL_OFFSETS:
+        actual = struct.unpack_from("<I", raw, offset)[0]
+        if actual != _TITLE_BACKING_VECTOR_CALL_WORD:
+            raise ValueError(f"title layout patch preimage mismatch for backing vector call at {offset:#x}")
+    footer_actual = struct.unpack_from("<I", raw, _TITLE_THIRD_OBJECT_VECTOR_CALL_OFFSET)[0]
+    if footer_actual != _TITLE_BACKING_VECTOR_CALL_WORD:
+        raise ValueError("title layout patch preimage mismatch for third-object vector call")
+
+    result = bytearray(raw)
+    struct.pack_into("<f", result, _TITLE_BACKING_TARGET_VECTOR_OFFSET, TITLE_BACKING_SCALE_X)
+    struct.pack_into("<I", result, _TITLE_THIRD_OBJECT_VECTOR_CALL_OFFSET, _TITLE_THIRD_OBJECT_VECTOR_CALL_WORD)
+    return bytes(result)

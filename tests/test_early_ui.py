@@ -61,6 +61,8 @@ class EarlyUiPatchTests(unittest.TestCase):
 
         allowed = set(range(TITLE_ARENA_START, TITLE_ARENA_END))
         allowed.update(range(TITLE_LOAD_POINTER_OFFSET, TITLE_LOAD_POINTER_OFFSET + 4))
+        allowed.update(range(0x6989C0, 0x6989C4))
+        allowed.update(range(0x1AC600, 0x1AC604))
         allowed.update(range(NAME_READING_ARENA_START, NAME_READING_ARENA_END))
         allowed.update(range(NAME_PROMPT_ARENA_START, NAME_PROMPT_ARENA_END))
         allowed.update(range(NAME_PROMPT_POINTER_TABLE_OFFSET, NAME_PROMPT_POINTER_TABLE_OFFSET + 8 * 4))
@@ -94,6 +96,13 @@ class EarlyUiPatchTests(unittest.TestCase):
         differences = {index for index, (before, after) in enumerate(zip(RAW, result[:len(RAW)])) if before != after}
         self.assertTrue(differences)
         self.assertTrue(differences <= allowed)
+
+    def test_composite_build_includes_widened_title_backing(self) -> None:
+        result = build_early_ui_elf(RAW)
+        scale_x, scale_y = struct.unpack_from("<ff", result, 0x6989C0)
+        self.assertAlmostEqual(17.0 / 9.0, scale_x, places=6)
+        self.assertEqual(1.0, scale_y)
+        self.assertEqual(0x2787D748, struct.unpack_from("<I", result, 0x1AC600)[0])
 
     def test_composite_build_includes_startup_pointer_relocation(self) -> None:
         result = build_early_ui_elf(RAW)

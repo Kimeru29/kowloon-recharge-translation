@@ -30,6 +30,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("name_prompt_2", names)
         self.assertIn("name_prompt_3", names)
         self.assertIn("runtime_name_Habaki", names)
+        self.assertIn("title_english_backing_geometry", names)
 
     def test_pristine_elf_fails_translated_renderer_checks(self) -> None:
         checks = verify_startup_elf(RAW)
@@ -40,6 +41,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("name_prompt_0", failed_names)
         self.assertIn("name_flow_skip_reading", failed_names)
         self.assertIn("memory_card_1_boot_aliases", failed_names)
+        self.assertIn("title_english_backing_geometry", failed_names)
 
     def test_v10_adv_patch_does_not_satisfy_v11_dg_layout_acceptance(self) -> None:
         old = bytearray(RAW)

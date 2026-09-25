@@ -4,6 +4,7 @@ import struct
 
 from tools.elf_strings import ElfFixedStringPatch, patch_fixed_strings
 from tools.localization import encode_ps2_english
+from tools.title_layout import patch_title_layout
 
 
 # The title renderer consumes two-byte JIS glyph codes.  The pristine executable
@@ -380,7 +381,8 @@ STARTUP_FIXED_PATCHES: tuple[ElfFixedStringPatch, ...] = (
 
 
 def build_startup_ui_elf(raw: bytes) -> bytes:
-    titled = patch_title_labels(raw)
+    laid_out = patch_title_layout(raw)
+    titled = patch_title_labels(laid_out)
     relocated = patch_name_prompt_arena(titled)
     flowed = patch_name_entry_flow(relocated)
     return patch_fixed_strings(flowed, STARTUP_FIXED_PATCHES)
