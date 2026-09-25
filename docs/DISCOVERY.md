@@ -227,7 +227,9 @@ Runtime proved the uppercase-folding design: lowercase and uppercase are visible
 
 ## Memory-card executable UI
 
-The startup stone-panel message belongs to a 27-entry executable pointer table at file offset `0x407440`. The observed entry is the PS2 memory-card-slot-1 checking state. `English.bytes` contains a structurally aligned official memory-card sequence (`Checking memory card slot 1`, `Loading...`, `Data loaded`, save/format/error prompts, etc.). v8 relocates only the proven corresponding entries into the shared translation segment. Eight re:charge-specific clear-data entries without proven official counterparts remain untouched.
+The startup stone-panel message belongs to a 27-entry executable pointer table at file offset `0x407440`. The observed entry is the PS2 memory-card-slot-1 checking state. `English.bytes` contains a structurally aligned official memory-card sequence (`Checking memory card slot 1`, `Loading...`, `Data loaded`, save/format/error prompts, etc.). v8 relocated the proven corresponding table entries into the shared translation segment, while eight re:charge-specific clear-data entries without proven official counterparts remained untouched.
+
+The later log-confirmed v8 runtime still showed Japanese, proving table relocation alone was insufficient. Static reference tracing found two handler-local aliases of entry 1: file `0x4077F0` immediately precedes `H_BootMcardChk`, and file `0x4078D0` immediately precedes `H_EmptyMcardChk`; both pristine words are `0x00506AD0`, the VA of the entry-1 Japanese source at file `0x406B50`. v10 promotes this into a general rule: every proven alias of a relocated executable message must validate the same source preimage and move to the same translation-segment target.
 
 ## GP088 startup/title graphics
 
@@ -263,4 +265,25 @@ Candidate: `/private/tmp/kowloon-recharge-startup-en-v9.iso`
 - dependency-free suite: **130 tests OK** (8 expected skips);
 - Pillow-enabled suite: **130 tests OK** (1 owned-corpus skip).
 
-Runtime proof remains mandatory; no PCSX2 launch has been performed for v8 or v9.
+A later PCSX2 log proved the supervised runtime session actually booted v8. Because v8 and v9 share the same final executable SHA, the observed memory-card and name-flow failures apply to both executable builds; v9's GP088_12 graphics remain runtime-unproven.
+
+## English name-flow transition
+
+The normal PS2 name editor already handles both permanent fields: positions 0..2 are the surname and 3..5 the given name. After the normal-name confirmation, the dispatcher calls the same transition routine used after the reading pass. At file `0x186A68` state 9 supplies flag `0` (`0x0000282D`) immediately before `jal 0x285E20` at `0x186A6C`; at file `0x186A8C` state 11 supplies flag `1` (`0x24050001`) before the same call at `0x186A90`. Flag 0 builds the PS2 kana-reading editor; flag 1 follows the existing commit/finalization path.
+
+The reading editor is semantically Japanese-specific: it is backed by `name/namedic.bin`, and its character classifier accepts the pristine kana readings while Latin test values such as `Hab`/`Kur` classify as having no valid reading characters. The official remaster deletes/suppresses the kana reading defaults (`@D`), which matches the existing English executable patch that redirects the reading buffers to the module's blank wide string. v10 therefore patches only the state-9 flag word from 0 to 1 and validates all four dispatcher words before doing so; it does not weaken the kana validator, alter buffer sizes, or synthesize phonetic readings.
+
+## Startup v10 static candidate
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v10.iso`
+
+- SHA-256: `24d425433af97b1617e820cac05aa2a4d9389aa9fa19c1767a57eb763812da8e`;
+- final ELF size 8,403,943 bytes, post-ROFS SHA-256 `e276442dc435034c59d471f6aad4b1eab7c0a4679f68717d4a3a5a3808b345a0`;
+- same 1,144-overlay / 891-in-place / 253-relocated geometry as v9; 1,144 ROFS records patched;
+- +900 embedded sectors; 17 shifted outer files; final ISO size unchanged;
+- final-image startup acceptance: **123/123**, adding named checks for both entry-1 boot aliases and the name-flow skip-reading instruction invariant;
+- dependency-free suite: **134 tests OK** (8 expected skips);
+- Pillow-enabled suite: **134 tests OK** (1 owned-corpus skip);
+- a second build from the pristine ISO has the same SHA-256 and is byte-for-byte identical.
+
+Runtime proof remains mandatory.

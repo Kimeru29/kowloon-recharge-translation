@@ -10,6 +10,7 @@ from tools.elf_translation_segment import (
 from tools.localization import encode_ps2_english
 from tools.memory_card_ui import (
     MEMORY_CARD_MESSAGES,
+    MEMORY_CARD_POINTER_ALIASES,
     MEMORY_CARD_POINTER_TABLE_OFFSET,
     encode_memory_card_english,
     validate_memory_card_sources,
@@ -155,10 +156,13 @@ def patch_hant_tutorial(
             info.segment_vaddr + payload_offset,
         )
     for index, payload_offset in memory_card_offsets.items():
+        target_va = info.segment_vaddr + payload_offset
         struct.pack_into(
             "<I",
             result,
             MEMORY_CARD_POINTER_TABLE_OFFSET + index * 4,
-            info.segment_vaddr + payload_offset,
+            target_va,
         )
+        for alias_offset in MEMORY_CARD_POINTER_ALIASES.get(index, ()):
+            struct.pack_into("<I", result, alias_offset, target_va)
     return bytes(result), info

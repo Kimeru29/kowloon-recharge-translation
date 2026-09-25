@@ -23,6 +23,8 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("runtime_heap_break", names)
         self.assertIn("hant_tutorial", names)
         self.assertIn("memory_card_1", names)
+        self.assertIn("memory_card_1_boot_aliases", names)
+        self.assertIn("name_flow_skip_reading", names)
         self.assertIn("name_prompt_0", names)
         self.assertIn("name_prompt_2", names)
         self.assertIn("name_prompt_3", names)
@@ -35,6 +37,8 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("translation_segment", failed_names)
         self.assertIn("hant_tutorial", failed_names)
         self.assertIn("name_prompt_0", failed_names)
+        self.assertIn("name_flow_skip_reading", failed_names)
+        self.assertIn("memory_card_1_boot_aliases", failed_names)
 
     def test_startup_graphics_manifest_is_complete_and_stable(self) -> None:
         self.assertEqual(31, len(STARTUP_GRAPHICS_PATHS))

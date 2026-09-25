@@ -28,6 +28,25 @@ class MemoryCardUiTests(unittest.TestCase):
             expected = encode_memory_card_english(english) + b"\x00"
             self.assertEqual(expected, result[target_file:target_file + len(expected)])
 
+    def test_boot_memory_card_handlers_follow_relocated_slot1_message(self) -> None:
+        result, info = patch_hant_tutorial(RAW)
+        primary = struct.unpack_from(
+            "<I", result, MEMORY_CARD_POINTER_TABLE_OFFSET + 4
+        )[0]
+        self.assertGreaterEqual(primary, info.segment_vaddr)
+
+        # H_BootMcardChk and H_EmptyMcardChk each embed a handler-local alias
+        # of table entry 1.  Runtime uses these aliases during the pre-title
+        # stone-panel check, so they must follow the relocated English string.
+        for alias_offset in (0x4077F0, 0x4078D0):
+            self.assertEqual(primary, struct.unpack_from("<I", result, alias_offset)[0])
+
+    def test_fail_closes_on_boot_memory_card_handler_alias_drift(self) -> None:
+        tampered = bytearray(RAW)
+        tampered[0x4077F0] ^= 1
+        with self.assertRaisesRegex(ValueError, "Memory-card.*alias"):
+            validate_memory_card_sources(bytes(tampered))
+
     def test_unproven_recharge_clear_data_entries_remain_pristine(self) -> None:
         result, _info = patch_hant_tutorial(RAW)
         for index in (11, 19, 20, 21, 22, 23, 24, 25):

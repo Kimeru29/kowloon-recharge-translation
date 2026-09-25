@@ -5,6 +5,12 @@ import struct
 from tools.localization import encode_ps2_english
 
 MEMORY_CARD_POINTER_TABLE_OFFSET = 0x407440
+# Handler-local aliases used by the pre-title boot checks.  Static tracing shows
+# H_BootMcardChk and H_EmptyMcardChk both embed table entry 1 directly instead
+# of loading it through MEMORY_CARD_POINTER_TABLE_OFFSET.
+MEMORY_CARD_POINTER_ALIASES: dict[int, tuple[int, ...]] = {
+    1: (0x4077F0, 0x4078D0),
+}
 _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
 _LINE_BREAK = "＠改行"
@@ -69,3 +75,13 @@ def validate_memory_card_sources(raw: bytes) -> None:
             raise ValueError(
                 f"Memory-card pointer preimage mismatch for entry {index}: expected {expected:#x}, got {actual:#x}"
             )
+
+        for alias_offset in MEMORY_CARD_POINTER_ALIASES.get(index, ()):
+            if alias_offset + 4 > len(raw):
+                raise ValueError("Memory-card pointer alias is outside executable")
+            alias = struct.unpack_from("<I", raw, alias_offset)[0]
+            if alias != expected:
+                raise ValueError(
+                    f"Memory-card pointer alias preimage mismatch for entry {index} at {alias_offset:#x}: "
+                    f"expected {expected:#x}, got {alias:#x}"
+                )

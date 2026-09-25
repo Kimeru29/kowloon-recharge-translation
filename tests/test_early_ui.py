@@ -15,11 +15,13 @@ from tools.startup_ui import (
     NAME_READING_POINTER_OFFSETS,
     NAME_DEFAULT_POINTER_OFFSETS,
     NAME_RUNTIME_POINTER_OFFSETS,
+    NAME_FLOW_STATE9_FLAG_OFFSET,
     TITLE_ARENA_END,
     TITLE_ARENA_START,
     TITLE_LOAD_POINTER_OFFSET,
 )
 from tools.hant_ui import HANT_ENGLISH_LINES, HANT_POINTER_TABLE_OFFSET
+from tools.memory_card_ui import MEMORY_CARD_POINTER_ALIASES
 from tools.elf_translation_segment import TRANSLATION_SEGMENT_VADDR
 from tools.localization import encode_ps2_english
 from tests.local_fixtures import require_local_fixture
@@ -78,6 +80,10 @@ class EarlyUiPatchTests(unittest.TestCase):
             allowed.update(range(off, off + 4))
         allowed.update(range(HANT_POINTER_TABLE_OFFSET, HANT_POINTER_TABLE_OFFSET + 17 * 4))
         allowed.update(range(0x407440, 0x4074AC))
+        for offsets in MEMORY_CARD_POINTER_ALIASES.values():
+            for off in offsets:
+                allowed.update(range(off, off + 4))
+        allowed.update(range(NAME_FLOW_STATE9_FLAG_OFFSET, NAME_FLOW_STATE9_FLAG_OFFSET + 4))
         # ELF program header / heap metadata used by the appended translation segment.
         allowed.update(range(0x54, 0x54 + 32))
         allowed.update(range(0x250, 0x254))

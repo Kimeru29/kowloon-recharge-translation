@@ -152,6 +152,41 @@ _NAME_RUNTIME_READING_POINTERS = (
     (0x577C6C, 0x6951A0, "くろう"),
 )
 
+# The PS2 state dispatcher invokes the same M_Name transition routine from
+# state 9 and state 11.  State 9 passes 0 and enters the kana-reading editor;
+# state 11 passes 1 and commits/finalizes.  The official English remaster
+# suppresses the reading buffers, so English reuses the already-existing flag-1
+# path at state 9 instead of entering the PS2-only kana pass.
+NAME_FLOW_STATE9_FLAG_OFFSET = 0x186A68
+_NAME_FLOW_STATE9_CALL_OFFSET = 0x186A6C
+_NAME_FLOW_STATE11_FLAG_OFFSET = 0x186A8C
+_NAME_FLOW_STATE11_CALL_OFFSET = 0x186A90
+_NAME_FLOW_FLAG_ZERO_WORD = 0x0000282D  # daddu a1, zero, zero
+_NAME_FLOW_FLAG_ONE_WORD = 0x24050001   # addiu a1, zero, 1
+_NAME_FLOW_TRANSITION_JAL_WORD = 0x0C0A1788  # jal 0x285e20
+
+
+def patch_name_entry_flow(raw: bytes) -> bytes:
+    expected = (
+        (NAME_FLOW_STATE9_FLAG_OFFSET, _NAME_FLOW_FLAG_ZERO_WORD),
+        (_NAME_FLOW_STATE9_CALL_OFFSET, _NAME_FLOW_TRANSITION_JAL_WORD),
+        (_NAME_FLOW_STATE11_FLAG_OFFSET, _NAME_FLOW_FLAG_ONE_WORD),
+        (_NAME_FLOW_STATE11_CALL_OFFSET, _NAME_FLOW_TRANSITION_JAL_WORD),
+    )
+    for offset, word in expected:
+        if offset + 4 > len(raw):
+            raise ValueError("Name-entry flow patch is outside executable")
+        actual = struct.unpack_from("<I", raw, offset)[0]
+        if actual != word:
+            raise ValueError(
+                f"Name-entry flow preimage mismatch at {offset:#x}: "
+                f"expected {word:#010x}, got {actual:#010x}"
+            )
+
+    result = bytearray(raw)
+    struct.pack_into("<I", result, NAME_FLOW_STATE9_FLAG_OFFSET, _NAME_FLOW_FLAG_ONE_WORD)
+    return bytes(result)
+
 
 def _validate_c_string(raw: bytes, offset: int, expected: str) -> None:
     encoded = expected.encode("cp932")
@@ -347,4 +382,5 @@ STARTUP_FIXED_PATCHES: tuple[ElfFixedStringPatch, ...] = (
 def build_startup_ui_elf(raw: bytes) -> bytes:
     titled = patch_title_labels(raw)
     relocated = patch_name_prompt_arena(titled)
-    return patch_fixed_strings(relocated, STARTUP_FIXED_PATCHES)
+    flowed = patch_name_entry_flow(relocated)
+    return patch_fixed_strings(flowed, STARTUP_FIXED_PATCHES)

@@ -114,6 +114,24 @@ class StartupUiPatchTests(unittest.TestCase):
         self.assertEqual(RAW[0x695188:0x6951A8], result[0x695188:0x6951A8])
         self.assertEqual(RAW[0x695840:0x695860], result[0x695840:0x695860])
 
+    def test_english_name_flow_skips_ps2_kana_reading_editor(self) -> None:
+        result = build_startup_ui_elf(RAW)
+
+        # The state dispatcher calls the same transition routine twice.  State 9
+        # originally passes flag 0 (enter kana-reading editor), while state 11
+        # passes flag 1 (commit/finalize).  English must reuse flag 1 at state 9
+        # because the remaster suppresses the kana reading buffers.
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x186A68)[0])
+        self.assertEqual(0x0C0A1788, struct.unpack_from("<I", result, 0x186A6C)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x186A8C)[0])
+        self.assertEqual(0x0C0A1788, struct.unpack_from("<I", result, 0x186A90)[0])
+
+    def test_name_flow_patch_fails_closed_on_dispatcher_drift(self) -> None:
+        tampered = bytearray(RAW)
+        tampered[0x186A68] ^= 1
+        with self.assertRaisesRegex(ValueError, "name.*flow|Name.*flow"):
+            build_startup_ui_elf(bytes(tampered))
+
     def test_name_keyboard_uses_ps2_adapted_latin_rows_with_two_byte_cell_geometry(self) -> None:
         result = build_startup_ui_elf(RAW)
         expected_rows = (
@@ -173,6 +191,7 @@ class StartupUiPatchTests(unittest.TestCase):
         allowed.update(range(0x586630, 0x586650))
         allowed.update(range(0x5869C0, 0x586AF0))
         allowed.update(range(0x577C60, 0x577C78))
+        allowed.update(range(0x186A68, 0x186A6C))
         for patch in STARTUP_FIXED_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
 

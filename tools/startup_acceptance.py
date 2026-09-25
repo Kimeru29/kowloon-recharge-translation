@@ -6,13 +6,19 @@ from hashlib import sha256
 
 from tools.hant_ui import HANT_ENGLISH_LINES, HANT_POINTER_TABLE_OFFSET
 from tools.localization import encode_ps2_english
-from tools.memory_card_ui import MEMORY_CARD_MESSAGES, MEMORY_CARD_POINTER_TABLE_OFFSET, encode_memory_card_english
+from tools.memory_card_ui import (
+    MEMORY_CARD_MESSAGES,
+    MEMORY_CARD_POINTER_ALIASES,
+    MEMORY_CARD_POINTER_TABLE_OFFSET,
+    encode_memory_card_english,
+)
 from tools.startup_ui import (
     KEYBOARD_ROW_PATCHES,
     NAME_DEFAULT_POINTER_OFFSETS,
     NAME_PROMPT_POINTER_TABLE_OFFSET,
     NAME_PROMPT_TEXTS,
     NAME_RUNTIME_POINTER_OFFSETS,
+    NAME_FLOW_STATE9_FLAG_OFFSET,
     TITLE_LOAD_POINTER_OFFSET,
     TITLE_LOAD_START,
     TITLE_NEW_GAME_START,
@@ -168,6 +174,22 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             break
     checks.append(_check("latin_name_keyboard", keyboard_ok, "one or more keyboard rows are not wide Latin"))
 
+    name_flow_ok = (
+        NAME_FLOW_STATE9_FLAG_OFFSET + 8 <= len(raw)
+        and struct.unpack_from("<I", raw, NAME_FLOW_STATE9_FLAG_OFFSET)[0] == 0x24050001
+        and struct.unpack_from("<I", raw, NAME_FLOW_STATE9_FLAG_OFFSET + 4)[0] == 0x0C0A1788
+        and 0x186A94 <= len(raw)
+        and struct.unpack_from("<I", raw, 0x186A8C)[0] == 0x24050001
+        and struct.unpack_from("<I", raw, 0x186A90)[0] == 0x0C0A1788
+    )
+    checks.append(
+        _check(
+            "name_flow_skip_reading",
+            name_flow_ok,
+            "state 9 does not reuse the post-reading flag-1 transition",
+        )
+    )
+
     adv_ok = all(
         offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == expected
         for offset, expected in _ADV_PATCH_WORDS
@@ -225,6 +247,29 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
                     target_file = p_offset + relative
                     ok = raw[target_file:target_file + len(expected)] == expected
         checks.append(_check(f"memory_card_{index}", ok, detail))
+
+    alias_ok = segment is not None
+    alias_detail = "boot memory-card aliases do not resolve to relocated entry 1 English"
+    if segment is not None:
+        p_offset, p_vaddr, p_filesz, _p_memsz = segment
+        primary_offset = MEMORY_CARD_POINTER_TABLE_OFFSET + 4
+        if primary_offset + 4 > len(raw):
+            alias_ok = False
+        else:
+            primary_va = struct.unpack_from("<I", raw, primary_offset)[0]
+            expected = encode_memory_card_english(MEMORY_CARD_MESSAGES[1][2]) + b"\x00"
+            relative = primary_va - p_vaddr
+            if relative < 0 or relative + len(expected) > p_filesz:
+                alias_ok = False
+            elif raw[p_offset + relative:p_offset + relative + len(expected)] != expected:
+                alias_ok = False
+            else:
+                alias_ok = all(
+                    alias_offset + 4 <= len(raw)
+                    and struct.unpack_from("<I", raw, alias_offset)[0] == primary_va
+                    for alias_offset in MEMORY_CARD_POINTER_ALIASES.get(1, ())
+                )
+    checks.append(_check("memory_card_1_boot_aliases", alias_ok, alias_detail))
     return checks
 
 

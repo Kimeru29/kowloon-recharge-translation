@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v9 result: 130 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v10 result: 134 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -354,7 +354,7 @@ Do not launch v8 automatically. Follow the exact runtime checklist in `docs/LOCA
 
 ## Build startup v9 candidate
 
-v9 supersedes the unlaunched v8 candidate by adding a proven structural GP088_12 atlas repack. Regenerate `local/startup-graphics/BLBRD/B_GP088.BIN` with the same `port_title_startup_graphics` command above; the function now validates the pristine GP088_03→GP088_12 alpha layout and rebuilds GP088_12 from official-English GP088_03 regions.
+v9 superseded v8 as the static candidate by adding a proven structural GP088_12 atlas repack. A later emulator log showed the supervised runtime session had in fact booted v8, so v8/v9 executable findings are tracked separately from the v9-only atlas change. Regenerate `local/startup-graphics/BLBRD/B_GP088.BIN` with the same `port_title_startup_graphics` command above; the function now validates the pristine GP088_03→GP088_12 alpha layout and rebuilds GP088_12 from official-English GP088_03 regions.
 
 ```bash
 python3 -m tools.build_early_ui_elf
@@ -385,3 +385,42 @@ Current v9 static result:
 - Pillow-enabled suite: **130 tests OK** (1 owned-corpus skip).
 
 Do not launch v9 automatically. Follow the exact runtime checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval before launching PCSX2.
+
+
+## Build startup v10 candidate
+
+v10 keeps the v9 graphics/corpus overlay set and changes only executable runtime routing: memory-card entry 1 now moves its two boot-handler aliases with the canonical pointer, and the English name flow reuses the existing post-reading transition instead of entering the PS2 kana-reading editor. Both patches validate exact pristine preimages.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v10.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v10.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v10.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v10.json
+```
+
+Current v10 static result:
+
+- pristine ISO SHA-256: `29e305e344c146e1416cca498e2d288718075380552d37886d9b469717779476`;
+- translated ELF SHA-256 before ISO ROFS rewrite: `ef1db436e6ef9c5b314cdb1c580b75c94cb2981025dc9788287810cd09c5a6ea`;
+- final post-ROFS ELF SHA-256: `e276442dc435034c59d471f6aad4b1eab7c0a4679f68717d4a3a5a3808b345a0`;
+- translated/final ELF size: 8,403,943 bytes; outer extent relocated from 288 to 1,013,782;
+- ISO SHA-256: `24d425433af97b1617e820cac05aa2a4d9389aa9fa19c1767a57eb763812da8e`;
+- 1,144 overlays; 891 in place / 253 relocated; 1,144 ROFS records patched/re-resolved;
+- +900 embedded sectors; 17 shifted outer files; whole ISO remains 2,095,382,528 bytes;
+- final-image startup verifier: **123/123**;
+- dependency-free suite: **134 tests OK** (8 expected skips);
+- Pillow-enabled suite: **134 tests OK** (1 owned-corpus skip);
+- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v10-repeat.iso` has the same SHA-256 and `cmp` reports byte-for-byte identity.
+
+Do not launch v10 automatically. Follow the exact v10 runtime checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval before launching PCSX2.

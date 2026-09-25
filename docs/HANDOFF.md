@@ -202,12 +202,12 @@ PS2-only lexical proxy:
 - `tools/exact_import.py`, `tools/import_exact_mtx.py` — fail-closed exact MTX importer
 - `tools/ksf_import.py`, `tools/import_exact_ksf.py` — conservative KSF importer
 - `tools/structural_import.py`, `tools/import_structural_mtx.py` — changed-source MTX importer
-- `tools/startup_ui.py` — title arena, wide startup prompt/name relocation and Latin keyboard
+- `tools/startup_ui.py` — title arena, wide startup prompt/name relocation, Latin keyboard, and fail-closed English name-flow bypass
 - `tools/adv_layout.py` — fail-closed ADV vertical→horizontal renderer transform
 - `tools/elf_translation_segment.py` — reusable second-PT_LOAD English text segment
 - `tools/hant_ui.py` — shared startup translation-segment payload: H.A.N.T., overflow name-reading prompts, and proven memory-card text
-- `tools/memory_card_ui.py` — fail-closed memory-card pointer-table correspondence + official English encoding
-- `tools/startup_acceptance.py` — reproducible final-ISO startup/renderer-class verifier
+- `tools/memory_card_ui.py` — fail-closed memory-card pointer-table + boot-handler alias correspondence and official English encoding
+- `tools/startup_acceptance.py` — reproducible final-ISO startup/renderer-class verifier, including memory-card aliases and name-flow instruction invariants
 - `tools/early_ui.py`, `tools/elf_strings.py` — executable UI build/slot handling
 - `tools/graphics_port.py` — optional-Pillow indexed PS2 graphics port, including raw-RGBA atlas output
 - `tools/graphics_layout.py` — generic fail-closed region-transfer / alpha-layout proof for structurally changed atlases
@@ -220,9 +220,11 @@ PS2-only lexical proxy:
 
 ## Latest runtime result and next gate
 
-v7 was runtime-tested after explicit approval. It proved uppercase reachability and kept the accepted startup/name-entry surfaces, but the relocated reading prompt was truncated to `Enter` and finishing the state froze. Static reverse engineering identified the stale libkernel heap-break collision described above.
+The latest supervised PCSX2 session was log-confirmed to have booted v8. It proved opening quotations rotate, retained the accepted title/name/Latin-keyboard surfaces, but still showed Japanese on the pre-title memory-card stone panel. The now-protected official reading prompt survived in full but clipped at the right edge, and finishing that screen still left the flow stuck. v8 and v9 share the same executable SHA, so those executable defects apply to both; v9's GP088_12 graphics remain runtime-unproven.
 
-v9 is statically verified with the allocator fix, proven memory-card UI, direct GP088_03 backport, and structural GP088_12 English atlas. Before launching v9, state the exact checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval. Do not claim the freeze fixed until runtime advances beyond the reading/confirmation flow.
+Static tracing after that run found two independent runtime-path omissions. The boot handlers `H_BootMcardChk` and `H_EmptyMcardChk` embed aliases at file offsets `0x4077F0` and `0x4078D0` that both point to memory-card table entry 1; v8/v9 relocated the table but not those aliases. The name dispatcher calls the same transition at `0x285E20`: state 9 passes flag `0` and enters the kana-reading pass, while state 11 passes flag `1` and commits/finalizes. v10 repoints both memory aliases and changes only the state-9 flag instruction to `1`, with exact preimage checks.
+
+v10 is built from the pristine ISO at `/private/tmp/kowloon-recharge-startup-en-v10.iso`, SHA-256 `24d425433af97b1617e820cac05aa2a4d9389aa9fa19c1767a57eb763812da8e`. Final-image acceptance is 123/123; both test suites run 134 tests; a second pristine build is byte-for-byte identical. Before launching v10, state the exact checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval. Runtime must still prove the boot alias and name-flow fixes.
 
 ## Resume procedure
 
