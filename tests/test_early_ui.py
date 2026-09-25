@@ -4,6 +4,7 @@ import struct
 import unittest
 from pathlib import Path
 
+from tools.adv_layout import ADV_DG_LAYOUT_PATCHES
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
 from tools.startup_ui import (
     NAME_BLANK_STRING_OFFSET,
@@ -75,8 +76,8 @@ class EarlyUiPatchTests(unittest.TestCase):
         allowed.update(range(0x577C68, 0x577C70))
         for patch in EARLY_UI_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
-        # ADV horizontal-layout patch and H.A.N.T pointer table are declared runtime patches.
-        for off in (0x14FA60, 0x14FA68, 0x14FAA4, 0x14FAA8):
+        # ADV DG horizontal-layout patch and H.A.N.T pointer table are declared runtime patches.
+        for off, _expected, _replacement in ADV_DG_LAYOUT_PATCHES:
             allowed.update(range(off, off + 4))
         allowed.update(range(HANT_POINTER_TABLE_OFFSET, HANT_POINTER_TABLE_OFFSET + 17 * 4))
         allowed.update(range(0x407440, 0x4074AC))
@@ -105,10 +106,15 @@ class EarlyUiPatchTests(unittest.TestCase):
 
     def test_composite_build_includes_horizontal_adv_layout(self) -> None:
         result = build_early_ui_elf(RAW)
-        self.assertEqual(0x80430465, struct.unpack_from("<I", result, 0x14FA60)[0])
-        self.assertEqual(0x00031843, struct.unpack_from("<I", result, 0x14FA68)[0])
-        self.assertEqual(0x80440463, struct.unpack_from("<I", result, 0x14FAA4)[0])
-        self.assertEqual(0x0080182D, struct.unpack_from("<I", result, 0x14FAA8)[0])
+        for offset, _expected, replacement in ADV_DG_LAYOUT_PATCHES:
+            self.assertEqual(replacement, struct.unpack_from("<I", result, offset)[0])
+
+        # The source fields and pristine byte-position /2 normalization remain intact.
+        for offset in (0x14FA60, 0x14FAA4, 0x14FAA8):
+            self.assertEqual(
+                struct.unpack_from("<I", RAW, offset)[0],
+                struct.unpack_from("<I", result, offset)[0],
+            )
 
     def test_composite_build_moves_hant_text_to_translation_segment(self) -> None:
         result = build_early_ui_elf(RAW)

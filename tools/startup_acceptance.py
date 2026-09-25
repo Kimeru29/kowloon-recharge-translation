@@ -4,6 +4,7 @@ import struct
 from typing import Any
 from hashlib import sha256
 
+from tools.adv_layout import ADV_DG_LAYOUT_PATCHES
 from tools.hant_ui import HANT_ENGLISH_LINES, HANT_POINTER_TABLE_OFFSET
 from tools.localization import encode_ps2_english
 from tools.memory_card_ui import (
@@ -37,12 +38,6 @@ _SECOND_PH_OFFSET = 0x54
 _TRANSLATION_VADDR = 0x00902F00
 _RUNTIME_HEAP_BREAK_OFFSET = 0x650014
 _EXPECTED_RUNTIME_HEAP_START = 0x00A02F00
-_ADV_PATCH_WORDS = (
-    (0x14FA60, 0x80430465),
-    (0x14FA68, 0x00031843),
-    (0x14FAA4, 0x80440463),
-    (0x14FAA8, 0x0080182D),
-)
 _VISIBLE_PROMPT_INDICES = tuple(range(len(NAME_PROMPT_TEXTS)))
 
 
@@ -191,10 +186,16 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
     )
 
     adv_ok = all(
-        offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == expected
-        for offset, expected in _ADV_PATCH_WORDS
+        offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
+        for offset, _expected, replacement in ADV_DG_LAYOUT_PATCHES
     )
-    checks.append(_check("adv_horizontal_layout", adv_ok, "ADV axis/normalization patch missing"))
+    checks.append(
+        _check(
+            "adv_dg_horizontal_layout",
+            adv_ok,
+            "proven DG coordinate-output swap is missing or stale",
+        )
+    )
 
     segment = _translation_segment(raw)
     checks.append(_check("translation_segment", segment is not None, "translation PT_LOAD is not active/valid"))

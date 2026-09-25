@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import struct
 import unittest
 from pathlib import Path
 
@@ -18,7 +19,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         failures = [check for check in checks if not check["ok"]]
         self.assertEqual([], failures)
         names = {check["name"] for check in checks}
-        self.assertIn("adv_horizontal_layout", names)
+        self.assertIn("adv_dg_horizontal_layout", names)
         self.assertIn("translation_segment", names)
         self.assertIn("runtime_heap_break", names)
         self.assertIn("hant_tutorial", names)
@@ -33,12 +34,28 @@ class StartupAcceptanceTests(unittest.TestCase):
     def test_pristine_elf_fails_translated_renderer_checks(self) -> None:
         checks = verify_startup_elf(RAW)
         failed_names = {check["name"] for check in checks if not check["ok"]}
-        self.assertIn("adv_horizontal_layout", failed_names)
+        self.assertIn("adv_dg_horizontal_layout", failed_names)
         self.assertIn("translation_segment", failed_names)
         self.assertIn("hant_tutorial", failed_names)
         self.assertIn("name_prompt_0", failed_names)
         self.assertIn("name_flow_skip_reading", failed_names)
         self.assertIn("memory_card_1_boot_aliases", failed_names)
+
+    def test_v10_adv_patch_does_not_satisfy_v11_dg_layout_acceptance(self) -> None:
+        old = bytearray(RAW)
+        for offset, replacement in (
+            (0x14FA60, 0x80430465),
+            (0x14FA68, 0x00031843),
+            (0x14FAA4, 0x80440463),
+            (0x14FAA8, 0x0080182D),
+        ):
+            struct.pack_into("<I", old, offset, replacement)
+
+        check = next(
+            check for check in verify_startup_elf(bytes(old))
+            if check["name"] == "adv_dg_horizontal_layout"
+        )
+        self.assertFalse(check["ok"])
 
     def test_startup_graphics_manifest_is_complete_and_stable(self) -> None:
         self.assertEqual(31, len(STARTUP_GRAPHICS_PATHS))

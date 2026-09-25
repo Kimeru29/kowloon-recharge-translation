@@ -32,6 +32,12 @@ v10 also introduces a distinct executable-control-flow localization class. The P
 
 The translation PT_LOAD owns a 1 MiB VA window starting at `0x00902F00`. Reserving that window requires moving not only startup/ELF heap metadata but also libkernel's live `sbrk` break word at file offset `0x650014`; v7 runtime proved that omitting this third owner lets the allocator corrupt relocated strings. v8 treats all three as one fail-closed allocator invariant. The same segment is the generic storage class for proven executable-resident long text, currently name-reading prompts, H.A.N.T., and a proven subset of memory-card UI messages. Executable message ownership includes both canonical pointer tables and any statically proven handler-local aliases; v10's memory-card boot aliases are the first runtime-proven need for this rule.
 
+## ADV/DG dialogue layout
+
+ADV dialogue is a renderer-specific layout class. The record fields at `+0x463` (line) and `+0x465` (byte position) have two proven consumers, but only one owns glyph placement. The ordinary script-text path reaches constructor VA `0x24F660`, whose coordinate code around VA `0x24F9E0` computes `114 - 39 * line` and `20 + 26 * (byte_position / 2)` before passing the results as integer coordinate arguments. Callback VA `0x24E920` consumes the same fields only to gate glyph reveal/progress and must remain pristine.
+
+The v11 English transform therefore does not alter the source fields, FPU constants, glyph renderer, or reveal callback. It swaps only the completed coordinate argument registers immediately before the coordinate helper: the byte-position formula becomes X and the line formula becomes Y. `ADV_DG_LAYOUT_PATCHES` is the single fail-closed mutation table consumed by the patcher, mutation-boundary tests, composite startup build tests, and final-image acceptance. This preserves the existing signed two-byte-glyph `/2` normalization exactly once and avoids the v6-v10 sequencing bug where normalization occurred after the coordinate had already been copied into the FPU.
+
 ## PS2 indexed graphics
 
 `tools/tmx.py` handles both named TMX chunks inside `B_GPxxx.BIN` containers and standalone `TMX0` files. `tools/graphics_port.py` downsizes official PS4 RGBA artwork, quantizes it to the PS2 palette size, preserves 4/8-bit indexed layout and CLUT ordering, and rewrites only palette/pixel payloads. File/container sizes remain fixed.
