@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
+from tools.menu_ui import MENU_LABELS
 from tools.startup_ui import (
     NAME_BLANK_STRING_OFFSET,
     NAME_PROMPT_ARENA_END,
@@ -41,6 +42,7 @@ RAW = ELF_PATH.read_bytes()
 class EarlyUiPatchTests(unittest.TestCase):
     def test_manifest_uses_official_title_and_menu_localization(self) -> None:
         actual = {(patch.offset, patch.expected): patch.text for patch in EARLY_UI_PATCHES}
+        semantic_menu = {spec.source_offset: spec for spec in MENU_LABELS}
 
         # Exact title labels are pointer-relocated and tested in test_startup_ui.
         self.assertNotIn((0x5CBDE8, "初めから"), actual)
@@ -61,6 +63,11 @@ class EarlyUiPatchTests(unittest.TestCase):
         self.assertEqual("Map", actual[(0x694188, "マップ")])
         self.assertEqual("Noise", actual[(0x694198, "ノイズ")])
         self.assertEqual("Battle", actual[(0x6941A0, "戦闘")])
+        self.assertEqual("relocated", semantic_menu[0x3BC888].storage)
+        self.assertEqual((0x3BC8F4,), semantic_menu[0x3BC888].pointer_offsets)
+        self.assertEqual("relocated", semantic_menu[0x694190].storage)
+        self.assertEqual((0x3BC8B8,), semantic_menu[0x694190].pointer_offsets)
+        self.assertEqual("unresolved", semantic_menu[0x3BC858].status)
 
     def test_build_changes_only_declared_pristine_regions_before_appended_segment(self) -> None:
         result = build_early_ui_elf(RAW)

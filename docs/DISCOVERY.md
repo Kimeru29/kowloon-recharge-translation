@@ -215,6 +215,14 @@ The parallel resolver at VA `0x2A9FA0` proves that tuple `(4,2,0)` also owns a c
 
 The v11 patch keeps both the original 17-entry tutorial pointer table and original controller metadata byte-identical as provenance. It places the 16 translated rows, a 17-word text table including the original EOF sentinel, and the relocated controller metadata in the translation PT_LOAD; only text leaf descriptor `0x5CBAB0` and metadata leaf descriptor `0x5CBA60` are redirected. Newly discovered Task-6 H.A.N.T. candidates remain unpromoted without `English.bytes`; the executable main-menu label at file `0x3BC7E8` is an explicit cross-owner exception because it is already translated by the separately proven menu fixed-string patch. Final-image acceptance names the ownership/layout gates `hant_inventory_proven_targets`, `hant_wrapped_layout_payload`, and `hant_unresolved_pristine`.
 
+## Semantic command-menu label ownership
+
+v11 Task 8 replaces the old tuple-only menu patch list with `MenuLabelSpec` records. The 19 known executable labels are all pointer-owned by one 21-entry command-label table at file `0x3BC8B0` / VA `0x004BC830` (two entries alias `Leave room`, two alias `Collection`). Renderer state paths at VAs `0x150C68` and `0x150FEC` load `table[command_id]` and pass that pointer to the text-object constructor at VA `0x1529E0`. The manifest therefore records the stable command-label id and every exact pointer-table alias for each source string rather than treating the source slot itself as its runtime owner.
+
+A whole-ELF 32-bit pointer scan plus MIPS address-materialization scan proves the two overflow labels are relocation-safe at this ownership boundary. `地上へ脱出` / `Return above ground` has one consuming source pointer, file `0x3BC8F4` (command-label id 17). `成績表` / `Report card` has one, file `0x3BC8B8` (id 2); with ELF `gp=0x0079B1F0`, the compact-label GP-relative scan finds no direct source access. Neither source VA is otherwise materialized directly by code. They are therefore classified `storage=relocated,status=proven`; Task 8 only exposes fail-closed pointer redirection, while Task 9 will allocate their translated strings in the shared PT_LOAD and supply the target VAs. The original source slots remain immutable provenance.
+
+`メディア` is different: its runtime owner is proven as command-label id 12 / pointer file `0x3BC8E0`, but there is still no exact accepted official English mapping while `English.bytes` is absent. It remains `storage=pristine,status=unresolved` and cannot be redirected through `patch_menu_labels`. Full local scan evidence is written to ignored `local/menu-ownership-v11.json`.
+
 ## Startup v6 static candidate
 
 Candidate: `/private/tmp/kowloon-recharge-startup-en-v6.iso`
