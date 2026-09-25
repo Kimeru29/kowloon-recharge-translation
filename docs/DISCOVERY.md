@@ -178,14 +178,18 @@ The prompt table at `0x586AD0` points into `m_name.c` text around `0x5869C0`. Si
 
 ## ADV horizontal-renderer transform
 
-Reverse engineering connected the script record writer and renderer:
+Reverse engineering connected the script record writer and the ADV glyph-layout subsystem:
 
 - record `+0x463` stores line index;
 - record `+0x465` stores byte position within the line;
-- pristine renderer consumes `+0x463` as X and `+0x465 / 2` as Y, yielding vertical Japanese columns;
-- v6 changes four exact MIPS instructions so X uses `+0x465 / 2` and Y uses `+0x463`.
+- the coordinate constructor at VA `0x24F9E0` consumes `+0x463` for the horizontal coordinate and `+0x465 / 2` for the vertical coordinate in the pristine Japanese layout;
+- a second consumer at VA `0x24ED20` reads the same fields, but static tracing now proves that it gates glyph reveal/progress rather than computing X/Y coordinates.
 
-`tools/adv_layout.py` asserts the pristine instruction preimage before patching. This is a global ADV renderer-class rule, not a DG00 string exception.
+v11 Task 2 traced the ownership chain rather than classifying by field pattern alone. The script-byte dispatcher at VA `0x215860` routes ordinary text through `0x24E690`; that driver calls wrapper `0x24E8A0`, which calls constructor `0x24F660`. The constructor computes glyph coordinates around `0x24F9E0`, creates the glyph/sprite objects, and registers callback `0x24E920`. The `0x24ED20` consumer lives inside that callback and compares line/position fields against reveal-progress state. Therefore exactly one known consumer is the ADV/DG layout owner: file `0x14FA60` / VA `0x24F9E0`; file `0x14EDA0` / VA `0x24ED20` is the progress gate.
+
+The v6-v10 four-word patch targeted the correct constructor but contains a concrete sequencing defect. It changes the first load to `+0x465` and places `sra v1,v1,1` at VA `0x24F9E8`, **after** VA `0x24F9E4` has already copied `v1` into `f0` with `mtc1`. The float X calculation therefore receives the unhalved byte position. This explains why the static `adv_horizontal_layout` check could pass while the v10 DG00 runtime presentation remained wrong. Task 3 must fix the proven constructor sequence and must not mutate the `0x24ED20` progress gate.
+
+`tools/adv_layout.py` fail-closes on the exact consumer and ownership-chain preimages. Detailed local evidence is emitted to ignored `local/adv-renderer-ownership-v11.json`.
 
 ## Executable translation segment / H.A.N.T. tutorial
 
@@ -288,4 +292,6 @@ Candidate: `/private/tmp/kowloon-recharge-startup-en-v10.iso`
 
 Runtime evidence now establishes the v10 presentation baseline. Proven observations: the startup/name flow advances into the first old-man scene; opening quotations vary across restarts; `New Game` / `Load Game` text is correct but exceeds the original purple backing; the first old-man DG00 content is English but still rendered vertically; H.A.N.T. is partially translated and clips; menu labels are mixed translated/awkward/unresolved; and the structural 3+3 name behavior remains.
 
-Strong inference, not yet ownership proof: because the visible DG00 dialogue remains vertical while the existing patch at VA `0x24F9E0` is present, that transform is not sufficient for the live DG renderer. Static scanning has identified another coordinate consumer around VA `0x24ED20` using the same `+0x463` / `+0x465` fields. v11 Task 2 must prove the callers/ownership of both consumers before Task 3 mutates the live one.
+v11 Task 2 resolves the two-consumer ambiguity. Proven static ownership is: file `0x14FA60` / VA `0x24F9E0` is the ADV/DG glyph-layout constructor path, while file `0x14EDA0` / VA `0x24ED20` is the registered glyph-progress gate. The call/data chain is `0x215860` script-byte dispatcher → `0x24E690` message driver → `0x24E8A0` wrapper → `0x24F660` constructor; the constructor registers `0x24E920`, which contains the progress consumer. Exactly one consumer is therefore classified `dg_dialogue`.
+
+The v10 runtime failure does not disprove that ownership: the old four-word patch itself is malformed. Its `/2` normalization at VA `0x24F9E8` executes after `mtc1` at VA `0x24F9E4`, so the float X calculation still receives unhalved byte positions. Task 3 is cleared to patch only the proven `0x24F9E0` layout sequence and leave the progress gate unchanged.

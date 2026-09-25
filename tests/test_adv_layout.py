@@ -5,13 +5,41 @@ import unittest
 from pathlib import Path
 
 from tests.local_fixtures import require_local_fixture
-from tools.adv_layout import patch_adv_horizontal_layout
+from tools.adv_layout import inspect_adv_coordinate_consumers, patch_adv_horizontal_layout
 
 ELF = require_local_fixture(Path(__file__).parents[1] / "fixtures" / "elf" / "SLPM_665.11")
 RAW = ELF.read_bytes()
 
 
 class AdvHorizontalLayoutTests(unittest.TestCase):
+    def test_finds_both_known_adv_coordinate_consumers(self) -> None:
+        consumers = inspect_adv_coordinate_consumers(RAW)
+
+        self.assertEqual(
+            [(0x14EDA0, 0x24ED20), (0x14FA60, 0x24F9E0)],
+            [(consumer.file_offset, consumer.va) for consumer in consumers],
+        )
+        self.assertTrue(all(consumer.line_field == 0x463 for consumer in consumers))
+        self.assertTrue(all(consumer.position_field == 0x465 for consumer in consumers))
+
+    def test_consumer_probe_fails_closed_on_known_load_drift(self) -> None:
+        tampered = bytearray(RAW)
+        tampered[0x14EDA0] ^= 1
+
+        with self.assertRaisesRegex(ValueError, "ADV consumer preimage"):
+            inspect_adv_coordinate_consumers(bytes(tampered))
+
+    def test_static_trace_classifies_exactly_one_live_dg_dialogue_consumer(self) -> None:
+        consumers = inspect_adv_coordinate_consumers(RAW)
+
+        self.assertEqual(
+            ["glyph_progress_gate", "dg_dialogue"],
+            [consumer.role for consumer in consumers],
+        )
+        dg = [consumer for consumer in consumers if consumer.role == "dg_dialogue"]
+        self.assertEqual(1, len(dg))
+        self.assertEqual(0x14FA60, dg[0].file_offset)
+
     def test_transposes_line_and_glyph_axes_without_touching_font_renderer(self) -> None:
         result = patch_adv_horizontal_layout(RAW)
 
