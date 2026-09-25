@@ -5,7 +5,12 @@ from typing import Any
 from hashlib import sha256
 
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES
-from tools.hant_ui import HANT_ENGLISH_LINES, HANT_POINTER_TABLE_OFFSET
+from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells
+from tools.hant_ui import (
+    HANT_POINTER_TABLE_OFFSET,
+    HANT_TUTORIAL_DESCRIPTOR_OFFSET,
+    HANT_WRAPPED_LINES,
+)
 from tools.localization import encode_ps2_english
 from tools.title_layout import TITLE_BACKING_SCALE_X
 from tools.memory_card_ui import (
@@ -40,6 +45,32 @@ _TRANSLATION_VADDR = 0x00902F00
 _RUNTIME_HEAP_BREAK_OFFSET = 0x650014
 _EXPECTED_RUNTIME_HEAP_START = 0x00A02F00
 _VISIBLE_PROMPT_INDICES = tuple(range(len(NAME_PROMPT_TEXTS)))
+_HANT_POINTER_TABLE_SHA256 = "2282baed9b810c5dc9de2ea6a57bb7e8308154279f2efe9b57ea5b3d761205a0"
+_HANT_EOF_VA = 0x00795FBC
+# Task-6 unresolved H.A.N.T. candidates. 0x3BC7E8 is cross-owned by the
+# separately proven main-menu fixed patch, so its pointer is pinned here while
+# its source bytes are intentionally allowed to change under that owner.
+_HANT_UNRESOLVED_SIGNATURES: tuple[tuple[int, tuple[int, ...], str | None], ...] = (
+    (0x3BC7E8, (0x3BC8C4,), None),
+    (0x575240, (0x694C10,), "　の情報を\n\nＨ．Ａ．Ｎ．Ｔに記録しました。\n"),
+    (0x5860F0, (0x586374,), "　　　Ｈ．Ａ．Ｎ．Ｔ（Ｈｕｎｔｅｒ"),
+    (0x5876E0, (0x587840,), "Ｈ．Ａ．Ｎ．Ｔの機能"),
+    (0x588410, (0x58856C,), "Ｈ．Ａ．Ｎ．Ｔ"),
+    (0x5975F0, (0x597678, 0x5A3958), "このＨ．Ａ．Ｎ．Ｔに転送される。"),
+    (0x599390, (0x5994BC,), "ルを貴方のＨ．Ａ．Ｎ．Ｔに転送するサービ"),
+    (
+        0x5A2E00,
+        (
+            0x5A2E74, 0x5A2EB4, 0x5A2EF4, 0x5A2F34, 0x5A2F74,
+            0x5A2FB4, 0x5A2FF4, 0x5A3034, 0x5A3074, 0x5A30B4,
+            0x5A30F4, 0x5A3634, 0x5A3674, 0x5A36B4, 0x5A36F4,
+            0x5A3734, 0x5A3774, 0x5A37B4, 0x5A37F4, 0x5A3834,
+        ),
+        "自動的に、このＨ．Ａ．Ｎ．Ｔに",
+    ),
+    (0x5B70A0, (0x5B7140,), "●Ｈ．Ａ．Ｎ．Ｔ（ハント）"),
+    (0x5BD200, (0x5BD2F4,), "　各地に支部があり、『Ｈ．Ａ．Ｎ．Ｔ』の"),
+)
 
 
 def _check(name: str, ok: bool, detail: str | None = None) -> dict[str, Any]:
@@ -246,25 +277,89 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "libkernel heap break still overlaps the translation PT_LOAD",
         )
     )
-    hant_ok = segment is not None
-    if segment is not None:
-        p_offset, p_vaddr, p_filesz, _p_memsz = segment
-        for index, english in HANT_ENGLISH_LINES.items():
-            pointer_offset = HANT_POINTER_TABLE_OFFSET + index * 4
-            if pointer_offset + 4 > len(raw):
-                hant_ok = False
+    hant_inventory_ok = False
+    hant_wrapped_ok = False
+    hant_unresolved_ok = True
+
+    if HANT_POINTER_TABLE_OFFSET + 17 * 4 > len(raw):
+        hant_unresolved_ok = False
+    else:
+        table_hash = sha256(raw[HANT_POINTER_TABLE_OFFSET:HANT_POINTER_TABLE_OFFSET + 17 * 4]).hexdigest()
+        table_pristine = table_hash == _HANT_POINTER_TABLE_SHA256
+        descriptor_in_segment = False
+        if segment is not None and HANT_TUTORIAL_DESCRIPTOR_OFFSET + 4 <= len(raw):
+            p_offset, p_vaddr, p_filesz, _p_memsz = segment
+            table_va = struct.unpack_from("<I", raw, HANT_TUTORIAL_DESCRIPTOR_OFFSET)[0]
+            descriptor_in_segment = p_vaddr <= table_va < p_vaddr + p_filesz
+            if descriptor_in_segment:
+                table_file = p_offset + (table_va - p_vaddr)
+                table_bytes = (len(HANT_WRAPPED_LINES) + 1) * 4
+                if table_file + table_bytes <= p_offset + p_filesz:
+                    hant_wrapped_ok = True
+                    for row_index, english in enumerate(HANT_WRAPPED_LINES):
+                        if measured_hant_cells(english) > HANT_LAYOUT_PROFILE.max_cells:
+                            hant_wrapped_ok = False
+                            break
+                        target_va = struct.unpack_from("<I", raw, table_file + row_index * 4)[0]
+                        expected = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
+                        relative = target_va - p_vaddr
+                        if relative < 0 or relative + len(expected) > p_filesz:
+                            hant_wrapped_ok = False
+                            break
+                        target_file = p_offset + relative
+                        if raw[target_file:target_file + len(expected)] != expected:
+                            hant_wrapped_ok = False
+                            break
+                    if hant_wrapped_ok:
+                        eof_va = struct.unpack_from(
+                            "<I", raw, table_file + len(HANT_WRAPPED_LINES) * 4
+                        )[0]
+                        hant_wrapped_ok = eof_va == _HANT_EOF_VA
+        hant_inventory_ok = table_pristine and descriptor_in_segment
+
+    for source_offset, pointer_offsets, source_text in _HANT_UNRESOLVED_SIGNATURES:
+        expected_va = _ELF_MAIN_VADDR + source_offset - _ELF_MAIN_FILE_OFFSET
+        if source_text is not None:
+            encoded = source_text.encode("cp932") + b"\x00"
+            if raw[source_offset:source_offset + len(encoded)] != encoded:
+                hant_unresolved_ok = False
                 break
-            target_va = struct.unpack_from("<I", raw, pointer_offset)[0]
-            relative = target_va - p_vaddr
-            expected = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
-            if relative < 0 or relative + len(expected) > p_filesz:
-                hant_ok = False
-                break
-            target_file = p_offset + relative
-            if raw[target_file:target_file + len(expected)] != expected:
-                hant_ok = False
-                break
-    checks.append(_check("hant_tutorial", hant_ok, "H.A.N.T pointers do not resolve to translated wide text"))
+        if any(
+            pointer_offset + 4 > len(raw)
+            or struct.unpack_from("<I", raw, pointer_offset)[0] != expected_va
+            for pointer_offset in pointer_offsets
+        ):
+            hant_unresolved_ok = False
+            break
+
+    checks.append(
+        _check(
+            "hant_inventory_proven_targets",
+            hant_inventory_ok,
+            "pristine tutorial table or translated descriptor target is missing/stale",
+        )
+    )
+    checks.append(
+        _check(
+            "hant_wrapped_layout_payload",
+            hant_wrapped_ok,
+            "wrapped H.A.N.T rows do not resolve within the proven 21-cell layout",
+        )
+    )
+    checks.append(
+        _check(
+            "hant_unresolved_pristine",
+            hant_unresolved_ok,
+            "one or more unresolved H.A.N.T owners changed outside an explicit owner",
+        )
+    )
+    checks.append(
+        _check(
+            "hant_tutorial",
+            hant_inventory_ok and hant_wrapped_ok and hant_unresolved_ok,
+            "H.A.N.T tutorial relocation/layout invariant failed",
+        )
+    )
 
     for index, (_source_offset, _source, english) in MEMORY_CARD_MESSAGES.items():
         ok = segment is not None

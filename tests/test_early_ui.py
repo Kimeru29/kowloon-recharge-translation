@@ -21,7 +21,11 @@ from tools.startup_ui import (
     TITLE_ARENA_START,
     TITLE_LOAD_POINTER_OFFSET,
 )
-from tools.hant_ui import HANT_ENGLISH_LINES, HANT_POINTER_TABLE_OFFSET
+from tools.hant_ui import (
+    HANT_POINTER_TABLE_OFFSET,
+    HANT_TUTORIAL_DESCRIPTOR_OFFSET,
+    HANT_WRAPPED_LINES,
+)
 from tools.memory_card_ui import MEMORY_CARD_POINTER_ALIASES
 from tools.elf_translation_segment import TRANSLATION_SEGMENT_VADDR
 from tools.localization import encode_ps2_english
@@ -78,10 +82,10 @@ class EarlyUiPatchTests(unittest.TestCase):
         allowed.update(range(0x577C68, 0x577C70))
         for patch in EARLY_UI_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
-        # ADV DG horizontal-layout patch and H.A.N.T pointer table are declared runtime patches.
+        # ADV DG horizontal-layout patch and the H.A.N.T tutorial descriptor are declared runtime patches.
         for off, _expected, _replacement in ADV_DG_LAYOUT_PATCHES:
             allowed.update(range(off, off + 4))
-        allowed.update(range(HANT_POINTER_TABLE_OFFSET, HANT_POINTER_TABLE_OFFSET + 17 * 4))
+        allowed.update(range(HANT_TUTORIAL_DESCRIPTOR_OFFSET, HANT_TUTORIAL_DESCRIPTOR_OFFSET + 4))
         allowed.update(range(0x407440, 0x4074AC))
         for offsets in MEMORY_CARD_POINTER_ALIASES.values():
             for off in offsets:
@@ -128,9 +132,29 @@ class EarlyUiPatchTests(unittest.TestCase):
     def test_composite_build_moves_hant_text_to_translation_segment(self) -> None:
         result = build_early_ui_elf(RAW)
         self.assertGreater(len(result), len(RAW))
-        for index in HANT_ENGLISH_LINES:
-            target = struct.unpack_from("<I", result, HANT_POINTER_TABLE_OFFSET + index * 4)[0]
-            self.assertGreaterEqual(target, TRANSLATION_SEGMENT_VADDR)
+
+        p_type, p_offset, p_vaddr, _paddr, p_filesz, _memsz, _flags, _align = struct.unpack_from(
+            "<IIIIIIII", result, 0x54
+        )
+        self.assertEqual(1, p_type)
+        self.assertEqual(TRANSLATION_SEGMENT_VADDR, p_vaddr)
+
+        table_va = struct.unpack_from("<I", result, HANT_TUTORIAL_DESCRIPTOR_OFFSET)[0]
+        self.assertGreaterEqual(table_va, p_vaddr)
+        self.assertLess(table_va, p_vaddr + p_filesz)
+        table_file = p_offset + table_va - p_vaddr
+        for index, english in enumerate(HANT_WRAPPED_LINES):
+            target_va = struct.unpack_from("<I", result, table_file + index * 4)[0]
+            self.assertGreaterEqual(target_va, p_vaddr)
+            self.assertLess(target_va, p_vaddr + p_filesz)
+            target_file = p_offset + target_va - p_vaddr
+            expected = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
+            self.assertEqual(expected, result[target_file:target_file + len(expected)])
+
+        self.assertEqual(
+            RAW[HANT_POINTER_TABLE_OFFSET:HANT_POINTER_TABLE_OFFSET + 17 * 4],
+            result[HANT_POINTER_TABLE_OFFSET:HANT_POINTER_TABLE_OFFSET + 17 * 4],
+        )
 
     def test_unfit_or_unmapped_slots_are_intentionally_unchanged(self) -> None:
         result = build_early_ui_elf(RAW)
