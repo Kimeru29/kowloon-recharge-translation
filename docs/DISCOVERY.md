@@ -273,7 +273,7 @@ The normal PS2 name editor already handles both permanent fields: positions 0..2
 
 The reading editor is semantically Japanese-specific: it is backed by `name/namedic.bin`, and its character classifier accepts the pristine kana readings while Latin test values such as `Hab`/`Kur` classify as having no valid reading characters. The official remaster deletes/suppresses the kana reading defaults (`@D`), which matches the existing English executable patch that redirects the reading buffers to the module's blank wide string. v10 therefore patches only the state-9 flag word from 0 to 1 and validates all four dispatcher words before doing so; it does not weaken the kana validator, alter buffer sizes, or synthesize phonetic readings.
 
-## Startup v10 static candidate
+## Startup v10 runtime-tested checkpoint
 
 Candidate: `/private/tmp/kowloon-recharge-startup-en-v10.iso`
 
@@ -286,4 +286,6 @@ Candidate: `/private/tmp/kowloon-recharge-startup-en-v10.iso`
 - Pillow-enabled suite: **134 tests OK** (1 owned-corpus skip);
 - a second build from the pristine ISO has the same SHA-256 and is byte-for-byte identical.
 
-Runtime proof remains mandatory.
+Runtime evidence now establishes the v10 presentation baseline. Proven observations: the startup/name flow advances into the first old-man scene; opening quotations vary across restarts; `New Game` / `Load Game` text is correct but exceeds the original purple backing; the first old-man DG00 content is English but still rendered vertically; H.A.N.T. is partially translated and clips; menu labels are mixed translated/awkward/unresolved; and the structural 3+3 name behavior remains.
+
+Strong inference, not yet ownership proof: because the visible DG00 dialogue remains vertical while the existing patch at VA `0x24F9E0` is present, that transform is not sufficient for the live DG renderer. Static scanning has identified another coordinate consumer around VA `0x24ED20` using the same `+0x463` / `+0x465` fields. v11 Task 2 must prove the callers/ownership of both consumers before Task 3 mutates the live one.

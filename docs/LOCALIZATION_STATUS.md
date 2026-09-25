@@ -13,16 +13,16 @@ Status meanings:
 
 | Surface | Status | Evidence / next action |
 | --- | --- | --- |
-| 29 opening quotations (`TR000`-`TR028`) | **Working / runtime-proven** | English quotation artwork renders correctly. v7 repeatedly showed the same quotation, but the 29 generated TMXs have 29 distinct hashes and the executable explicitly selects `PRNG % 29` before formatting `TR%03d.TMX`. Repetition is therefore a runtime seed/PRNG behavior to investigate, not duplicated translation assets. |
+| 29 opening quotations (`TR000`-`TR028`) | **Working / runtime-proven** | v10 runtime confirmed English quotation artwork and observed different quotations across restarts. The 29 generated TMXs remain distinct and the executable selects `PRNG % 29` before formatting `TR%03d.TMX`. |
 | Pre-title memory-card status text | **Translated but buggy** | The log-confirmed v8 runtime still showed the Japanese stone-panel message. Static tracing proved the boot path uses two handler-local aliases at `0x4077F0` (`H_BootMcardChk`) and `0x4078D0` (`H_EmptyMcardChk`) that v8/v9 did not repoint. v10 moves both aliases with table entry 1 to official `Checking memory card slot 1`; runtime proof pending. |
 | GP088 startup/title artwork — direct `GP088_03` counterpart | **Not runtime-tested** | v9 retains the v8 same-name official English `b_gp088_en/GP088_03` port into PS2 `B_GP088.BIN`. |
 | GP088 PS2 packed title atlas (`GP088_12`) | **Not runtime-tested** | v9 proves that the two GP088_12 Japanese title variants are repacked GP088_03 regions (Dice 0.8758 / 0.8765 after excluding the known flattened banner band), then rebuilds GP088_12 from the official English GP088_03 regions. The official English remaster omits the flattened gold `re:charge` banner, so v9 removes it rather than synthesizing missing artwork. `GP088_13` is a separate already-English blue `re:charge` badge and remains unchanged. |
-| Title `New Game` / `Load Game` | **Working / runtime-proven** | Runtime showed both exact English labels correctly. |
+| Title `New Game` / `Load Game` | **Translated but buggy** | v10 runtime proved the exact English labels are correct, but they extend well beyond the original purple backing. The strings stay authoritative; v11 must fix title backing/layout geometry rather than shorten them. |
 | Name-entry English button graphics (`B_GP019.BIN`) | **Working / runtime-proven** | Back/Edit/Finish/Delete/Confirm controls render correctly. |
 | `Enter last name.` | **Working / runtime-proven** | Wide English prompt renders correctly. |
 | Lowercase Latin keyboard | **Working / runtime-proven** | Runtime accepts lowercase Latin input. |
 | Uppercase Latin keyboard | **Working / runtime-proven** | v7 runtime proved the PS2-adapted reachable rows expose uppercase alongside lowercase. |
-| Name fields / permanent name storage | **Translated but buggy** | PS2 editor is structurally two 3-glyph permanent fields: two 6-byte buffers, six-position cursor, and split/layout/delete logic at position 3. `Habaki`/`Kuro` visibly truncate to `Hab`/`Kur`. No unsafe limit-only patch is applied. |
+| Name fields / permanent name storage | **Translated but buggy** | v10 still shows the structural two-3-glyph permanent-name behavior. The editor uses two 6-byte buffers, a six-position cursor, and split/layout/delete logic at position 3; `Habaki`/`Kuro` truncate to `Hab`/`Kur`. This remains explicitly out of scope for v11. |
 | `Enter first name.` | **Not runtime-tested** | Official wide English is statically present; the current runtime path has not produced a clean accepted observation of this prompt. |
 | `Enter reading for last name.` | **Translated but buggy** | The log-confirmed v8 run proved the allocator fix: the full official string survived, but the PS2 two-byte-cell renderer clipped it at the right edge (`Enter reading for las...`). v10 no longer enters this PS2-only kana-reading editor during the English flow, so this prompt should be unreachable rather than cosmetically shortened. |
 | `Enter reading for first name.` | **Not runtime-tested** | The exact official prompt remains present in the protected translation segment for provenance, but v10 should bypass the kana-reading pass before this screen is reached. |
@@ -31,10 +31,11 @@ Status meanings:
 | `Is this fine?` / `Yes / No` | **Not runtime-tested** | Official English is statically present. v10 preserves the normal-name confirmation; an affirmative result now routes directly through the existing post-reading/finalization path instead of opening the kana-reading editor. |
 | License-ID messages | **Not runtime-tested** | `Verifying license ID...` and `ID verification complete.` are statically present. |
 | `Heracleion Shrine` | **Not runtime-tested** | Statically translated as wide executable text. |
-| H.A.N.T. tutorial | **Not runtime-tested** | Official English is relocated into the executable translation PT_LOAD; v8 additionally protects that segment from the runtime allocator. |
-| ADV horizontal dialogue renderer | **Not runtime-tested** | Four-instruction fail-closed renderer transform is present; v5 proved the pre-fix vertical failure. |
-| First old-man DG00 English dialogue | **Not runtime-tested** | English MTX data is present and statically accepted; runtime has not reached it after the current startup blockers. |
-| DG00 English choices | **Not runtime-tested** | Reviewed KSF overrides/imports are present; runtime has not reached them. |
+| H.A.N.T. tutorial | **Translated but buggy** | v10 runtime reached H.A.N.T. content and showed that localization is only partial; translated lines can clip. Current tooling covers only the startup tutorial table, so v11 must inventory H.A.N.T.-owned text and establish renderer-specific wrapping/layout. |
+| ADV horizontal dialogue renderer | **Translated but buggy** | v10 runtime proves the first old-man DG00 dialogue is still vertical despite the existing four-instruction transform. The current patch is therefore insufficient for the live visible DG path; v11 must prove ownership of both known coordinate consumers before changing the live one. |
+| First old-man DG00 English dialogue | **Translated but buggy** | v10 runtime reached the first old-man scene and proved the DG00 dialogue content is English. Content is runtime-proven; presentation is not: the text still uses the vertical Japanese layout. |
+| DG00 English choices | **Not runtime-tested** | Reviewed KSF overrides/imports remain present; the accepted v10 observation did not explicitly promote this row. |
+| Command/menu labels | **Translated but buggy** | v10 runtime shows a mixed state: several labels are translated but semantically awkward, while some remain unresolved. v11 will replace fit-driven patches with a semantic manifest and leave unproven labels pristine. |
 
 ## Known executable/UI text not yet solved
 
@@ -103,7 +104,7 @@ v9 adds the generalized `RegionTransfer` atlas-repack renderer class and applies
 
 The latest supervised PCSX2 session was identified from the emulator log as `/private/tmp/kowloon-recharge-startup-en-v8.iso`. Opening quotation rotation was runtime-proven, existing title/name-entry/Latin-keyboard behavior remained good, but the memory-card stone panel was still Japanese. The protected reading prompt now rendered its full payload but clipped at the right edge, and the flow remained stuck after finishing that screen. Because v8 and v9 share the same final executable SHA-256 (`5c1cee88e6cb9c2aaf4710a928ce24fb013beb3a56f3fd98b94654ef1f507fdd`), those executable defects also apply to v9; only v9's GP088_12 graphics differ.
 
-### v10 — current static candidate
+### v10 — runtime-tested checkpoint
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v10.iso`
 - ISO SHA-256: `24d425433af97b1617e820cac05aa2a4d9389aa9fa19c1767a57eb763812da8e`
@@ -119,13 +120,17 @@ The latest supervised PCSX2 session was identified from the emulator log as `/pr
 - final-image startup acceptance: **123/123** (`local/startup-acceptance-v10.json`)
 - deterministic rebuild: second pristine build has the same SHA-256 and is byte-for-byte identical (`cmp`)
 
-v10 adds two fail-closed runtime-path fixes. Memory-card entry 1 now repoints the proven `H_BootMcardChk`/`H_EmptyMcardChk` aliases as well as the main table. The English name flow changes only the state-9 flag word from `0` to `1`, reusing the game's existing post-reading transition so the PS2 kana-reading editor is skipped; all four dispatcher words are validated before patching.
+v10 adds two fail-closed runtime-path fixes. Memory-card entry 1 repoints the proven `H_BootMcardChk`/`H_EmptyMcardChk` aliases as well as the main table. The English name flow changes only the state-9 flag word from `0` to `1`, reusing the game's existing post-reading transition so the PS2 kana-reading editor is skipped; all four dispatcher words are validated before patching.
 
-## Runtime gate for v10
+The supervised v10 run advanced through the startup/name flow into the first old-man scene. It established the v11 baseline: opening quote rotation is working; `New Game` / `Load Game` text is correct but its backing geometry is buggy; first-old-man DG00 English content is runtime-proven content, vertical-layout bug; H.A.N.T. is partially translated and clips; menus are mixed translated/awkward/unresolved; and the 3+3 name-storage behavior remains buggy and out of scope.
 
-Do not launch PCSX2 automatically. Before launch, state the exact expected visual sequence and wait for Pablo's explicit approval.
+## v10 runtime result
 
-The minimum v10 regression scope is:
+The supervised v10 launch has now occurred. Do not launch PCSX2 again automatically; future emulator launches still require an exact expected-visual checklist and Pablo's explicit approval.
+
+The pre-launch v10 checklist remains useful as a historical regression reference. v10 passed the startup/name progression needed to reach gameplay, but failed presentation checkpoints for title backing, H.A.N.T. clipping/completeness, menu semantics, and horizontal DG dialogue:
+
+The minimum v10 regression scope was:
 
 1. an English opening quotation appears; restarts may show different English quotations, and any Japanese quotation is a failure;
 2. the pre-title stone-panel message must read `Checking memory card slot 1`; Japanese here means the boot-handler alias fix failed;

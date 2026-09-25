@@ -63,7 +63,7 @@ v5 was launched and is **not accepted**. Runtime established these class-level f
 
 These are now modeled as reusable automator classes rather than screenshot-specific fixes.
 
-## Last runtime-tested candidate — startup v6
+## Historical runtime-tested candidate — startup v6
 
 Candidate:
 
@@ -91,7 +91,7 @@ Runtime proved that folding uppercase into the seven PS2-reachable keyboard rows
 
 Static tracing after this run found the freeze/truncation root cause: v6/v7 moved the startup heap instruction and ELF heap metadata to `0x00A02F00`, but libkernel's live `sbrk` heap-break word at file offset `0x650014` still contained `0x00902F00`, the translation PT_LOAD base. Normal allocations could therefore overwrite the relocated prompt/H.A.N.T. payload in RAM.
 
-## Current static candidate — startup v9
+## Historical static candidate — startup v9
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v9.iso`
 - SHA-256: `6770862cbde8edf301afdef7778d440c0d2eab99806d732724afc6ef5a279d76`
@@ -220,11 +220,11 @@ PS2-only lexical proxy:
 
 ## Latest runtime result and next gate
 
-The latest supervised PCSX2 session was log-confirmed to have booted v8. It proved opening quotations rotate, retained the accepted title/name/Latin-keyboard surfaces, but still showed Japanese on the pre-title memory-card stone panel. The now-protected official reading prompt survived in full but clipped at the right edge, and finishing that screen still left the flow stuck. v8 and v9 share the same executable SHA, so those executable defects apply to both; v9's GP088_12 graphics remain runtime-unproven.
+v10 is now the latest supervised runtime checkpoint. Candidate: `/private/tmp/kowloon-recharge-startup-en-v10.iso`, SHA-256 `24d425433af97b1617e820cac05aa2a4d9389aa9fa19c1767a57eb763812da8e`. Its static baseline remains 123/123 final-image checks, 134 tests in both suites, and a deterministic pristine rebuild.
 
-Static tracing after that run found two independent runtime-path omissions. The boot handlers `H_BootMcardChk` and `H_EmptyMcardChk` embed aliases at file offsets `0x4077F0` and `0x4078D0` that both point to memory-card table entry 1; v8/v9 relocated the table but not those aliases. The name dispatcher calls the same transition at `0x285E20`: state 9 passes flag `0` and enters the kana-reading pass, while state 11 passes flag `1` and commits/finalizes. v10 repoints both memory aliases and changes only the state-9 flag instruction to `1`, with exact preimage checks.
+The accepted v10 runtime observation proved the startup/name flow now advances into the first old-man scene. Opening quotations can vary across restarts; `New Game` / `Load Game` text itself is correct; the name-flow blocker is gone; and the first old-man DG00 content is English. It also exposed the presentation work that defines v11: the title labels overrun the original purple backing, first-old-man English still renders vertically, H.A.N.T. is only partially translated and clips, and menu labels are a mix of translated-but-awkward and unresolved entries. The structural 3+3 permanent-name behavior remains unchanged and is out of scope for v11.
 
-v10 is built from the pristine ISO at `/private/tmp/kowloon-recharge-startup-en-v10.iso`, SHA-256 `24d425433af97b1617e820cac05aa2a4d9389aa9fa19c1767a57eb763812da8e`. Final-image acceptance is 123/123; both test suites run 134 tests; a second pristine build is byte-for-byte identical. Before launching v10, state the exact checklist in `docs/LOCALIZATION_STATUS.md` and wait for Pablo's explicit approval. Runtime must still prove the boot alias and name-flow fixes.
+Do not infer additional runtime success from the fact that v10 reached dialogue. In particular, rows not explicitly observed remain at their prior evidence level. v11 now proceeds renderer-first: prove the live ADV consumer, title backing owner, H.A.N.T. ownership/layout, and menu semantics before mutating those classes. PCSX2 remains gated until the final v11 static/deterministic checks pass and Pablo explicitly approves the stated visual checklist.
 
 ## Resume procedure
 
