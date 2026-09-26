@@ -150,11 +150,11 @@ The visible Japanese control captions are baked into `BLBRD/B_GP019.BIN`, especi
 
 ### ADV dialogue layout
 
-`DG/DG00_00.MTX` remains the opening dialogue proof. v5 showed that the localized two-byte English itself was present, but the Japanese ADV renderer displayed it vertically. v11 ownership tracing proves file `0x14FA60` / VA `0x24F9E0` is the live coordinate constructor while `0x14EDA0` / VA `0x24ED20` is only the reveal-progress gate. The v6-v10 transform targeted the right constructor but normalized the byte position after it had already been copied into the FPU. v11 leaves both source fields and the progress callback pristine and swaps only the completed coordinate output registers immediately before the coordinate helper, so X receives `+0x465/2` and Y receives `+0x463`.
+`DG/DG00_00.MTX` remains the opening dialogue proof. v5 showed that the localized two-byte English itself was present, but the Japanese ADV renderer displayed it vertically. v11 ownership tracing proves file `0x14FA60` / VA `0x24F9E0` is the live coordinate constructor while `0x14EDA0` / VA `0x24ED20` is only the reveal-progress gate. The v6-v10 transform targeted the right constructor but normalized the byte position after it had already been copied into the FPU. v11 leaves both source fields and the progress callback pristine and swaps only the completed coordinate output registers immediately before the coordinate helper, so X receives `+0x465/2` and Y receives `+0x463`. The supervised v11 runtime still rendered vertically; r4 traces the single wrapper orientation owner at file `0x14E96C` / VA `0x24E8EC`, which feeds all four DG font canvases, and changes only `a2=1` to `a2=0` there so every canvas inherits horizontal advance.
 
 ### Executable long-text / H.A.N.T class
 
-The H.A.N.T. tutorial is an executable pointer table at `0x5C8C70`; its visible strings do not safely fit their Japanese slots. The pristine ELF has a zero-sized second PT_LOAD at virtual address `0x00902F00`. The localization activates it as a reusable translation segment with a 1 MiB reserved VA window and moves all proven heap owners to `0x00A02F00`. v11 measures the mode-4 tutorial at 26 visible glyph cells per row, keeps the pristine 17-slot table as provenance, emits a 16-row-plus-EOF translated table, and moves the independent controller metadata to the reflowed English holes. The shared allocator also owns the two overflow name-reading prompts, the proven memory-card subset, and the proven long command labels `Return above ground` and `Report card`; unresolved owners remain pristine.
+The H.A.N.T. tutorial is an executable pointer table at `0x5C8C70`; its visible strings do not safely fit their Japanese slots. The pristine ELF has a zero-sized second PT_LOAD at virtual address `0x00902F00`. The localization activates it as a reusable translation segment with a 1 MiB reserved VA window and moves all proven heap owners to `0x00A02F00`. Runtime v11 established about 336 safe horizontal pixels for the tutorial. r4 changes only the mode-4 tutorial row constructor from the existing 16px style 0 to the existing 12px style 1, yielding a conservative 28-cell budget and a 14-row-plus-EOF table while keeping the pristine 17-slot source table as provenance; the independent controller metadata moves with the reflowed holes on rows 6, 9, and 12. The independently proven seven-entry H.A.N.T. chrome owner table at `0x586D20` is also relocated to semantic English labels; these are explicitly not claimed as official-remaster wording because the localized TextAsset is absent from the owned extraction. The shared allocator additionally owns the two overflow name-reading prompts, the proven memory-card subset, and the proven long command labels `Return above ground` and `Report card`; other unresolved owners remain pristine.
 
 ## Current corpus/import coverage
 
@@ -202,16 +202,17 @@ PS2-only lexical proxy:
 - `tools/exact_import.py`, `tools/import_exact_mtx.py` — fail-closed exact MTX importer
 - `tools/ksf_import.py`, `tools/import_exact_ksf.py` — conservative KSF importer
 - `tools/structural_import.py`, `tools/import_structural_mtx.py` — changed-source MTX importer
-- `tools/startup_ui.py` — title arena, wide startup prompt/name relocation, Latin keyboard, and fail-closed English name-flow bypass
+- `tools/startup_ui.py` — title arena, wide startup prompt/name relocation, Latin keyboard, fail-closed English name-flow bypass, and license-completion X correction
 - `tools/adv_layout.py` — fail-closed ADV vertical→horizontal renderer transform
 - `tools/elf_translation_segment.py` — reusable second-PT_LOAD English text segment
 - `tools/executable_text.py` — deterministic shared executable-text allocator with unique key/pointer ownership
-- `tools/hant_layout.py`, `tools/hant_ui.py` — 26-cell H.A.N.T. wrapping, translated table/controller metadata, and shared relocation payload
+- `tools/hant_layout.py`, `tools/hant_ui.py` — page-local 12px/28-cell H.A.N.T. tutorial with 18px row stride, relocated controller metadata, seven semantic chrome labels, 15 semantic Help-topic aliases, and shared relocation payload
 - `tools/menu_ui.py` — semantic command-label manifest, fixed labels, proven long-label relocation, unresolved preservation
 - `tools/memory_card_ui.py` — fail-closed memory-card pointer-table + boot-handler alias correspondence and official English encoding
 - `tools/startup_acceptance.py` — reproducible final-ISO startup/renderer-class verifier, including v11 title/ADV/H.A.N.T./menu invariants
 - `tools/early_ui.py`, `tools/elf_strings.py` — executable UI build/slot handling
 - `tools/graphics_port.py` — optional-Pillow indexed PS2 graphics port, including raw-RGBA atlas output
+- `tools/hant_graphics.py` — deterministic, fail-closed semantic caption repaint for the baked `GP020_03` H.A.N.T. atlas
 - `tools/graphics_layout.py` — generic fail-closed region-transfer / alpha-layout proof for structurally changed atlases
 - `tools/startup_graphics.py` — quote, B_GP019, direct GP088, and structural GP088_12 startup graphics transforms
 - `tools/translation_overlay.py` — overlay path policy/precedence and relocation planning; supports ADV scripts plus explicit startup BLBRD assets
@@ -222,11 +223,11 @@ PS2-only lexical proxy:
 
 ## Latest runtime result and next gate
 
-v10 remains the latest supervised runtime checkpoint. v11 is now the current static/deterministic candidate at `/private/tmp/kowloon-recharge-startup-en-v11.iso`, SHA-256 `4150414b817fe54cf90ac28887568a37c6910995d7f8bc46e6887a6c4f6ef516`. Its final post-ROFS ELF SHA-256 is `9771bd9c031d7bcdb5e716c458d059feac6bdb2e31dd2fca6f4de7ca7f38e088`; final-image acceptance is **130/130**; both suites execute **177 tests** (8 dependency-free skips, 1 Pillow skip); and an independent pristine rebuild is byte-for-byte identical.
+v11-r3 remains the latest candidate known to have booted in PCSX2; its corrected target screens were never re-observed. The current static/deterministic candidate is **v11-r5** at `/private/tmp/kowloon-recharge-startup-en-v11-r5.iso`, SHA-256 `2ebee6fb45125fdfd826f15cb0a9eee09a66a861f39058103704a00244deb739`. Its pre-ROFS translated ELF SHA-256 is `6e385c38fd012d8d11a5e3f0f20220412506ed6aa43b75b8bd712035365a28fa`; final post-ROFS ELF SHA-256 is `c3b228c946df9bae9d8aec81058a04801de1483191c28d5077087e1d9c2d3eee`; final-image acceptance is **137/137**; both full suites execute **191 tests** (8 dependency-free skips, 1 Pillow-enabled owned-corpus skip); and the r5 repeat ISO is byte-for-byte identical. r5 has **not** been launched in PCSX2.
 
-The v11 pass statically fixes the v10 presentation classes without changing the accepted startup/name-flow contract: the title backing is widened through the proven paired GP088_12 owner, the live ADV/DG constructor owns the horizontal coordinate swap, H.A.N.T. wraps at the measured 26-cell visible width with independently relocated controller metadata, and command labels are keyed by semantic pointer-table ownership. `Return above ground` and `Report card` are the only new relocated command labels; unresolved `メディア` remains intentionally Japanese.
+r5 preserves the improved title/tablet geometry and all accepted r4 work. Its new scope is only the screenshot-confirmed remainder: separate speaker-label horizontal orientation at file `0x151608`; H.A.N.T. tutorial row stride `21→18px`; the proven 15-entry H.A.N.T. Help-topic table; the memory-card boot line split into `Checking memory card` / `slot 1`; and the baked `GP020_03` captions repainted to semantic English. The GP020 repaint is not represented as official-remaster artwork because the localized PS4 bundle is unavailable in the current owned extraction.
 
-Runtime proof is still required. Use the exact eight-point v11 checklist in `docs/LOCALIZATION_STATUS.md` and do not launch PCSX2 until Pablo explicitly approves it. The structural 3+3 permanent-name limit remains out of scope, and cross-build memory-card save compatibility still needs a real create/load test.
+Pablo will perform the r5 runtime checks manually. Expected observations are: speaker name and body dialogue both horizontal; H.A.N.T. tutorial no longer clips at the bottom; Help/deeper labels and the six main-menu tile captions are English; the stone-panel message fits on two lines; and title/tablet centering remains unchanged. Do not launch PCSX2 automatically. The structural 3+3 permanent-name limit and cross-build memory-card save compatibility remain separate work.
 
 ## Resume procedure
 

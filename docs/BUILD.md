@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v11 result: 177 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11-r5 result: 191 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -462,3 +462,80 @@ Measured v11 static result:
 - deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-repeat.iso` has the same SHA-256 and `cmp` reports byte-for-byte identity.
 
 Do not launch v11 automatically. The exact supervised runtime checklist is in `docs/LOCALIZATION_STATUS.md`; PCSX2 remains blocked until Pablo explicitly approves that launch.
+
+## Build startup v11-r4 candidate
+
+v11-r4 is the historical four-defect correction pass after the supervised v11 presentation failure and the unproven r3 experiment. It preserves the accepted title/tablet geometry and does **not** include the r3 memory-card wrapping experiment. The only new runtime-facing owners are the license-completion X origin, the upstream DG all-canvas orientation flag, the mode-4 H.A.N.T. tutorial font/reflow, and the seven pointer-owned H.A.N.T. chrome labels.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r4.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r4.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r4.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r4.json
+```
+
+Measured v11-r4 static/deterministic result:
+
+- translated ELF SHA-256 before ISO ROFS rewrite: `4501cee41d3941d40c687f9806b51aa0196f6c206132fd6614f3bbe8ee461a43`;
+- final post-ROFS ELF SHA-256: `54690aed73a68d19e8b1fcd787e346086fbd3bb30dd9dea9b39b99acf93d3d9f`;
+- translated/final ELF size: 8,404,046 bytes; outer extent relocated from 288 to 1,013,782;
+- ISO SHA-256: `3566b2395165cf4ba4b34ebed874ba405f17c0d452753786cfc116ed80c494bb`;
+- 1,144 overlays; 891 in place / 253 relocated; 1,144 ROFS records patched/re-resolved;
+- +900 embedded sectors; 17 shifted outer files; whole ISO remains 2,095,382,528 bytes;
+- final-image startup verifier: **132/132**;
+- dependency-free suite: **182 tests OK** (8 expected skips);
+- Pillow-enabled suite: **182 tests OK** (1 owned-corpus skip);
+- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r4-repeat.iso` has the same builder SHA-256 and `cmp` reports byte-for-byte identity.
+
+Do not launch r4 automatically. PCSX2 has not been launched for this candidate. The supervised target-screen checklist is recorded in `docs/LOCALIZATION_STATUS.md`.
+
+
+## Build startup v11-r5 candidate
+
+v11-r5 is the current correction pass after Pablo's r4 screenshot review. It preserves the accepted title/tablet geometry and adds only the remaining runtime-facing owners: the separate speaker-name orientation, the H.A.N.T. 18px row stride and 15-entry Help topic table, the two-line memory-card boot message, and the baked GP020 caption atlas. GP020 wording/art is semantic because the current owned PS4 extraction does not expose a localized GP020 bundle.
+
+The generated local `BLBRD/B_GP020.BIN` is a same-size transform of pristine `GRP020/GP020_03.TMX`. Its nine caption rectangles are pinned by SHA-256 preimages and only the existing H.A.N.T.-green indexed pixels inside those rectangles may change.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r5.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r5.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r5.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r5.json
+```
+
+Measured v11-r5 static/deterministic result:
+
+- translated ELF SHA-256 before ISO ROFS rewrite: `6e385c38fd012d8d11a5e3f0f20220412506ed6aa43b75b8bd712035365a28fa`;
+- final post-ROFS ELF SHA-256: `c3b228c946df9bae9d8aec81058a04801de1483191c28d5077087e1d9c2d3eee`;
+- translated/final ELF size: 8,404,478 bytes; outer extent relocated from 288 to 1,013,782;
+- ISO SHA-256: `2ebee6fb45125fdfd826f15cb0a9eee09a66a861f39058103704a00244deb739`;
+- 1,145 overlays; 892 in place / 253 relocated; 1,145 ROFS records patched/re-resolved;
+- +900 embedded sectors; 17 shifted outer files; whole ISO remains 2,095,382,528 bytes;
+- final-image startup verifier: **137/137**;
+- dependency-free suite: **191 tests OK** (8 expected skips);
+- Pillow-enabled suite: **191 tests OK** (1 owned-corpus skip);
+- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r5-repeat.iso` is byte-for-byte identical by `cmp`.
+
+Do not launch r5 automatically. Pablo will perform the runtime checks manually.

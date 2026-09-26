@@ -12,19 +12,20 @@ class HantLayoutProfile:
     max_rows: int = 16
 
 
-# Static renderer trace for the H.A.N.T. text page:
+# Renderer/runtime profile for the translated H.A.N.T. tutorial page:
 # - row staging copies at most 0x40 bytes; PS2 English is two bytes/glyph
 #   (32-cell hard storage ceiling),
-# - style-0 font record VA 0x005D77D0 is 16x18, so ordinary glyphs advance
-#   16 logical pixels at the 1.0 scale used by this page,
-# - text rows begin at X=85 in a 512-wide logical canvas,
-# - row Y is 131 + 21*n.
-# The visual width is therefore the tighter constraint:
-# floor((512 - 85) / 16) == 26 cells.
+# - the failed v11 runtime capture establishes a safe visible span of about
+#   21 pristine style-0 cells = 21 * 16 = 336 logical pixels,
+# - the page-local row constructor can select existing font style 1 (12x12)
+#   instead of style 0 (16x18), so that same proven 336 px span safely holds
+#   28 translated cells without global font changes,
+# - r4 runtime still clipped the final rows; r5 keeps the 12px font and uses a
+#   page-local 18px row stride (patched from pristine 21px), with at most 16 rows.
 HANT_LAYOUT_PROFILE = HantLayoutProfile(
-    max_cells=26,
-    glyph_advance=16.0,
-    line_spacing=21.0,
+    max_cells=28,
+    glyph_advance=12.0,
+    line_spacing=18.0,
     controller_gap_cells=5,
 )
 

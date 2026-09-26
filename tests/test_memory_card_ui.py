@@ -42,6 +42,16 @@ class MemoryCardUiTests(unittest.TestCase):
             expected = encode_memory_card_english(english) + b"\x00"
             self.assertEqual(expected, result[target_file:target_file + len(expected)])
 
+    def test_boot_slot1_message_wraps_before_slot_number_for_stone_panel(self) -> None:
+        english = MEMORY_CARD_MESSAGES[1][2]
+        self.assertEqual("\nChecking memory card\nslot 1", english)
+
+        result, info = patch_hant_tutorial(RAW)
+        target_va = struct.unpack_from("<I", result, MEMORY_CARD_POINTER_TABLE_OFFSET + 4)[0]
+        target_file = info.file_offset + (target_va - info.segment_vaddr)
+        expected = encode_memory_card_english(english) + b"\x00"
+        self.assertEqual(expected, result[target_file:target_file + len(expected)])
+
     def test_boot_memory_card_handlers_follow_relocated_slot1_message(self) -> None:
         result, info = patch_hant_tutorial(RAW)
         primary = struct.unpack_from(

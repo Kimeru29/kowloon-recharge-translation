@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 import struct
 
 from tools.elf_translation_segment import TranslationSegmentInfo
@@ -25,6 +26,18 @@ HANT_TUTORIAL_DESCRIPTOR_OFFSET = 0x5CBAB0
 # controller metadata list at VA 0x006C8A20 through this independent leaf.
 HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET = 0x5CBA60
 HANT_CONTROLLER_METADATA_OFFSET = 0x5C8AA0
+# Mode-4 tutorial row constructor at VA 0x2908E8. Pristine style 0 is 16x18;
+# existing style 1 is 12x12 and reduces English glyph advance without a global
+# font change or injected call path.
+HANT_TUTORIAL_FONT_STYLE_OFFSET = 0x190968
+_HANT_TUTORIAL_FONT_STYLE_PRISTINE_WORD = 0x0000282D  # move a1,zero
+_HANT_TUTORIAL_FONT_STYLE_ENGLISH_WORD = 0x24050001   # addiu a1,zero,1
+# VA 0x2907E4 materializes the page-local float stride used by
+# Y = 131 + stride * row. r4 runtime proved 21px still exceeds the visible
+# tutorial budget, so r5 tightens only this page to 18px.
+HANT_TUTORIAL_ROW_SPACING_OFFSET = 0x190864
+_HANT_TUTORIAL_ROW_SPACING_PRISTINE_WORD = 0x3C0241A8  # lui v0,0x41A8 => 21.0f
+_HANT_TUTORIAL_ROW_SPACING_ENGLISH_WORD = 0x3C024190   # lui v0,0x4190 => 18.0f
 
 _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
@@ -33,6 +46,67 @@ _HANT_EOF_STRING_OFFSET = 0x69603C
 _HANT_METADATA_SCREEN_X_BASE = 73
 _HANT_METADATA_SCREEN_Y_BASE = 119
 _HANT_TEXT_ORIGIN_Y = 131
+
+
+@dataclass(frozen=True)
+class HantChromeLabel:
+    key: str
+    source_offset: int
+    pointer_offset: int
+    source_text: str
+    english: str
+    provenance: str
+
+
+@dataclass(frozen=True)
+class HantHelpTopic:
+    key: str
+    source_offset: int
+    pointer_offset: int
+    source_text: str
+    english: str
+    provenance: str = "semantic"
+
+
+# Runtime ownership is proven independently of translation provenance: the seven
+# pointers at file 0x586D20 are indexed by the live H.A.N.T. chrome renderer at
+# VA 0x2881B0/0x2881C0. The owned remaster extraction does not expose the
+# localized TextAsset that would establish exact official wording, so these are
+# deliberately classified as semantic translations rather than official text.
+# Preserve the original corner-bracket chrome while translating the labels.
+HANT_CHROME_LABELS: tuple[HantChromeLabel, ...] = (
+    HantChromeLabel("main_menu", 0x586CB0, 0x586D20, "【メインメニュー】", "【Main Menu】", "semantic"),
+    HantChromeLabel("mail", 0x586CC8, 0x586D24, "【メール】", "【Mail】", "semantic"),
+    HantChromeLabel("dictionary", 0x586CD8, 0x586D28, "【用語辞典】", "【Dictionary】", "semantic"),
+    HantChromeLabel("enemy", 0x695888, 0x586D2C, "【敵】", "【Enemy】", "semantic"),
+    HantChromeLabel("memo", 0x586CE8, 0x586D30, "【睡院メモ】", "【Memo】", "semantic"),
+    HantChromeLabel("help", 0x586CF8, 0x586D34, "【ヘルプ】", "【Help】", "semantic"),
+    HantChromeLabel("config", 0x586D08, 0x586D38, "【コンフィグ】", "【Config】", "semantic"),
+)
+
+
+# The Help index shown in the H.A.N.T screenshot is a separate 15-entry pointer
+# table at file 0x587840. Each pointer resolves one visible Japanese topic label;
+# preserving the source strings while relocating those exact aliases keeps the
+# owner boundary explicit. Wording is semantic because the current owned PS4
+# extraction no longer exposes the localized bundle/TextAsset for this screen.
+HANT_HELP_TOPICS: tuple[HantHelpTopic, ...] = (
+    HantHelpTopic("hant_functions", 0x5876E0, 0x587840, "Ｈ．Ａ．Ｎ．Ｔの機能", "H.A.N.T Functions"),
+    HantHelpTopic("command_thumbnails", 0x587700, 0x587844, "コマンドサムネイル", "Command Thumbnails"),
+    HantHelpTopic("your_room", 0x587718, 0x587848, "自室について", "About Your Room"),
+    HantHelpTopic("shopping_site", 0x587730, 0x58784C, "ショッピングサイト", "Shopping Site"),
+    HantHelpTopic("guild_site", 0x587748, 0x587850, "ギルドサイト", "Guild Site"),
+    HantHelpTopic("shop", 0x587758, 0x587854, "売店について", "About the Shop"),
+    HantHelpTopic("item_screen", 0x587770, 0x587858, "アイテム画面について", "Item Screen"),
+    HantHelpTopic("using_items", 0x587790, 0x58785C, "アイテムの使い方", "Using Items"),
+    HantHelpTopic("carrying_items", 0x5877A8, 0x587860, "アイテムの携行", "Carrying Items"),
+    HantHelpTopic("equipping_items", 0x5877B8, 0x587864, "アイテムの装備", "Equipping Items"),
+    HantHelpTopic("recycling", 0x5877D0, 0x587868, "リサイクルについて", "Recycling"),
+    HantHelpTopic("item_synthesis", 0x5877E8, 0x58786C, "アイテムの調合", "Item Synthesis"),
+    HantHelpTopic("ammunition", 0x5877F8, 0x587870, "弾薬について", "Ammunition"),
+    HantHelpTopic("level_up", 0x587810, 0x587874, "レベルアップしたら", "When You Level Up"),
+    HantHelpTopic("save_load", 0x587828, 0x587878, "セーブ＆ロード", "Save & Load"),
+)
 
 
 def _elf_va(file_offset: int) -> int:
@@ -103,33 +177,32 @@ def _build_wrapped_hant_lines() -> tuple[tuple[str, ...], dict[int, tuple[int, i
     instruction_3 = HANT_ENGLISH_LINES[14].strip()
 
     body_lines = _wrap_section(body)
+    boot_heading_lines = _wrap_section(HANT_ENGLISH_LINES[7].strip())
     instruction_1_lines = _wrap_section(instruction_1, (_HANT_CONTROLLER_SOURCE_SPANS[9],))
     instruction_2_lines = _wrap_section(instruction_2, (_HANT_CONTROLLER_SOURCE_SPANS[12],))
     instruction_3_lines = _wrap_section(instruction_3, (_HANT_CONTROLLER_SOURCE_SPANS[14],))
 
-    if tuple(map(len, (body_lines, instruction_1_lines, instruction_2_lines, instruction_3_lines))) != (5, 3, 3, 2):
-        raise ValueError("H.A.N.T wrapping no longer matches the proven 26-cell page geometry")
+    if tuple(map(len, (body_lines, boot_heading_lines, instruction_1_lines, instruction_2_lines, instruction_3_lines))) != (5, 1, 3, 3, 2):
+        raise ValueError("H.A.N.T wrapping no longer matches the 12px/28-cell tutorial profile")
 
-    # Preserve the original 16 materialized rows plus EOF shape. Row 1 remains
-    # blank; the decorative underline is presentation-only and is omitted rather
-    # than mutating/truncating its official punctuation. The three controller
-    # holes land on rows 8, 11 and 14 and retain their established five-cell gaps.
+    # Keep all accepted instructional wording while dropping only the redundant
+    # standalone H.A.N.T heading and decorative separator. The existing 12px font
+    # style fits the text in 14 rows, leaving two rows of headroom under the
+    # renderer's hard 16-row cap instead of clipping the final instruction.
     lines = (
-        HANT_ENGLISH_LINES[0].strip(),
-        "",
         *body_lines,
-        HANT_ENGLISH_LINES[7].strip(),
+        *boot_heading_lines,
         *instruction_1_lines,
         *instruction_2_lines,
         *instruction_3_lines,
     )
-    if len(lines) != HANT_LAYOUT_PROFILE.max_rows:
-        raise ValueError(f"wrapped H.A.N.T tutorial must materialize 16 rows, got {len(lines)}")
+    if len(lines) != 14 or len(lines) > HANT_LAYOUT_PROFILE.max_rows:
+        raise ValueError(f"wrapped H.A.N.T tutorial must materialize 14 rows, got {len(lines)}")
 
     controller_spans = {
-        8: _HANT_CONTROLLER_SOURCE_SPANS[9],
-        11: _HANT_CONTROLLER_SOURCE_SPANS[12],
-        14: _HANT_CONTROLLER_SOURCE_SPANS[14],
+        6: _HANT_CONTROLLER_SOURCE_SPANS[9],
+        9: _HANT_CONTROLLER_SOURCE_SPANS[12],
+        12: _HANT_CONTROLLER_SOURCE_SPANS[14],
     }
     gap = " " * HANT_LAYOUT_PROFILE.controller_gap_cells
     for row, (start, end) in controller_spans.items():
@@ -152,12 +225,14 @@ HANT_PRISTINE_CONTROLLER_METADATA_RECORDS: tuple[tuple[int, int, int, int], ...]
     (-1, -1, -1, -1),
 )
 _HANT_SOURCE_ICON_POSITIONS = ((9, 0), (12, 3), (14, 0))
-_HANT_TARGET_ICON_POSITIONS = ((8, 10), (11, 6), (14, 10))
+_HANT_TARGET_ICON_POSITIONS = ((6, 10), (9, 6), (12, 10))
+_HANT_PRISTINE_GLYPH_ADVANCE = 16.0
+_HANT_PRISTINE_LINE_SPACING = 21.0
 
 
 def _relocated_controller_metadata() -> tuple[tuple[int, int, int, int], ...]:
     records: list[tuple[int, int, int, int]] = []
-    advance = HANT_LAYOUT_PROFILE.glyph_advance
+    target_advance = HANT_LAYOUT_PROFILE.glyph_advance
     spacing = HANT_LAYOUT_PROFILE.line_spacing
     origin_x = 85.0
 
@@ -173,12 +248,12 @@ def _relocated_controller_metadata() -> tuple[tuple[int, int, int, int], ...]:
 
         source_icon_x = _HANT_METADATA_SCREEN_X_BASE + source_field_x
         source_icon_y = _HANT_METADATA_SCREEN_Y_BASE + source_field_y
-        source_gap_x = origin_x + source_column * advance
-        source_row_y = _HANT_TEXT_ORIGIN_Y + source_row * spacing
+        source_gap_x = origin_x + source_column * _HANT_PRISTINE_GLYPH_ADVANCE
+        source_row_y = _HANT_TEXT_ORIGIN_Y + source_row * _HANT_PRISTINE_LINE_SPACING
         delta_x = source_icon_x - source_gap_x
         delta_y = source_icon_y - source_row_y
 
-        target_icon_x = origin_x + target_column * advance + delta_x
+        target_icon_x = origin_x + target_column * target_advance + delta_x
         target_icon_y = _HANT_TEXT_ORIGIN_Y + target_row * spacing + delta_y
         target_field_x = int(round(target_icon_x - _HANT_METADATA_SCREEN_X_BASE))
         target_field_y = int(round(target_icon_y - _HANT_METADATA_SCREEN_Y_BASE))
@@ -214,6 +289,60 @@ def _read_metadata_records(raw: bytes, offset: int) -> tuple[tuple[int, int, int
 
 
 def _validate_source(raw: bytes) -> None:
+    if HANT_TUTORIAL_ROW_SPACING_OFFSET + 4 > len(raw):
+        raise ValueError("H.A.N.T renderer spacing preimage is outside executable")
+    actual_spacing = struct.unpack_from("<I", raw, HANT_TUTORIAL_ROW_SPACING_OFFSET)[0]
+    if actual_spacing != _HANT_TUTORIAL_ROW_SPACING_PRISTINE_WORD:
+        raise ValueError(
+            "H.A.N.T renderer spacing preimage mismatch: "
+            f"expected {_HANT_TUTORIAL_ROW_SPACING_PRISTINE_WORD:#010x}, got {actual_spacing:#010x}"
+        )
+
+    if HANT_TUTORIAL_FONT_STYLE_OFFSET + 4 > len(raw):
+        raise ValueError("H.A.N.T renderer style preimage is outside executable")
+    actual_style = struct.unpack_from("<I", raw, HANT_TUTORIAL_FONT_STYLE_OFFSET)[0]
+    if actual_style != _HANT_TUTORIAL_FONT_STYLE_PRISTINE_WORD:
+        raise ValueError(
+            "H.A.N.T renderer style preimage mismatch: "
+            f"expected {_HANT_TUTORIAL_FONT_STYLE_PRISTINE_WORD:#010x}, got {actual_style:#010x}"
+        )
+
+    for spec in HANT_CHROME_LABELS:
+        encoded = spec.source_text.encode("cp932")
+        if (
+            spec.source_offset + len(encoded) >= len(raw)
+            or raw[spec.source_offset:spec.source_offset + len(encoded)] != encoded
+            or raw[spec.source_offset + len(encoded)] != 0
+        ):
+            raise ValueError(f"H.A.N.T chrome source preimage mismatch: {spec.key}")
+        if spec.pointer_offset + 4 > len(raw):
+            raise ValueError(f"H.A.N.T chrome pointer is outside executable: {spec.key}")
+        expected_va = _elf_va(spec.source_offset)
+        actual_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+        if actual_va != expected_va:
+            raise ValueError(
+                f"H.A.N.T chrome pointer preimage mismatch for {spec.key}: "
+                f"expected {expected_va:#x}, got {actual_va:#x}"
+            )
+
+    for spec in HANT_HELP_TOPICS:
+        encoded = spec.source_text.encode("cp932")
+        if (
+            spec.source_offset + len(encoded) >= len(raw)
+            or raw[spec.source_offset:spec.source_offset + len(encoded)] != encoded
+            or raw[spec.source_offset + len(encoded)] != 0
+        ):
+            raise ValueError(f"H.A.N.T help-topic source preimage mismatch: {spec.key}")
+        if spec.pointer_offset + 4 > len(raw):
+            raise ValueError(f"H.A.N.T help-topic pointer is outside executable: {spec.key}")
+        expected_va = _elf_va(spec.source_offset)
+        actual_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+        if actual_va != expected_va:
+            raise ValueError(
+                f"H.A.N.T help-topic pointer preimage mismatch for {spec.key}: "
+                f"expected {expected_va:#x}, got {actual_va:#x}"
+            )
+
     for index, (offset, source) in _HANT_SOURCES.items():
         encoded = source.encode("cp932")
         if raw[offset:offset + len(encoded)] != encoded or raw[offset + len(encoded)] != 0:
@@ -282,8 +411,13 @@ def _base_relocated_entries(raw: bytes) -> tuple[RelocatedText, ...]:
         RelocatedText(f"hant_row_{index}", _encoded_wide(text), ())
         for index, text in enumerate(HANT_WRAPPED_LINES)
     )
-    # The translated table is patched with the final row VAs after the one PT_LOAD
-    # installation. Its 68-byte placeholder preserves the old payload geometry.
+    # The translated pointer table itself requires 4-byte alignment, while the
+    # shared allocator intentionally guarantees only 2-byte string alignment.
+    # Keep one explicit H.A.N.T.-owned 2-byte pad before the structured table;
+    # the translated string payload is only 2-byte aligned while this table must
+    # remain 4-byte aligned. The fail-closed
+    # alignment check below still guards future row-shape drift.
+    entries.append(RelocatedText("hant_table_alignment", b"\x00\x00", ()))
     entries.append(
         RelocatedText(
             "hant_table",
@@ -297,6 +431,22 @@ def _base_relocated_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             _controller_metadata_bytes(),
             (HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,),
         )
+    )
+    entries.extend(
+        RelocatedText(
+            key=f"hant_chrome_{spec.key}",
+            encoded=_encoded_wide(spec.english),
+            pointer_offsets=(spec.pointer_offset,),
+        )
+        for spec in HANT_CHROME_LABELS
+    )
+    entries.extend(
+        RelocatedText(
+            key=f"hant_help_{spec.key}",
+            encoded=_encoded_wide(spec.english),
+            pointer_offsets=(spec.pointer_offset,),
+        )
+        for spec in HANT_HELP_TOPICS
     )
     entries.extend(relocated_memory_card_entries(raw))
     return tuple(entries)
@@ -327,8 +477,9 @@ def patch_hant_tutorial(
 
     ``extra_entries`` lets the composite early-UI build append independently
     validated relocation classes (currently long command-menu labels) without a
-    second translation-segment installation. The default preserves the exact
-    pre-Task-9 name/H.A.N.T./memory-card payload for byte-regression tests.
+    second translation-segment installation. The base payload includes the
+    accepted name/H.A.N.T./memory-card classes plus the separately owned semantic
+    H.A.N.T. chrome labels.
     """
 
     _validate_source(raw)
@@ -343,6 +494,18 @@ def patch_hant_tutorial(
         raise ValueError("H.A.N.T structured translation payload lost word alignment")
 
     result = bytearray(installed.raw)
+    struct.pack_into(
+        "<I",
+        result,
+        HANT_TUTORIAL_ROW_SPACING_OFFSET,
+        _HANT_TUTORIAL_ROW_SPACING_ENGLISH_WORD,
+    )
+    struct.pack_into(
+        "<I",
+        result,
+        HANT_TUTORIAL_FONT_STYLE_OFFSET,
+        _HANT_TUTORIAL_FONT_STYLE_ENGLISH_WORD,
+    )
     table_file = installed.info.file_offset + (table_va - installed.info.segment_vaddr)
     for index in range(len(HANT_WRAPPED_LINES)):
         struct.pack_into("<I", result, table_file + index * 4, installed.target_vas[f"hant_row_{index}"])

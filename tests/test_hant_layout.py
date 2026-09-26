@@ -7,9 +7,9 @@ from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells, wrap_han
 
 class HantLayoutTests(unittest.TestCase):
     def test_profile_matches_traced_hant_renderer_geometry(self) -> None:
-        self.assertEqual(26, HANT_LAYOUT_PROFILE.max_cells)
-        self.assertEqual(16.0, HANT_LAYOUT_PROFILE.glyph_advance)
-        self.assertEqual(21.0, HANT_LAYOUT_PROFILE.line_spacing)
+        self.assertEqual(28, HANT_LAYOUT_PROFILE.max_cells)
+        self.assertEqual(12.0, HANT_LAYOUT_PROFILE.glyph_advance)
+        self.assertEqual(18.0, HANT_LAYOUT_PROFILE.line_spacing)
         self.assertEqual(5, HANT_LAYOUT_PROFILE.controller_gap_cells)
         self.assertEqual(16, HANT_LAYOUT_PROFILE.max_rows)
         self.assertLess(HANT_LAYOUT_PROFILE.max_cells, 0x40 // 2)
@@ -49,7 +49,7 @@ class HantLayoutTests(unittest.TestCase):
 
     def test_rejects_single_unbreakable_token_wider_than_line(self) -> None:
         with self.assertRaisesRegex(ValueError, "cannot fit"):
-            wrap_hant_text("X" * 27, max_cells=HANT_LAYOUT_PROFILE.max_cells)
+            wrap_hant_text("X" * 29, max_cells=HANT_LAYOUT_PROFILE.max_cells)
 
     def test_wrapping_is_deterministic(self) -> None:
         text = "The H.A.N.T is a mini info device designed to support exploration."

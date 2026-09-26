@@ -122,6 +122,21 @@ class StartupUiPatchTests(unittest.TestCase):
         self.assertEqual(RAW[0x695188:0x6951A8], result[0x695188:0x6951A8])
         self.assertEqual(RAW[0x695840:0x695860], result[0x695840:0x695860])
 
+    def test_license_completion_prompt_preserves_working_right_edge(self) -> None:
+        result = build_startup_ui_elf(RAW)
+
+        # `Verifying license ID...` is 23 glyphs at X=140 and renders cleanly.
+        # The completion string is 25 glyphs in the same 16 px text renderer, so
+        # X=108 preserves the same right edge: 140+23*16 == 108+25*16 == 508.
+        self.assertEqual(0x3C02430C, struct.unpack_from("<I", result, 0x181B70)[0])
+        self.assertEqual(0x3C0242D8, struct.unpack_from("<I", result, 0x181EAC)[0])
+
+    def test_license_completion_layout_fails_closed_on_x_owner_drift(self) -> None:
+        tampered = bytearray(RAW)
+        tampered[0x181EAC] ^= 1
+        with self.assertRaisesRegex(ValueError, "license.*layout|License.*layout"):
+            build_startup_ui_elf(bytes(tampered))
+
     def test_english_name_flow_skips_ps2_kana_reading_editor(self) -> None:
         result = build_startup_ui_elf(RAW)
 
@@ -204,6 +219,8 @@ class StartupUiPatchTests(unittest.TestCase):
         allowed.update(range(0x186A68, 0x186A6C))
         for patch in STARTUP_FIXED_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
+        # Runtime owner for the longer "ID verification complete." line.
+        allowed.update(range(0x181EAC, 0x181EB0))
 
         changed = {i for i, (before, after) in enumerate(zip(RAW, result)) if before != after}
         self.assertTrue(changed)

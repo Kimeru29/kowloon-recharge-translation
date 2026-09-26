@@ -4,7 +4,7 @@ import struct
 import unittest
 from pathlib import Path
 
-from tools.adv_layout import ADV_DG_LAYOUT_PATCHES
+from tools.adv_layout import ADV_DG_LAYOUT_PATCHES, ADV_SPEAKER_LAYOUT_PATCHES
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
 from tools.menu_ui import MENU_LABELS
 from tools.hant_inventory import inventory_hant_text
@@ -24,10 +24,14 @@ from tools.startup_ui import (
     TITLE_LOAD_POINTER_OFFSET,
 )
 from tools.hant_ui import (
+    HANT_CHROME_LABELS,
+    HANT_HELP_TOPICS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
     HANT_CONTROLLER_METADATA_RECORDS,
     HANT_POINTER_TABLE_OFFSET,
     HANT_TUTORIAL_DESCRIPTOR_OFFSET,
+    HANT_TUTORIAL_FONT_STYLE_OFFSET,
+    HANT_TUTORIAL_ROW_SPACING_OFFSET,
     HANT_WRAPPED_LINES,
 )
 from tools.memory_card_ui import (
@@ -97,12 +101,17 @@ class EarlyUiPatchTests(unittest.TestCase):
         for patch in EARLY_UI_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
         # ADV DG horizontal-layout patch and the two proven H.A.N.T leaf descriptors are runtime patches.
-        for off, _expected, _replacement in ADV_DG_LAYOUT_PATCHES:
+        for off, _expected, _replacement in (*ADV_DG_LAYOUT_PATCHES, *ADV_SPEAKER_LAYOUT_PATCHES):
             allowed.update(range(off, off + 4))
         allowed.update(range(HANT_TUTORIAL_DESCRIPTOR_OFFSET, HANT_TUTORIAL_DESCRIPTOR_OFFSET + 4))
         allowed.update(
             range(HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET + 4)
         )
+        allowed.update(range(HANT_TUTORIAL_FONT_STYLE_OFFSET, HANT_TUTORIAL_FONT_STYLE_OFFSET + 4))
+        allowed.update(range(HANT_TUTORIAL_ROW_SPACING_OFFSET, HANT_TUTORIAL_ROW_SPACING_OFFSET + 4))
+        for spec in (*HANT_CHROME_LABELS, *HANT_HELP_TOPICS):
+            allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
+        allowed.update(range(0x181EAC, 0x181EB0))
         for index in MEMORY_CARD_MESSAGES:
             off = MEMORY_CARD_POINTER_TABLE_OFFSET + index * 4
             allowed.update(range(off, off + 4))
@@ -144,10 +153,13 @@ class EarlyUiPatchTests(unittest.TestCase):
     def test_unresolved_hant_candidates_match_pristine_fixture_except_cross_owned_sources(self) -> None:
         result = build_early_ui_elf(RAW)
         entries = inventory_hant_text(RAW, None)
+        promoted_help_sources = {spec.source_offset for spec in HANT_HELP_TOPICS}
         candidates = [
             entry
             for entry in entries
-            if entry.owner == "executable_hant_candidate" and entry.classification == "unresolved"
+            if entry.owner == "executable_hant_candidate"
+            and entry.classification == "unresolved"
+            and entry.source_offset not in promoted_help_sources
         ]
         self.assertTrue(candidates)
         cross_owned_sources = {
@@ -184,7 +196,7 @@ class EarlyUiPatchTests(unittest.TestCase):
         segment_va = segment[2]
         segment_size = segment[4]
         by_key = {spec.key: spec for spec in MENU_LABELS}
-        self.assertEqual(2712, segment_size)
+        self.assertEqual(3246, segment_size)
 
         for key, expected in (("return_above_ground", b"Return above ground\x00"), ("report_card", b"Report card\x00")):
             spec = by_key[key]
@@ -197,7 +209,7 @@ class EarlyUiPatchTests(unittest.TestCase):
             target_va = targets.pop()
             self.assertGreaterEqual(target_va, segment_va)
             self.assertLess(target_va, segment_va + segment_size)
-            expected_offset = {"return_above_ground": 0xA78, "report_card": 0xA8C}[key]
+            expected_offset = {"return_above_ground": 0xC8E, "report_card": 0xCA2}[key]
             self.assertEqual(segment_va + expected_offset, target_va)
             target_file = segment_file + target_va - segment_va
             self.assertEqual(expected, result[target_file:target_file + len(expected)])
@@ -223,7 +235,7 @@ class EarlyUiPatchTests(unittest.TestCase):
 
     def test_composite_build_includes_horizontal_adv_layout(self) -> None:
         result = build_early_ui_elf(RAW)
-        for offset, _expected, replacement in ADV_DG_LAYOUT_PATCHES:
+        for offset, _expected, replacement in (*ADV_DG_LAYOUT_PATCHES, *ADV_SPEAKER_LAYOUT_PATCHES):
             self.assertEqual(replacement, struct.unpack_from("<I", result, offset)[0])
 
         # The source fields and pristine byte-position /2 normalization remain intact.

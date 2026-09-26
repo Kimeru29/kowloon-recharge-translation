@@ -32,12 +32,12 @@ def _segment_file_offset(info, va: int) -> int:
 
 
 class HantTutorialTests(unittest.TestCase):
-    def test_generic_relocation_refactor_preserves_task8_payload_geometry(self) -> None:
+    def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(2679, info.payload_size)
+        self.assertEqual(3213, info.payload_size)
         self.assertEqual(
-            "1921fb7a9fe657961f64a78e51515c9973bede9ff7a43c637c1789b048c3d8f9",
+            "f1752bfc3292d9fb14e206100ed1c119cec484733931f736e4cff19423296b5e",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -49,11 +49,11 @@ class HantTutorialTests(unittest.TestCase):
             struct.unpack_from("<I", result, NAME_PROMPT_POINTER_TABLE_OFFSET + 3 * 4)[0],
         )
         self.assertEqual(
-            info.segment_vaddr + 732,
+            info.segment_vaddr + 716,
             struct.unpack_from("<I", result, HANT_TUTORIAL_DESCRIPTOR_OFFSET)[0],
         )
         self.assertEqual(
-            info.segment_vaddr + 800,
+            info.segment_vaddr + 776,
             struct.unpack_from("<I", result, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET)[0],
         )
 
@@ -75,14 +75,14 @@ class HantTutorialTests(unittest.TestCase):
         self.assertLess(table_va, info.segment_vaddr + info.payload_size)
         table_file = _segment_file_offset(info, table_va)
 
-        self.assertEqual(16, len(HANT_WRAPPED_LINES))
-        self.assertEqual("", HANT_WRAPPED_LINES[1])
+        self.assertEqual(14, len(HANT_WRAPPED_LINES))
+        self.assertEqual("The H.A.N.T is a mini info", HANT_WRAPPED_LINES[0])
         self.assertEqual(
-            {8: (10, 15), 11: (6, 11), 14: (10, 15)},
+            {6: (10, 15), 9: (6, 11), 12: (10, 15)},
             HANT_CONTROLLER_SPANS_BY_ROW,
         )
         self.assertEqual(
-            ((0, 5, 170, 180), (38, 1, 102, 242), (0, 0, 169, 305), (-1, -1, -1, -1)),
+            ((0, 5, 130, 120), (38, 1, 78, 173), (0, 0, 129, 227), (-1, -1, -1, -1)),
             HANT_CONTROLLER_METADATA_RECORDS,
         )
         for index, english in enumerate(HANT_WRAPPED_LINES):
@@ -119,9 +119,112 @@ class HantTutorialTests(unittest.TestCase):
             result[HANT_CONTROLLER_METADATA_OFFSET:HANT_CONTROLLER_METADATA_OFFSET + metadata_size],
         )
 
-    def test_wrapping_preserves_established_tutorial_wording_and_punctuation(self) -> None:
+    def test_relocates_hant_chrome_labels_through_proven_seven_entry_owner_table(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        expected = (
+            ("main_menu", 0x586CB0, 0x586D20, "【メインメニュー】", "【Main Menu】"),
+            ("mail", 0x586CC8, 0x586D24, "【メール】", "【Mail】"),
+            ("dictionary", 0x586CD8, 0x586D28, "【用語辞典】", "【Dictionary】"),
+            ("enemy", 0x695888, 0x586D2C, "【敵】", "【Enemy】"),
+            ("memo", 0x586CE8, 0x586D30, "【睡院メモ】", "【Memo】"),
+            ("help", 0x586CF8, 0x586D34, "【ヘルプ】", "【Help】"),
+            ("config", 0x586D08, 0x586D38, "【コンフィグ】", "【Config】"),
+        )
+        self.assertEqual(expected, tuple(
+            (spec.key, spec.source_offset, spec.pointer_offset, spec.source_text, spec.english)
+            for spec in hant_ui.HANT_CHROME_LABELS
+        ))
+        self.assertTrue(all(spec.provenance == "semantic" for spec in hant_ui.HANT_CHROME_LABELS))
+
+        result, info = patch_hant_tutorial(RAW)
+        for spec in hant_ui.HANT_CHROME_LABELS:
+            with self.subTest(key=spec.key):
+                # Relocation leaves the Japanese source as immutable provenance.
+                source = spec.source_text.encode("cp932") + b"\x00"
+                self.assertEqual(source, result[spec.source_offset:spec.source_offset + len(source)])
+
+                target_va = struct.unpack_from("<I", result, spec.pointer_offset)[0]
+                self.assertGreaterEqual(target_va, info.segment_vaddr)
+                self.assertLess(target_va, info.segment_vaddr + info.payload_size)
+                target_file = _segment_file_offset(info, target_va)
+                translated = encode_ps2_english(spec.english, collapse_spaces=False) + b"\x00"
+                self.assertEqual(translated, result[target_file:target_file + len(translated)])
+
+        tampered = bytearray(RAW)
+        tampered[0x586D20] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T chrome.*pointer"):
+            patch_hant_tutorial(bytes(tampered))
+
+        tampered = bytearray(RAW)
+        tampered[0x586CB0] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T chrome.*source"):
+            patch_hant_tutorial(bytes(tampered))
+
+    def test_relocates_visible_help_topic_list_to_semantic_english(self) -> None:
+        topics = (
+            (0x5876E0, 0x587840, "Ｈ．Ａ．Ｎ．Ｔの機能", "H.A.N.T Functions"),
+            (0x587700, 0x587844, "コマンドサムネイル", "Command Thumbnails"),
+            (0x587718, 0x587848, "自室について", "About Your Room"),
+            (0x587730, 0x58784C, "ショッピングサイト", "Shopping Site"),
+            (0x587748, 0x587850, "ギルドサイト", "Guild Site"),
+            (0x587758, 0x587854, "売店について", "About the Shop"),
+            (0x587770, 0x587858, "アイテム画面について", "Item Screen"),
+            (0x587790, 0x58785C, "アイテムの使い方", "Using Items"),
+            (0x5877A8, 0x587860, "アイテムの携行", "Carrying Items"),
+            (0x5877B8, 0x587864, "アイテムの装備", "Equipping Items"),
+            (0x5877D0, 0x587868, "リサイクルについて", "Recycling"),
+            (0x5877E8, 0x58786C, "アイテムの調合", "Item Synthesis"),
+            (0x5877F8, 0x587870, "弾薬について", "Ammunition"),
+            (0x587810, 0x587874, "レベルアップしたら", "When You Level Up"),
+            (0x587828, 0x587878, "セーブ＆ロード", "Save & Load"),
+        )
+        result, info = patch_hant_tutorial(RAW)
+
+        for source_offset, pointer_offset, source_text, english in topics:
+            with self.subTest(source=source_text):
+                source = source_text.encode("cp932") + b"\x00"
+                self.assertEqual(source, result[source_offset:source_offset + len(source)])
+                target_va = struct.unpack_from("<I", result, pointer_offset)[0]
+                self.assertGreaterEqual(target_va, info.segment_vaddr)
+                self.assertLess(target_va, info.segment_vaddr + info.payload_size)
+                target_file = _segment_file_offset(info, target_va)
+                translated = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
+                self.assertEqual(translated, result[target_file:target_file + len(translated)])
+
+    def test_tutorial_rows_use_existing_12px_font_style_without_global_font_patch(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+
+        # VA 0x2908E8 is the mode-4 tutorial row constructor's font-style arg.
+        # Pristine style 0 is 16x18; style 1 is the existing 12x12 record.
+        self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x190968)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x190968)[0])
+        self.assertLessEqual(
+            131 + (len(HANT_WRAPPED_LINES) - 1) * HANT_LAYOUT_PROFILE.line_spacing + 12,
+            416,
+        )
+
+        tampered = bytearray(RAW)
+        tampered[0x190968] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T.*style|H.A.N.T.*renderer"):
+            patch_hant_tutorial(bytes(tampered))
+
+    def test_tutorial_rows_use_page_local_18px_vertical_spacing(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+
+        # VA 0x2907E4 materializes the page-local 21.0f row stride used by
+        # ``131 + stride * row``. r4 still clipped the final tutorial rows, so
+        # only this tutorial stride is tightened to 18.0f.
+        self.assertEqual(18.0, HANT_LAYOUT_PROFILE.line_spacing)
+        self.assertEqual(0x3C0241A8, struct.unpack_from("<I", RAW, 0x190864)[0])
+        self.assertEqual(0x3C024190, struct.unpack_from("<I", result, 0x190864)[0])
+
+    def test_wrapping_preserves_instructional_wording_and_uses_runtime_row_budget(self) -> None:
+        # The standalone H.A.N.T heading is presentation-only and redundant with
+        # both the page chrome and the first body sentence. The runtime-good pixel
+        # span is ~336 px; style 1 renders 12 px glyphs, allowing 28 cells and 14
+        # rows while preserving all instructional wording under the 16-row cap.
         expected = " ".join((
-            HANT_ENGLISH_LINES[0].strip(),
             *(HANT_ENGLISH_LINES[index].strip() for index in (2, 3, 4)),
             HANT_ENGLISH_LINES[7].strip(),
             *(HANT_ENGLISH_LINES[index].strip() for index in (9, 10, 12, 13, 14)),
@@ -130,11 +233,15 @@ class HantTutorialTests(unittest.TestCase):
 
     def test_unresolved_hant_candidates_remain_pristine(self) -> None:
         result, _info = patch_hant_tutorial(RAW)
+        from tools.hant_ui import HANT_HELP_TOPICS
+
+        promoted_help_sources = {spec.source_offset for spec in HANT_HELP_TOPICS}
         candidates = [
             entry for entry in inventory_hant_text(RAW, None)
             if entry.owner == "executable_hant_candidate"
+            and entry.source_offset not in promoted_help_sources
         ]
-        self.assertGreaterEqual(len(candidates), 10)
+        self.assertGreaterEqual(len(candidates), 9)
 
         for entry in candidates:
             with self.subTest(key=entry.key):

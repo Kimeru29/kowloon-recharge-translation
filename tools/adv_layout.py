@@ -53,8 +53,10 @@ _CONSUMER_ROLE_PREIMAGES: dict[int, tuple[str, tuple[tuple[int, int], ...]]] = {
             (0x115A00, 0x0C0939A4),  # jal 0x24E690
             (0x115AF0, 0x0C0939A4),  # second dispatcher path -> 0x24E690
             (0x14E7A0, 0x0C093A28),  # 0x24E690 -> jal 0x24E8A0
-            # Constructor prologue and wrapper call.
+            # Constructor prologue and wrapper call.  The wrapper passes
+            # orientation a2=1 (vertical); the constructor saves it in s4.
             (0x14F6E0, 0x27BDFF20),
+            (0x14E96C, 0x24060001),  # addiu a2,zero,1
             (0x14E978, 0x0C093D98),  # 0x24E8A0 -> jal 0x24F660
             # Constructor registers 0x24E920 as its progress callback.
             (0x14F808, 0x3C070025),
@@ -62,9 +64,15 @@ _CONSUMER_ROLE_PREIMAGES: dict[int, tuple[str, tuple[tuple[int, int], ...]]] = {
             (0x14F81C, 0x0C068464),  # jal 0x1A1190
             # Preserve the pristine signed byte-position /2 normalization.
             (0x14FAA8, 0x00041843),  # sra v1,a0,1
-            # Coordinate builder followed by glyph/sprite construction.
+            # Coordinate builder followed by fragment-font construction.
+            # s4 is forwarded as font orientation; generic font drawing uses
+            # zero to advance X and nonzero to advance Y.
             (0x14FB10, 0x0C094700),  # jal 0x251C00
+            (0x14FB7C, 0x0280302D),  # move a2,s4
             (0x14FB90, 0x0C062FC4),  # jal 0x18BF10
+            (0x08E07C, 0x16C00009),  # bnez s6 -> vertical advance
+            (0x08E098, 0x4600AD40),  # horizontal: add.s f21,f21,f0
+            (0x08E0B8, 0x4600A500),  # vertical: add.s f20,f20,f0
         ),
     ),
 }
@@ -115,11 +123,30 @@ def inspect_adv_coordinate_consumers(raw: bytes) -> tuple[AdvCoordinateConsumer,
     return tuple(consumers)
 
 
-# The pristine constructor computes both coordinate formulas correctly for its
-# two record fields; only their destination argument registers are vertical-JP
-# ordered.  Swap the finished signed integer coordinate outputs immediately
-# before the 0x251C00 call.  This preserves the proven FPU formula/pipeline and
-# the existing signed byte-position /2 normalization path.
+# The pristine ADV object has two independent vertical-JP behaviors. First,
+# its completed record coordinates are routed as X=line/Y=position. Second,
+# the unique wrapper calls the object constructor with orientation=1; that flag
+# is saved in s4 and propagated to all four child font canvases, whose generic
+# draw callback advances Y per character. English must transpose the finished
+# origins AND clear the single upstream constructor orientation. The FPU formulas
+# and signed byte-position /2 normalization remain unchanged.
+# Runtime r4 proved the bracket-derived speaker label is a distinct font object
+# from the ordinary DG body.  The state machine at VA 0x251470 reads speaker
+# state from global +0x444, builds per-speaker canvases, and writes the resolved
+# speaker string into those canvases at VA 0x2516A8.  Its font constructor call
+# at VA 0x251594 passes orientation=1 independently of the DG body constructor.
+_ADV_SPEAKER_ROLE_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x1514F0, 0x27BDFF30),  # state-machine prologue at VA 0x251470
+    (0x151554, 0x80430444),  # lb v1,0x444(v0): speaker state
+    (0x15158C, 0x0C094700),  # jal 0x251C00: speaker coordinate builder
+    (0x151614, 0x0C062FC4),  # jal 0x18BF10: font canvas constructor
+    (0x151728, 0x0C063074),  # jal 0x18C1D0: write resolved speaker string
+)
+
+ADV_SPEAKER_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x151608, 0x24060001, 0x24060000),  # a2=1 vertical -> a2=0 horizontal
+)
+
 ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # First formula: 114 - 39 * line.  a1 (X) -> a2 (Y).
     (0x14FA9C, 0x00032C3C, 0x0003343C),  # dsll32 a1,v1,16 -> dsll32 a2,v1,16
@@ -127,6 +154,10 @@ ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # Second formula: 20 + 26 * (byte_position / 2).  a2 (Y) -> a1 (X).
     (0x14FAF4, 0x0003343C, 0x00032C3C),  # dsll32 a2,v1,16 -> dsll32 a1,v1,16
     (0x14FAF8, 0x0006343F, 0x00052C3F),  # dsra32 a2,a2,16 -> dsra32 a1,a1,16
+    # Unique wrapper callsite: orientation=1 is saved in s4 and reaches all four
+    # child font canvases. Clear it before construction rather than patching only
+    # one downstream fragment as the failed r3 experiment did.
+    (0x14E96C, 0x24060001, 0x24060000),  # addiu a2,zero,1 -> addiu a2,zero,0
 )
 
 
@@ -134,12 +165,14 @@ def patch_adv_horizontal_layout(raw: bytes) -> bytes:
     """Transpose only the proven ADV/DG glyph-layout constructor to English.
 
     The pristine constructor computes X-like ``114 - 39 * line`` and Y-like
-    ``20 + 26 * (byte_position / 2)`` integer coordinates before passing them as
+    ``20 + 26 * (byte_position / 2)`` integer origins before passing them as
     ``a1``/``a2`` to the coordinate helper.  English needs the second formula as
-    X and the first as Y.  Swapping the completed argument registers preserves
-    the existing two-byte glyph normalization exactly once, does not halve the
-    line index, and avoids modifying the FPU pipeline or the separate reveal
-    progress callback.
+    X and the first as Y. Separately, the unique wrapper passes orientation=1
+    into the ADV object constructor; that value is propagated to every child font
+    canvas, and the generic callback proves nonzero advances Y while zero advances
+    X. Swap the completed origins and clear that one upstream orientation flag.
+    Preserve the existing two-byte glyph normalization exactly once, the FPU
+    pipeline, sibling-object construction, and the reveal-progress callback.
     """
 
     try:
@@ -151,8 +184,14 @@ def patch_adv_horizontal_layout(raw: bytes) -> bytes:
     if len(live) != 1 or live[0].file_offset != 0x14FA60:
         raise ValueError("ADV layout preimage does not identify exactly one proven DG consumer")
 
+    for offset, expected in _ADV_SPEAKER_ROLE_PREIMAGES:
+        try:
+            _require_word(raw, offset, expected)
+        except ValueError as exc:
+            raise ValueError(f"ADV speaker layout preimage mismatch: {exc}") from exc
+
     result = bytearray(raw)
-    for offset, expected, replacement in ADV_DG_LAYOUT_PATCHES:
+    for offset, expected, replacement in (*ADV_DG_LAYOUT_PATCHES, *ADV_SPEAKER_LAYOUT_PATCHES):
         if offset + 4 > len(result):
             raise ValueError("ADV layout patch is outside executable")
         actual = struct.unpack_from("<I", result, offset)[0]

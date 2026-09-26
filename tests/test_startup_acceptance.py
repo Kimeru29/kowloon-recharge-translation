@@ -6,6 +6,13 @@ from pathlib import Path
 
 from tests.local_fixtures import require_local_fixture
 from tools.early_ui import build_early_ui_elf
+from tools.adv_layout import ADV_SPEAKER_LAYOUT_PATCHES
+from tools.hant_ui import (
+    HANT_CHROME_LABELS,
+    HANT_HELP_TOPICS,
+    HANT_TUTORIAL_FONT_STYLE_OFFSET,
+    HANT_TUTORIAL_ROW_SPACING_OFFSET,
+)
 from tools.menu_ui import MENU_LABELS
 from tools.startup_acceptance import STARTUP_GRAPHICS_PATHS, verify_startup_elf
 
@@ -26,6 +33,11 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_tutorial", names)
         self.assertIn("hant_inventory_proven_targets", names)
         self.assertIn("hant_wrapped_layout_payload", names)
+        self.assertIn("hant_tutorial_font_style", names)
+        self.assertIn("hant_tutorial_row_spacing", names)
+        self.assertIn("hant_chrome_labels", names)
+        self.assertIn("hant_help_topics", names)
+        self.assertIn("adv_speaker_horizontal_layout", names)
         self.assertIn("hant_unresolved_pristine", names)
         self.assertIn("memory_card_1", names)
         self.assertIn("memory_card_1_boot_aliases", names)
@@ -47,6 +59,8 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_tutorial", failed_names)
         self.assertIn("hant_inventory_proven_targets", failed_names)
         self.assertIn("hant_wrapped_layout_payload", failed_names)
+        self.assertIn("hant_tutorial_font_style", failed_names)
+        self.assertIn("hant_chrome_labels", failed_names)
         self.assertIn("name_prompt_0", failed_names)
         self.assertIn("name_flow_skip_reading", failed_names)
         self.assertIn("memory_card_1_boot_aliases", failed_names)
@@ -76,6 +90,33 @@ class StartupAcceptanceTests(unittest.TestCase):
                 check = next(check for check in verify_startup_elf(bytes(tampered)) if check["name"] == name)
                 self.assertFalse(check["ok"])
 
+    def test_hant_runtime_layout_acceptance_fails_closed_on_style_or_chrome_drift(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        cases = (
+            ("hant_tutorial_font_style", HANT_TUTORIAL_FONT_STYLE_OFFSET),
+            ("hant_tutorial_row_spacing", HANT_TUTORIAL_ROW_SPACING_OFFSET),
+            ("hant_chrome_labels", HANT_CHROME_LABELS[0].pointer_offset),
+            ("hant_help_topics", HANT_HELP_TOPICS[0].pointer_offset),
+        )
+        for name, offset in cases:
+            with self.subTest(name=name):
+                tampered = bytearray(translated)
+                tampered[offset] ^= 1
+                check = next(check for check in verify_startup_elf(bytes(tampered)) if check["name"] == name)
+                self.assertFalse(check["ok"])
+
+
+    def test_adv_speaker_acceptance_fails_closed_on_orientation_drift(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        offset = ADV_SPEAKER_LAYOUT_PATCHES[0][0]
+        tampered = bytearray(translated)
+        tampered[offset] ^= 1
+        check = next(
+            check for check in verify_startup_elf(bytes(tampered))
+            if check["name"] == "adv_speaker_horizontal_layout"
+        )
+        self.assertFalse(check["ok"])
+
     def test_v10_adv_patch_does_not_satisfy_v11_dg_layout_acceptance(self) -> None:
         old = bytearray(RAW)
         for offset, replacement in (
@@ -93,10 +134,11 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertFalse(check["ok"])
 
     def test_startup_graphics_manifest_is_complete_and_stable(self) -> None:
-        self.assertEqual(31, len(STARTUP_GRAPHICS_PATHS))
+        self.assertEqual(32, len(STARTUP_GRAPHICS_PATHS))
         self.assertEqual("BLBRD/B_GP019.BIN", STARTUP_GRAPHICS_PATHS[0])
-        self.assertEqual("BLBRD/B_GP088.BIN", STARTUP_GRAPHICS_PATHS[1])
-        self.assertEqual("BLBRD/INIT_MES/TR000.TMX", STARTUP_GRAPHICS_PATHS[2])
+        self.assertEqual("BLBRD/B_GP020.BIN", STARTUP_GRAPHICS_PATHS[1])
+        self.assertEqual("BLBRD/B_GP088.BIN", STARTUP_GRAPHICS_PATHS[2])
+        self.assertEqual("BLBRD/INIT_MES/TR000.TMX", STARTUP_GRAPHICS_PATHS[3])
         self.assertEqual("BLBRD/INIT_MES/TR028.TMX", STARTUP_GRAPHICS_PATHS[-1])
 
 

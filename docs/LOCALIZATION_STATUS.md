@@ -14,7 +14,7 @@ Status meanings:
 | Surface | Status | Evidence / next action |
 | --- | --- | --- |
 | 29 opening quotations (`TR000`-`TR028`) | **Working / runtime-proven** | v10 runtime confirmed English quotation artwork and observed different quotations across restarts. The 29 generated TMXs remain distinct and the executable selects `PRNG % 29` before formatting `TR%03d.TMX`. |
-| Pre-title memory-card status text | **Translated but buggy** | The log-confirmed v8 runtime still showed the Japanese stone-panel message. Static tracing proved the boot path uses two handler-local aliases at `0x4077F0` (`H_BootMcardChk`) and `0x4078D0` (`H_EmptyMcardChk`) that v8/v9 did not repoint. v10 moves both aliases with table entry 1 to official `Checking memory card slot 1`; runtime proof pending. |
+| Pre-title memory-card status text | **Translated but buggy** | v11 runtime showed the official `Checking memory card slot 1` text reaching the stone panel but clipping horizontally. v11-r4 intentionally does **not** change this surface: the accepted single-line official payload and both boot-handler aliases (`0x4077F0`, `0x4078D0`) remain as before. The clipping defect is still pending outside the r4 four-defect scope. |
 | GP088 startup/title artwork — direct `GP088_03` counterpart | **Not runtime-tested** | v9 retains the v8 same-name official English `b_gp088_en/GP088_03` port into PS2 `B_GP088.BIN`. |
 | GP088 PS2 packed title atlas (`GP088_12`) | **Not runtime-tested** | v9 proves that the two GP088_12 Japanese title variants are repacked GP088_03 regions (Dice 0.8758 / 0.8765 after excluding the known flattened banner band), then rebuilds GP088_12 from the official English GP088_03 regions. The official English remaster omits the flattened gold `re:charge` banner, so v9 removes it rather than synthesizing missing artwork. `GP088_13` is a separate already-English blue `re:charge` badge and remains unchanged. |
 | Title `New Game` / `Load Game` | **Not runtime-tested** | v10 runtime proved the exact strings but exposed the undersized purple backing. v11 statically ties the backing to the paired GP088_12 title objects and widens only their animation target to `17/9`; `title_english_backing_geometry` passes in the final ISO. The resized presentation still needs PCSX2 observation. |
@@ -29,12 +29,13 @@ Status meanings:
 | Reading-input states | **Translated but buggy** | The log-confirmed v8 run reached the PS2 reading editor and showed that its prompt now survives but clips. Reverse engineering proved this is a kana-specific second pass backed by `name/namedic.bin`; v10 reuses the existing post-reading transition and skips the pass entirely for English. |
 | Finish/advance after name-reading input | **Translated but buggy** | The log-confirmed v8 run still remained stuck after Finish, so the old heap collision was not the only flow defect. State 9 passes flag `0` to the shared `M_Name` transition and deliberately enters the kana-reading editor; state 11 passes flag `1` to the same routine and commits/finalizes. v10 changes only the state-9 flag to `1`, with exact instruction preimage checks, so English should skip the problematic reading phase. Runtime proof pending. |
 | `Is this fine?` / `Yes / No` | **Not runtime-tested** | Official English is statically present. v10 preserves the normal-name confirmation; an affirmative result now routes directly through the existing post-reading/finalization path instead of opening the kana-reading editor. |
-| License-ID messages | **Not runtime-tested** | `Verifying license ID...` and `ID verification complete.` are statically present. |
+| License-ID messages | **Not runtime-tested** | `Verifying license ID...` is the runtime-good 23-glyph reference at X=140. v11-r4 keeps both official strings and moves only the 25-glyph `ID verification complete.` X owner from 156 to 108 so both lines end at the same 508-pixel right edge in the traced 16-pixel renderer. The instruction preimage and final image are fail-closed; runtime proof of the unclipped completion line is pending. |
 | `Heracleion Shrine` | **Not runtime-tested** | Statically translated as wide executable text. |
-| H.A.N.T. tutorial | **Not runtime-tested** | v10 runtime exposed partial/clipped localization. v11 keeps the pristine 17-slot owner, reflows the mode-4 tutorial to the proven 26-cell visible width, preserves the 16-row/EOF shape, and relocates controller metadata with its English gaps. All three H.A.N.T. v11 acceptance checks pass; runtime presentation is pending. |
-| ADV horizontal dialogue renderer | **Not runtime-tested** | v10 runtime proved the old transform still rendered vertically. v11 traces the live constructor/progress-gate ownership and swaps only the completed coordinate output registers at the constructor, preserving the `/2` normalization and callback. `adv_dg_horizontal_layout` passes in the final ISO; runtime proof is pending. |
-| First old-man DG00 English dialogue | **Not runtime-tested** | The DG00 English content itself was runtime-proven in v10; only its presentation failed. v11 applies the newly proven horizontal renderer rule, but that presentation change has not yet been observed in PCSX2. |
+| H.A.N.T. tutorial | **Translated but buggy** | Original v11 runtime disproved the 16px presentation: the live page exposed only about 336 usable horizontal pixels and the 16-row reflow clipped vertically. v11-r4 switches only this mode-4 tutorial row constructor from existing font style 0 (16px) to existing style 1 (12px), giving a 28-cell budget across the same proven pixel span. The accepted wording now reflows to 14 rows with controller holes on rows 6/9/12; row spacing remains 21px and original sources stay pristine. Final-image checks pass; target-screen proof is pending. |
+| ADV horizontal dialogue renderer | **Translated but buggy** | Original v11 runtime proved the coordinate-origin swap was insufficient. Follow-up tracing showed the DG object constructs four font canvases and propagates one wrapper orientation argument to all four; r3 changed only a downstream canvas and therefore could leave speaker/body canvases vertical. v11-r4 keeps the proven coordinate transpose and changes the unique wrapper callsite at file `0x14E96C` from `a2=1` to `a2=0`, so all four DG canvases inherit horizontal advance. Final-image acceptance passes; corrected dialogue still needs runtime target-screen proof. |
+| First old-man DG00 English dialogue | **Translated but buggy** | The DG00 English content itself is runtime-proven, but original v11 still rendered it vertically. v11-r4 contains the upstream all-canvas orientation correction described above. The r4 ISO has **not** been launched in PCSX2; the old-man target screen still requires supervised runtime observation. |
 | DG00 English choices | **Not runtime-tested** | Reviewed KSF overrides/imports remain present; the accepted v10 observation did not explicitly promote this row. |
+| H.A.N.T. chrome labels | **Not runtime-tested** | v11-r4 proves the independent seven-entry live H.A.N.T. chrome owner table at file `0x586D20` and relocates `【Main Menu】`, `【Mail】`, `【Dictionary】`, `【Enemy】`, `【Memo】`, `【Help】`, and `【Config】` through those pointers. The owned remaster extraction does not expose the localized TextAsset, so these seven are explicitly **semantic translations**, not claimed official-remaster wording. Runtime proof is pending. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
@@ -145,33 +146,75 @@ The minimum v10 regression scope was:
 Any Japanese in the tested startup slice, corrupted/clipped text, appearance of the reading editor, freeze, wrong name state, or vertical English dialogue is a failed checkpoint.
 
 
-### v11 — static/deterministic candidate, awaiting supervised runtime
+### v11 — runtime failed presentation acceptance
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11.iso`
 - ISO SHA-256: `4150414b817fe54cf90ac28887568a37c6910995d7f8bc46e6887a6c4f6ef516`
-- translated ELF SHA-256 before ROFS rewrite: `edfca4471122c3f05c35c23a0d8c728ff45cc207b021ea2efca8af02c7003fac`
-- final post-ROFS ELF SHA-256: `9771bd9c031d7bcdb5e716c458d059feac6bdb2e31dd2fca6f4de7ca7f38e088`
-- translated/final ELF size: 8,403,944 bytes
+- final-image startup acceptance: **130/130** (`local/startup-acceptance-v11.json`)
+- deterministic rebuild: byte-for-byte identical
+
+The supervised v11 screenshots disproved two static renderer assumptions despite the clean verifier. ADV fragments had their origins transposed, but their font objects still carried orientation `a2=1`, so characters continued advancing vertically. H.A.N.T. was wrapped for a theoretical 26-cell canvas, while the live page exposed only about 21 cells; English clipped and one page was effectively blank. The pre-title memory-card wording was English but also clipped as a single line. Japanese H.A.N.T./Help chrome remained visible; those broader owners stay unresolved because the required official `English.bytes` corpus is absent.
+
+### v11-r3 — superseded correction candidate, target-screen proof pending
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r3.iso`
+- ISO SHA-256: `bbc7fa247288769679b1d41d83d5aba001ff194c9070825c7534b6af56097245`
+- translated ELF SHA-256 before ROFS rewrite: `5f7cbe627cdffbc52c55ce6ab2908732590c4d62f1200f81026db82396ffc711`
+- final post-ROFS ELF SHA-256: `17c3858f45ac26ac864cfe2e6434a05f7ee934d18d1ac2e74f0b59ac225b24f0`
+- translated/final ELF size: 8,403,932 bytes
 - overlays: 1,144 total; 891 in place / 253 relocated
 - executable relocated from outer extent 288 to 1,013,782
 - embedded growth: +900 sectors; 17 shifted outer files
 - executable ROFS records: 1,144 patched/re-resolved
 - whole ISO size unchanged: 2,095,382,528 bytes
-- dependency-free suite: **177 tests OK** (8 expected skips)
-- Pillow suite: **177 tests OK** (1 owned-corpus skip)
-- final-image startup acceptance: **130/130** (`local/startup-acceptance-v11.json`)
-- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-repeat.iso` has the same SHA-256 and is byte-for-byte identical (`cmp`)
-- runtime status: **not yet tested**; do not promote any v11 presentation surface from static evidence alone.
+- full suites: **178 tests OK** in both measured environments (8 expected local-dependency skips in each)
+- final-image startup acceptance: **130/130** (`local/startup-acceptance-v11-r3.json`)
+- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r3-repeat.iso` has the same SHA-256 and is byte-for-byte identical (`cmp`)
+- PCSX2 boot identity: log-confirmed exact `v11-r3` ISO, game CRC `6AF4B773`; boot reached the normal startup sequence.
+- runtime status: **target screens not yet re-observed**; no ADV/H.A.N.T./memory-card presentation fix is promoted to runtime-proven yet.
 
-#### Exact v11 supervised runtime checklist
+v11-r3 corrects the runtime-disproven mechanics rather than adding another cosmetic approximation. The ADV dialogue-fragment constructor now clears the vertical-advance orientation only for the proven DG fragment object while preserving the existing coordinate formulas/progress callback. H.A.N.T. uses the runtime-observed 21-cell viewport and 16-row budget, omitting only redundant presentation rows while preserving accepted body/instruction wording and controller holes at rows 8/11/14. The memory-card entry keeps the exact official wording but uses the already-supported line-break token as `Checking memory card` / `slot 1`.
 
-1. v10 boot/name flow still progresses without the kana-reading screen or freeze.
-2. memory-card/startup/title graphics retain accepted English behavior.
-3. `New Game` / `Load Game` fit fully inside the resized purple backing.
-4. H.A.N.T. tutorial/help pages show complete official English without clipping.
-5. menu labels match their proven actions and fit; unresolved labels remain intentionally Japanese rather than guessed.
-6. first old-man speaker/body dialogue is horizontal and readable, with PS2 scene art retained.
-7. at least one later translated dialogue page uses the same horizontal renderer rule without clipping.
-8. any vertical English, clipped translated text, wrong menu semantic, unexpected Japanese in a proven H.A.N.T. entry, or v10 regression fails the candidate.
+The r3 target screens were never re-observed, so its presentation changes remain historical static hypotheses rather than runtime proof.
 
-PCSX2 must not be launched until Pablo explicitly approves this checklist.
+### v11-r4 — historical deterministic correction candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r4.iso`
+- ISO SHA-256: `3566b2395165cf4ba4b34ebed874ba405f17c0d452753786cfc116ed80c494bb`
+- translated ELF SHA-256 before ROFS rewrite: `4501cee41d3941d40c687f9806b51aa0196f6c206132fd6614f3bbe8ee461a43`
+- final post-ROFS ELF SHA-256: `54690aed73a68d19e8b1fcd787e346086fbd3bb30dd9dea9b39b99acf93d3d9f`
+- translated/final ELF size: 8,404,046 bytes
+- overlays: 1,144 total; 891 in place / 253 relocated
+- executable relocated from outer extent 288 to 1,013,782
+- embedded growth: +900 sectors; 17 shifted outer files
+- executable ROFS records: 1,144 patched/re-resolved
+- whole ISO size unchanged: 2,095,382,528 bytes
+- dependency-free suite: **182 tests OK** (8 expected local/optional-dependency skips)
+- Pillow-enabled suite: **182 tests OK** (1 owned-corpus skip)
+- final-image startup acceptance: **132/132** (`local/startup-acceptance-v11-r4.json`)
+- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r4-repeat.iso` has the same builder SHA-256 and is byte-for-byte identical (`cmp`)
+- PCSX2 status: **not launched** for r4; no r4 target screen is runtime-proven yet.
+
+v11-r4 was intentionally limited to its four runtime defects while preserving the already-improved title/tablet geometry. It moves the license-completion X owner from 156 to 108, changes the unique DG wrapper orientation argument from vertical to horizontal for all four font canvases, changes only the mode-4 H.A.N.T. tutorial rows to the existing 12px font style and 28-cell/14-row reflow, and relocates the seven proven H.A.N.T. chrome labels with explicitly semantic English wording. The r3 memory-card wrapping experiment is **not** included; the known memory-card clipping remains a separate issue.
+
+The next supervised r4 runtime acceptance should verify exactly these targets plus regression safety: `ID verification complete.` is fully visible; the H.A.N.T. tutorial is compact/readable with no bottom clipping and its seven chrome labels are English; the first old-man dialogue is horizontal; and the previously accepted title/tablet centering remains unchanged. Memory-card clipping is not an r4 acceptance criterion.
+
+
+### v11-r5 — current deterministic correction candidate; Pablo runtime test pending
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r5.iso`
+- ISO SHA-256: `2ebee6fb45125fdfd826f15cb0a9eee09a66a861f39058103704a00244deb739`
+- translated ELF SHA-256 before ROFS rewrite: `6e385c38fd012d8d11a5e3f0f20220412506ed6aa43b75b8bd712035365a28fa`
+- final post-ROFS ELF SHA-256: `c3b228c946df9bae9d8aec81058a04801de1483191c28d5077087e1d9c2d3eee`
+- translated/final ELF size: 8,404,478 bytes
+- overlays: 1,145 total; 892 in place / 253 relocated
+- executable ROFS records: 1,145 patched/re-resolved
+- final-image startup acceptance: **137/137** (`local/startup-acceptance-v11-r5.json`)
+- dependency-free suite: **191 tests OK** (8 expected skips)
+- Pillow-enabled suite: **191 tests OK** (1 owned-corpus skip)
+- deterministic repeat ISO: byte-for-byte identical by `cmp`
+- PCSX2 status: **not launched**; Pablo will perform the runtime checks manually.
+
+r5 preserves the r4 title/tablet geometry and adds only the remaining screenshot-driven fixes. The separate speaker-name canvas now receives horizontal orientation independently of the body canvas. The H.A.N.T. tutorial retains the 12px/28-cell reflow but uses an 18px row stride; the 15 Help index aliases relocate to semantic English; and `GRP020/GP020_03.TMX` repaints nine baked caption regions to semantic English while preserving all non-caption pixels. The pre-title memory-card text now uses two visible lines: `Checking memory card` and `slot 1`.
+
+Manual acceptance targets: speaker label and dialogue body horizontal; full H.A.N.T. page visible vertically; Help/topic list and H.A.N.T. tile captions English; stone-panel text not clipped; title/tablet centering unchanged.

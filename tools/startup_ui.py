@@ -166,6 +166,35 @@ _NAME_FLOW_FLAG_ZERO_WORD = 0x0000282D  # daddu a1, zero, zero
 _NAME_FLOW_FLAG_ONE_WORD = 0x24050001   # addiu a1, zero, 1
 _NAME_FLOW_TRANSITION_JAL_WORD = 0x0C0A1788  # jal 0x285e20
 
+# License-status states use the same 16-pixel text renderer but different fixed
+# X origins. `Verifying license ID...` is 23 glyphs at X=140 and is runtime-good.
+# `ID verification complete.` is 25 glyphs, so X=108 preserves the same right
+# edge (508) without changing the official wording.
+_LICENSE_VERIFY_X_OFFSET = 0x181B70
+_LICENSE_COMPLETE_X_OFFSET = 0x181EAC
+_LICENSE_VERIFY_X_WORD = 0x3C02430C  # lui v0,0x430c -> 140.0f
+_LICENSE_COMPLETE_X_PRISTINE_WORD = 0x3C02431C  # lui v0,0x431c -> 156.0f
+_LICENSE_COMPLETE_X_ENGLISH_WORD = 0x3C0242D8  # lui v0,0x42d8 -> 108.0f
+
+
+def patch_license_completion_layout(raw: bytes) -> bytes:
+    for offset, expected in (
+        (_LICENSE_VERIFY_X_OFFSET, _LICENSE_VERIFY_X_WORD),
+        (_LICENSE_COMPLETE_X_OFFSET, _LICENSE_COMPLETE_X_PRISTINE_WORD),
+    ):
+        if offset + 4 > len(raw):
+            raise ValueError("License-status layout patch is outside executable")
+        actual = struct.unpack_from("<I", raw, offset)[0]
+        if actual != expected:
+            raise ValueError(
+                f"License-status layout preimage mismatch at {offset:#x}: "
+                f"expected {expected:#010x}, got {actual:#010x}"
+            )
+
+    result = bytearray(raw)
+    struct.pack_into("<I", result, _LICENSE_COMPLETE_X_OFFSET, _LICENSE_COMPLETE_X_ENGLISH_WORD)
+    return bytes(result)
+
 
 def patch_name_entry_flow(raw: bytes) -> bytes:
     expected = (
@@ -385,4 +414,5 @@ def build_startup_ui_elf(raw: bytes) -> bytes:
     titled = patch_title_labels(laid_out)
     relocated = patch_name_prompt_arena(titled)
     flowed = patch_name_entry_flow(relocated)
-    return patch_fixed_strings(flowed, STARTUP_FIXED_PATCHES)
+    license_layout = patch_license_completion_layout(flowed)
+    return patch_fixed_strings(license_layout, STARTUP_FIXED_PATCHES)

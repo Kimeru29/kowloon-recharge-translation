@@ -4,15 +4,19 @@ import struct
 from typing import Any
 from hashlib import sha256
 
-from tools.adv_layout import ADV_DG_LAYOUT_PATCHES
+from tools.adv_layout import ADV_DG_LAYOUT_PATCHES, ADV_SPEAKER_LAYOUT_PATCHES
 from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells
 from tools.hant_ui import (
+    HANT_CHROME_LABELS,
+    HANT_HELP_TOPICS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
     HANT_CONTROLLER_METADATA_OFFSET,
     HANT_CONTROLLER_METADATA_RECORDS,
     HANT_POINTER_TABLE_OFFSET,
     HANT_PRISTINE_CONTROLLER_METADATA_RECORDS,
     HANT_TUTORIAL_DESCRIPTOR_OFFSET,
+    HANT_TUTORIAL_FONT_STYLE_OFFSET,
+    HANT_TUTORIAL_ROW_SPACING_OFFSET,
     HANT_WRAPPED_LINES,
 )
 from tools.localization import encode_ps2_english
@@ -39,6 +43,7 @@ from tools.startup_ui import (
 
 STARTUP_GRAPHICS_PATHS: tuple[str, ...] = (
     "BLBRD/B_GP019.BIN",
+    "BLBRD/B_GP020.BIN",
     "BLBRD/B_GP088.BIN",
     *(f"BLBRD/INIT_MES/TR{index:03d}.TMX" for index in range(29)),
 )
@@ -59,7 +64,6 @@ _HANT_UNRESOLVED_SIGNATURES: tuple[tuple[int, tuple[int, ...], str | None], ...]
     (0x3BC7E8, (0x3BC8C4,), None),
     (0x575240, (0x694C10,), "　の情報を\n\nＨ．Ａ．Ｎ．Ｔに記録しました。\n"),
     (0x5860F0, (0x586374,), "　　　Ｈ．Ａ．Ｎ．Ｔ（Ｈｕｎｔｅｒ"),
-    (0x5876E0, (0x587840,), "Ｈ．Ａ．Ｎ．Ｔの機能"),
     (0x588410, (0x58856C,), "Ｈ．Ａ．Ｎ．Ｔ"),
     (0x5975F0, (0x597678, 0x5A3958), "このＨ．Ａ．Ｎ．Ｔに転送される。"),
     (0x599390, (0x5994BC,), "ルを貴方のＨ．Ａ．Ｎ．Ｔに転送するサービ"),
@@ -346,6 +350,17 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "proven DG coordinate-output swap is missing or stale",
         )
     )
+    adv_speaker_ok = all(
+        offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
+        for offset, _expected, replacement in ADV_SPEAKER_LAYOUT_PATCHES
+    )
+    checks.append(
+        _check(
+            "adv_speaker_horizontal_layout",
+            adv_speaker_ok,
+            "separate ADV speaker-name canvas is not using horizontal advance",
+        )
+    )
 
     segment = _translation_segment(raw)
     checks.append(_check("translation_segment", segment is not None, "translation PT_LOAD is not active/valid"))
@@ -457,6 +472,59 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         )
         hant_wrapped_ok = text_payload_ok and metadata_payload_ok
 
+    hant_style_ok = (
+        HANT_TUTORIAL_FONT_STYLE_OFFSET + 4 <= len(raw)
+        and struct.unpack_from("<I", raw, HANT_TUTORIAL_FONT_STYLE_OFFSET)[0] == 0x24050001
+    )
+    hant_spacing_ok = (
+        HANT_TUTORIAL_ROW_SPACING_OFFSET + 4 <= len(raw)
+        and struct.unpack_from("<I", raw, HANT_TUTORIAL_ROW_SPACING_OFFSET)[0] == 0x3C024190
+    )
+
+    hant_chrome_ok = segment is not None
+    if segment is not None:
+        p_offset, p_vaddr, p_filesz, _p_memsz = segment
+        for spec in HANT_CHROME_LABELS:
+            source = spec.source_text.encode("cp932") + b"\x00"
+            if raw[spec.source_offset:spec.source_offset + len(source)] != source:
+                hant_chrome_ok = False
+                break
+            if spec.pointer_offset + 4 > len(raw):
+                hant_chrome_ok = False
+                break
+            target_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+            relative = target_va - p_vaddr
+            expected = encode_ps2_english(spec.english, collapse_spaces=False) + b"\x00"
+            if relative < 0 or relative + len(expected) > p_filesz:
+                hant_chrome_ok = False
+                break
+            target_file = p_offset + relative
+            if raw[target_file:target_file + len(expected)] != expected:
+                hant_chrome_ok = False
+                break
+
+    hant_help_ok = segment is not None
+    if segment is not None:
+        p_offset, p_vaddr, p_filesz, _p_memsz = segment
+        for spec in HANT_HELP_TOPICS:
+            source = spec.source_text.encode("cp932") + b"\x00"
+            if raw[spec.source_offset:spec.source_offset + len(source)] != source:
+                hant_help_ok = False
+                break
+            if spec.pointer_offset + 4 > len(raw):
+                hant_help_ok = False
+                break
+            target_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+            relative = target_va - p_vaddr
+            expected = encode_ps2_english(spec.english, collapse_spaces=False) + b"\x00"
+            if relative < 0 or relative + len(expected) > p_filesz:
+                hant_help_ok = False
+                break
+            target_file = p_offset + relative
+            if raw[target_file:target_file + len(expected)] != expected:
+                hant_help_ok = False
+                break
+
     for source_offset, pointer_offsets, source_text in _HANT_UNRESOLVED_SIGNATURES:
         expected_va = _ELF_MAIN_VADDR + source_offset - _ELF_MAIN_FILE_OFFSET
         if source_text is not None:
@@ -483,7 +551,35 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         _check(
             "hant_wrapped_layout_payload",
             hant_wrapped_ok,
-            "wrapped H.A.N.T rows/icon metadata do not resolve within the proven 26-cell layout",
+            "wrapped H.A.N.T rows/icon metadata do not match the page-local 12px/28-cell profile",
+        )
+    )
+    checks.append(
+        _check(
+            "hant_tutorial_font_style",
+            hant_style_ok,
+            "H.A.N.T tutorial rows are not using the page-local 12px style",
+        )
+    )
+    checks.append(
+        _check(
+            "hant_tutorial_row_spacing",
+            hant_spacing_ok,
+            "H.A.N.T tutorial rows are not using the page-local 18px stride",
+        )
+    )
+    checks.append(
+        _check(
+            "hant_chrome_labels",
+            hant_chrome_ok,
+            "one or more H.A.N.T chrome labels do not resolve through the proven seven-entry owner table",
+        )
+    )
+    checks.append(
+        _check(
+            "hant_help_topics",
+            hant_help_ok,
+            "one or more H.A.N.T Help topic labels do not resolve through the proven 15-entry owner table",
         )
     )
     checks.append(
@@ -496,7 +592,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
     checks.append(
         _check(
             "hant_tutorial",
-            hant_inventory_ok and hant_wrapped_ok and hant_unresolved_ok,
+            hant_inventory_ok and hant_wrapped_ok and hant_style_ok and hant_spacing_ok and hant_unresolved_ok,
             "H.A.N.T tutorial relocation/layout invariant failed",
         )
     )
