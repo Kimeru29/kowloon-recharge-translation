@@ -29,11 +29,13 @@ _TITLE_RECORD_CONSUMER_WORDS: tuple[tuple[int, int], ...] = (
     (0x1ABE84, 0x2A220011),  # loop bound 17
 )
 
-# Records 11/12 are the two (88,12) instances.  m_title starts their X scale at
-# zero, attaches the same scale-animation helper to each immediately before the
-# menu text objects are created, and later presents both at X scale 1.0.  Record
-# 13 follows the same transition but is a distinct (88,11) asset.
-_TITLE_BACKING_OWNER_WORDS: tuple[tuple[int, int], ...] = (
+# Records 11/12 are the two (88,12) instances. Existing decoded-asset evidence
+# identifies GP088_12 as the packed two-variant TITLE atlas, and r5 runtime
+# disproved the earlier inference that these objects were menu-panel backings.
+# m_title still animates them adjacent to label creation; that temporal/alignment
+# correlation is recorded here without assigning false ownership. Record 13
+# follows the same transition but is a distinct (88,11) asset.
+_TITLE_PACKED_ART_OWNER_WORDS: tuple[tuple[int, int], ...] = (
     (0x1ABEA4, 0x8E020054),  # record 11 object
     (0x1ABEA8, 0xAC400060),  # initial scale X = 0
     (0x1ABEAC, 0x8E020058),  # record 12 object
@@ -48,10 +50,13 @@ _TITLE_BACKING_OWNER_WORDS: tuple[tuple[int, int], ...] = (
     (0x1AC7E0, 0xAC430060),  # presented scale X = 1.0
 )
 
-# The two generic text anchors are created at (68,299) and (380,299).  The
-# paired (88,12) records are at (64,296) and (376,296), an exact +4/+3 text
-# inset for both menu choices.  The two label strings are then resolved from the
-# pointer table and passed to VA 0x29A520.
+# The two generic title-label anchors are created at (68,299) and (380,299),
+# then their strings are passed to VA 0x29A520. That renderer advances one
+# two-byte title glyph every 16 px: m_title supplies f16=0 and the label state
+# adds the literal 16.0f. The pristine four-glyph Japanese labels therefore
+# center at X=100 and X=412. Exact English is 8/9 glyphs, so preserving those
+# centers requires X=36 and X=340 respectively. The renderer-owned group 2
+# 0x8E/0x8C reveal/chrome follows the same anchor automatically.
 _TITLE_LABEL_OWNER_WORDS: tuple[tuple[int, int], ...] = (
     (0x1ABF64, 0x3C024288),  # 68.0f
     (0x1ABF6C, 0x2402012B),  # 299
@@ -75,26 +80,31 @@ _TITLE_REVEAL_MARKER_WORDS: tuple[tuple[int, int], ...] = (
     (0x19A118, 0x2405008E),  # index 0x8E
     (0x19A128, 0x0C041F58),  # sprite constructor
     (0x19A130, 0xAE420000),  # stored at label object root
+    (0x19A198, 0x3C024180),  # 16.0f reveal/glyph advance component
     (0x19A1B8, 0x8E420000),  # load marker object
     (0x19A1BC, 0xC440003C),  # load marker X
     (0x19A1C0, 0x46010000),  # add reveal advance
     (0x19A1C4, 0xE440003C),  # store marker X
+    (0x19A220, 0x3C024180),  # same 16.0f component for per-glyph placement
     (0x19A2D8, 0x24040002),  # per-glyph group 2
     (0x19A2DC, 0x2405008C),  # per-glyph index 0x8C
 )
 
-# Runtime/title-renderer geometry: four pristine Japanese glyphs advance 16 px
-# each inside a 72 px panel with 4 px side padding.  The exact eight-glyph
-# official English labels therefore need 136 px while preserving that padding.
-TITLE_BACKING_SCALE_X = 17.0 / 9.0  # 136 / 72
-_TITLE_BACKING_TARGET_VECTOR_OFFSET = 0x6989C0
-_TITLE_THIRD_OBJECT_TARGET_VECTOR_OFFSET = 0x6989B8
-_TITLE_BACKING_TARGET_VECTOR_PREIMAGE = struct.pack("<ff", 1.0, 1.0)
-_TITLE_THIRD_OBJECT_TARGET_VECTOR_PREIMAGE = struct.pack("<ff", 1.0, 1.0)
-_TITLE_BACKING_VECTOR_CALL_WORD = 0x2787D750  # addiu a3,gp,-0x28b0
-_TITLE_THIRD_OBJECT_VECTOR_CALL_WORD = 0x2787D748   # addiu a3,gp,-0x28b8
-_TITLE_BACKING_VECTOR_CALL_OFFSETS = (0x1AC5C0, 0x1AC5E0)
+TITLE_NEW_GAME_X = 36.0
+TITLE_LOAD_GAME_X = 340.0
+_TITLE_NEW_GAME_X_OFFSET = 0x1ABF64
+_TITLE_LOAD_GAME_X_OFFSET = 0x1ABF84
+_TITLE_NEW_GAME_X_PREIMAGE = 0x3C024288  # lui v0,0x4288 -> 68.0f
+_TITLE_LOAD_GAME_X_PREIMAGE = 0x3C0243BE  # lui v0,0x43be -> 380.0f
+_TITLE_NEW_GAME_X_REPLACEMENT = 0x3C024210  # 36.0f
+_TITLE_LOAD_GAME_X_REPLACEMENT = 0x3C0243AA  # 340.0f
+
+# r5 changed these after misclassifying GP088_12 as a static menu backing. r6
+# deliberately leaves them pristine because GP088_12 is packed title artwork.
+_TITLE_PACKED_ART_TARGET_VECTOR_OFFSET = 0x6989C0
+_TITLE_PACKED_ART_TARGET_VECTOR_PREIMAGE = struct.pack("<ff", 1.0, 1.0)
 _TITLE_THIRD_OBJECT_VECTOR_CALL_OFFSET = 0x1AC600
+_TITLE_SHARED_VECTOR_CALL_WORD = 0x2787D750
 
 
 @dataclass(frozen=True)
@@ -106,7 +116,7 @@ class TitleLayoutRecord:
 
 
 @dataclass(frozen=True)
-class TitleBackingGeometry:
+class TitlePackedArtGeometry:
     record_offset: int
     group: int
     index: int
@@ -130,7 +140,7 @@ class TitleLayoutEvidence:
     string_arena_start: int
     string_pointer_table: int
     sprite_records: tuple[TitleLayoutRecord, ...]
-    backing_instances: tuple[TitleBackingGeometry, ...]
+    packed_title_instances: tuple[TitlePackedArtGeometry, ...]
     label_anchors: tuple[tuple[float, float], ...]
     reveal_marker: TitleRevealMarkerEvidence
     unrelated_record_bytes: tuple[tuple[int, bytes], ...]
@@ -153,9 +163,11 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
     """Return fail-closed static evidence for the title menu layout owner.
 
     Evidence is deliberately split into three classes: the bounded m_title
-    sprite table, the paired GP088_12 objects aligned behind the two menu-label
-    anchors, and the label renderer's dynamic group-2/index-0x8E reveal marker.
-    No arbitrary floats outside the proven title-state region are interpreted.
+    sprite table, the paired GP088_12 packed-title objects that happen to animate
+    adjacent to label creation, and the label renderer's dynamic group-2/index-
+    0x8E/0x8C chrome path. Runtime evidence is authoritative over the discarded
+    GP088_12-as-menu-backing inference. No arbitrary floats outside the proven
+    title-state region are interpreted.
     """
 
     if _TITLE_RECORD_END > len(raw):
@@ -177,7 +189,7 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
         )
 
     _require_words(raw, _TITLE_RECORD_CONSUMER_WORDS, "m_title record consumer")
-    _require_words(raw, _TITLE_BACKING_OWNER_WORDS, "title backing owner")
+    _require_words(raw, _TITLE_PACKED_ART_OWNER_WORDS, "packed title-art owner")
     _require_words(raw, _TITLE_LABEL_OWNER_WORDS, "title label owner")
     _require_words(raw, _TITLE_REVEAL_MARKER_WORDS, "title reveal marker")
 
@@ -198,10 +210,10 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
 
     paired = tuple(record for record in records if (record.group, record.index) == (88, 12))
     if tuple(record.file_offset for record in paired) != (0x5CBF3C, 0x5CBF50):
-        raise ValueError("title layout preimage mismatch for paired GP088_12 backing records")
+        raise ValueError("title layout preimage mismatch for paired GP088_12 packed-title records")
 
-    backings = tuple(
-        TitleBackingGeometry(
+    packed_title = tuple(
+        TitlePackedArtGeometry(
             record_offset=record.file_offset,
             group=record.group,
             index=record.index,
@@ -215,15 +227,17 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
     )
     label_anchors = ((68.0, 299.0), (380.0, 299.0))
 
-    for backing, anchor in zip(backings, label_anchors, strict=True):
-        if (anchor[0] - backing.x, anchor[1] - backing.y) != (4.0, 3.0):
-            raise ValueError("title layout preimage mismatch for label/backing alignment")
+    # Keep the observed +4/+3 relationship as evidence only. r5 runtime proved
+    # that proximity does not imply that GP088_12 owns the visible menu panels.
+    for art, anchor in zip(packed_title, label_anchors, strict=True):
+        if (anchor[0] - art.x, anchor[1] - art.y) != (4.0, 3.0):
+            raise ValueError("title layout preimage mismatch for label/packed-art alignment")
 
     return TitleLayoutEvidence(
         string_arena_start=TITLE_STRING_ARENA_START,
         string_pointer_table=TITLE_STRING_POINTER_TABLE,
         sprite_records=tuple(records),
-        backing_instances=backings,
+        packed_title_instances=packed_title,
         label_anchors=label_anchors,
         reveal_marker=TitleRevealMarkerEvidence(
             file_offset=0x19A118,
@@ -238,40 +252,46 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
         ),
         evidence=(
             "proven: title-state constructor copies exactly 17 20-byte GP088/GP091 records from VA 0x006CBDE0 and instantiates each through VA 0x107D60",
-            "proven: records 11/12 are the only two (group 88,index 12) instances, at (64,296) and (376,296), and resolve to GRP088/GP088_12.TMX",
-            "proven: the two menu text anchors are (68,299) and (380,299), giving the same +4/+3 inset over the paired GP088_12 instances",
-            "proven: m_title initializes both GP088_12 instances with X scale 0, activates them immediately before constructing the two text labels, and later presents both at X scale 1",
-            "proven: group 2/index 0x8E is not a static backing; the label state machine mutates its X coordinate during reveal before creating per-glyph group 2/index 0x8C sprites",
+            "proven: records 11/12 are the only two (group 88,index 12) instances, at (64,296) and (376,296), and resolve to GRP088/GP088_12.TMX packed title art",
+            "proven: existing decoded GP088_12 asset is the packed two-variant vertical title atlas; r5 runtime disproves treating its +4/+3 proximity to label anchors as menu-panel ownership",
+            "proven: title labels use anchors (68,299)/(380,299), f16=0, and the label state adds a literal 16.0f per two-byte glyph",
+            "proven: m_title initializes both GP088_12 packed-title instances with X scale 0, activates them immediately before constructing labels, and later presents both at X scale 1",
+            "proven: group 2/index 0x8E is the moving reveal marker and per-glyph group 2/index 0x8C follows the same title-label anchor path",
         ),
     )
 
 def patch_title_layout(raw: bytes) -> bytes:
-    """Widen only the two proven title-label backing instances.
+    """Recenter the exact English title labels while preserving title artwork.
 
-    The first two scale animations share the gp-relative ``(1,1)`` target at
-    0x798940.  The third animation belongs to an unrelated title-state object.  Redirect the
-    footer to the adjacent pristine ``(1,1)`` vector, then change the now-unique
-    backing target to ``(17/9,1)``.  This keeps the animation behavior and Y
-    scale intact while preserving the original four-pixel text padding.
+    r5 widened GP088_12 after a static correlation was mistaken for ownership.
+    The decoded texture and r5 runtime contradict that inference: GP088_12 is
+    packed title art. r6 therefore leaves its animation target pristine and
+    changes only the two title-specific text-anchor X immediates. The label
+    renderer's own group-2 reveal/per-glyph chrome is derived from those anchors,
+    so text and its dynamic presentation move together without touching art.
     """
 
-    # Reuse the complete Task-4 ownership proof as the structural preimage.
     inspect_title_layout(raw)
 
-    if raw[_TITLE_BACKING_TARGET_VECTOR_OFFSET:_TITLE_BACKING_TARGET_VECTOR_OFFSET + 8] != _TITLE_BACKING_TARGET_VECTOR_PREIMAGE:
-        raise ValueError("title layout patch preimage mismatch for backing target vector")
-    if raw[_TITLE_THIRD_OBJECT_TARGET_VECTOR_OFFSET:_TITLE_THIRD_OBJECT_TARGET_VECTOR_OFFSET + 8] != _TITLE_THIRD_OBJECT_TARGET_VECTOR_PREIMAGE:
-        raise ValueError("title layout patch preimage mismatch for third-object target vector")
+    if raw[
+        _TITLE_PACKED_ART_TARGET_VECTOR_OFFSET:_TITLE_PACKED_ART_TARGET_VECTOR_OFFSET + 8
+    ] != _TITLE_PACKED_ART_TARGET_VECTOR_PREIMAGE:
+        raise ValueError("title layout preimage mismatch for packed title-art target vector")
+    if struct.unpack_from("<I", raw, _TITLE_THIRD_OBJECT_VECTOR_CALL_OFFSET)[0] != _TITLE_SHARED_VECTOR_CALL_WORD:
+        raise ValueError("title layout preimage mismatch for third packed-art animation call")
 
-    for offset in _TITLE_BACKING_VECTOR_CALL_OFFSETS:
+    for offset, expected in (
+        (_TITLE_NEW_GAME_X_OFFSET, _TITLE_NEW_GAME_X_PREIMAGE),
+        (_TITLE_LOAD_GAME_X_OFFSET, _TITLE_LOAD_GAME_X_PREIMAGE),
+    ):
         actual = struct.unpack_from("<I", raw, offset)[0]
-        if actual != _TITLE_BACKING_VECTOR_CALL_WORD:
-            raise ValueError(f"title layout patch preimage mismatch for backing vector call at {offset:#x}")
-    footer_actual = struct.unpack_from("<I", raw, _TITLE_THIRD_OBJECT_VECTOR_CALL_OFFSET)[0]
-    if footer_actual != _TITLE_BACKING_VECTOR_CALL_WORD:
-        raise ValueError("title layout patch preimage mismatch for third-object vector call")
+        if actual != expected:
+            raise ValueError(
+                f"title layout preimage mismatch for label anchor at {offset:#x}: "
+                f"expected {expected:#010x}, got {actual:#010x}"
+            )
 
     result = bytearray(raw)
-    struct.pack_into("<f", result, _TITLE_BACKING_TARGET_VECTOR_OFFSET, TITLE_BACKING_SCALE_X)
-    struct.pack_into("<I", result, _TITLE_THIRD_OBJECT_VECTOR_CALL_OFFSET, _TITLE_THIRD_OBJECT_VECTOR_CALL_WORD)
+    struct.pack_into("<I", result, _TITLE_NEW_GAME_X_OFFSET, _TITLE_NEW_GAME_X_REPLACEMENT)
+    struct.pack_into("<I", result, _TITLE_LOAD_GAME_X_OFFSET, _TITLE_LOAD_GAME_X_REPLACEMENT)
     return bytes(result)

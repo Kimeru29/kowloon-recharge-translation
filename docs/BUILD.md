@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v11-r5 result: 191 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11-r6 result: 198 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -503,7 +503,7 @@ Do not launch r4 automatically. PCSX2 has not been launched for this candidate. 
 
 ## Build startup v11-r5 candidate
 
-v11-r5 is the current correction pass after Pablo's r4 screenshot review. It preserves the accepted title/tablet geometry and adds only the remaining runtime-facing owners: the separate speaker-name orientation, the H.A.N.T. 18px row stride and 15-entry Help topic table, the two-line memory-card boot message, and the baked GP020 caption atlas. GP020 wording/art is semantic because the current owned PS4 extraction does not expose a localized GP020 bundle.
+v11-r5 was the correction pass after Pablo's r4 screenshot review. It added the then-assumed separate speaker-name orientation, the H.A.N.T. 18px row stride and 15-entry Help topic table, the two-line memory-card boot message, and the baked GP020 caption atlas. Pablo later runtime-tested r5; its results now serve as the preservation/failure baseline for r6. GP020 wording/art is semantic because the current owned PS4 extraction does not expose a localized GP020 bundle.
 
 The generated local `BLBRD/B_GP020.BIN` is a same-size transform of pristine `GRP020/GP020_03.TMX`. Its nine caption rectangles are pinned by SHA-256 preimages and only the existing H.A.N.T.-green indexed pixels inside those rectangles may change.
 
@@ -538,4 +538,42 @@ Measured v11-r5 static/deterministic result:
 - Pillow-enabled suite: **191 tests OK** (1 owned-corpus skip);
 - deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r5-repeat.iso` is byte-for-byte identical by `cmp`.
 
-Do not launch r5 automatically. Pablo will perform the runtime checks manually.
+r5 was subsequently runtime-tested manually by Pablo. Preserve its runtime-good GP020 top-level tile artwork and 12px/18px H.A.N.T. tutorial presentation; see `docs/LOCALIZATION_STATUS.md` for the failures that motivated r6.
+
+## Build startup v11-r6 candidate
+
+v11-r6 keeps the r5 graphics/corpus overlays and stone-tablet line split. It changes only evidence-backed executable owners: the true bracket-derived inline speaker text mode, the title label anchors while restoring pristine packed-title scaling, all three Help category/topic owner tables, and the nine-entry Config label table.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r6.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r6.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r6.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r6.json
+```
+
+Measured v11-r6 static/deterministic result:
+
+- pristine ISO SHA-256: `29e305e344c146e1416cca498e2d288718075380552d37886d9b469717779476`;
+- translated ELF SHA-256 before ISO ROFS rewrite: `06b76b01e9ef1364f5c67473edaf1b68b367512ba0af7dd1ad533f726b64ecfa`;
+- final post-ROFS ELF SHA-256: `0fe52d198679c9c2eb4784cab12a554f4569488af018fd9778c3b72ca031b0eb`;
+- translated/final ELF size: 8,405,736 bytes; outer extent relocated from 288 to 1,013,782;
+- ISO SHA-256: `dbd25ff8ada4724d6c280a32199dd3ef7fc49442923d904db56359ed02ef32a4`;
+- 1,145 overlays; 892 in place / 253 relocated; 1,145 ROFS records patched/re-resolved;
+- +900 embedded sectors; 17 shifted outer files; whole ISO remains 2,095,382,528 bytes;
+- final-image startup verifier: **139/139**;
+- dependency-free suite: **198 tests OK** (8 expected skips);
+- Pillow-enabled suite: **198 tests OK** (1 owned-corpus skip);
+- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r6-repeat.iso` has the same SHA-256 and is byte-for-byte identical by `cmp`.
+
+Do not launch r6 automatically. Pablo is the runtime tester; the exact r6 visual gate is in `docs/LOCALIZATION_STATUS.md`.

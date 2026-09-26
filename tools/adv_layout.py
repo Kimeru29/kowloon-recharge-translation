@@ -130,21 +130,39 @@ def inspect_adv_coordinate_consumers(raw: bytes) -> tuple[AdvCoordinateConsumer,
 # draw callback advances Y per character. English must transpose the finished
 # origins AND clear the single upstream constructor orientation. The FPU formulas
 # and signed byte-position /2 normalization remain unchanged.
-# Runtime r4 proved the bracket-derived speaker label is a distinct font object
-# from the ordinary DG body.  The state machine at VA 0x251470 reads speaker
-# state from global +0x444, builds per-speaker canvases, and writes the resolved
-# speaker string into those canvases at VA 0x2516A8.  Its font constructor call
-# at VA 0x251594 passes orientation=1 independently of the DG body constructor.
+# Runtime r5 disproved the earlier assumption that the 0x251470 record renderer
+# owns the visible ``【speaker】`` label. The DG script dispatcher recognizes the
+# CP932 opening bracket (0x81,0x79), routes it to 0x250B10 -> 0x250530, and that
+# parser copies the resolved speaker name to global +0x198. The live renderer at
+# VA 0x24FFF8 passes exactly global +0x198 to 0x190A50. Its a1 text mode is stored
+# on the created object at +0x0C; modes 0/1 use the 0x192400 mesh path while mode
+# 2 takes the alternate 0x18F6F0 path. Pristine speaker mode=2 is therefore a
+# separate vertical-style path from the body fragments, which already use mode=1.
+#
+# Keep the r5 0x251470 orientation patch for now because it is a distinct ADV
+# record-label renderer and removing an already-shipped change without runtime
+# evidence would risk a regression. It is no longer classified as the inline DG
+# speaker owner.
 _ADV_SPEAKER_ROLE_PREIMAGES: tuple[tuple[int, int], ...] = (
-    (0x1514F0, 0x27BDFF30),  # state-machine prologue at VA 0x251470
-    (0x151554, 0x80430444),  # lb v1,0x444(v0): speaker state
-    (0x15158C, 0x0C094700),  # jal 0x251C00: speaker coordinate builder
-    (0x151614, 0x0C062FC4),  # jal 0x18BF10: font canvas constructor
-    (0x151728, 0x0C063074),  # jal 0x18C1D0: write resolved speaker string
+    (0x11597C, 0x24020081),  # dispatcher: first CP932 bracket byte 0x81
+    (0x115988, 0x92030001),  # dispatcher: load second bracket byte
+    (0x11598C, 0x24020079),  # dispatcher: second CP932 bracket byte 0x79
+    (0x1159E8, 0x0C0942C4),  # bracket path -> jal 0x250B10
+    (0x1506F8, 0x24640198),  # parser destination: global +0x198
+    (0x150078, 0x24470198),  # live renderer a3 = global +0x198
+    (0x15007C, 0x0C064294),  # live renderer -> jal 0x190A50
+    (0x090C98, 0x8E23000C),  # ctor reads text mode saved at object +0x0C
+    (0x090CA4, 0x24020001),  # mode 1 selects the horizontal mesh branch
+    (0x1514F0, 0x27BDFF30),  # distinct r5 record-label state machine
+    (0x151614, 0x0C062FC4),  # its separate 0x18BF10 font canvas constructor
 )
 
 ADV_SPEAKER_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
-    (0x151608, 0x24060001, 0x24060000),  # a2=1 vertical -> a2=0 horizontal
+    # Inline bracket-derived DG speaker: text mode 2 -> same horizontal mode 1
+    # used by ordinary dialogue fragments. This is the runtime-visible owner.
+    (0x15006C, 0x24050002, 0x24050001),
+    # Retain the r5 record-label orientation until runtime proves it is dead.
+    (0x151608, 0x24060001, 0x24060000),
 )
 
 ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (

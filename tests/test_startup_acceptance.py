@@ -8,8 +8,10 @@ from tests.local_fixtures import require_local_fixture
 from tools.early_ui import build_early_ui_elf
 from tools.adv_layout import ADV_SPEAKER_LAYOUT_PATCHES
 from tools.hant_ui import (
+    HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
-    HANT_HELP_TOPICS,
+    HANT_CONFIG_LABELS,
+    HANT_HELP_CATEGORY_LABELS,
     HANT_TUTORIAL_FONT_STYLE_OFFSET,
     HANT_TUTORIAL_ROW_SPACING_OFFSET,
 )
@@ -37,6 +39,8 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_tutorial_row_spacing", names)
         self.assertIn("hant_chrome_labels", names)
         self.assertIn("hant_help_topics", names)
+        self.assertIn("hant_config_labels", names)
+        self.assertIn("hant_help_category_labels", names)
         self.assertIn("adv_speaker_horizontal_layout", names)
         self.assertIn("hant_unresolved_pristine", names)
         self.assertIn("memory_card_1", names)
@@ -46,7 +50,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("name_prompt_2", names)
         self.assertIn("name_prompt_3", names)
         self.assertIn("runtime_name_Habaki", names)
-        self.assertIn("title_english_backing_geometry", names)
+        self.assertIn("title_english_label_geometry", names)
         self.assertIn("menu_semantic_fixed_labels", names)
         self.assertIn("menu_relocated_labels", names)
         self.assertIn("menu_unresolved_pristine", names)
@@ -61,10 +65,12 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_wrapped_layout_payload", failed_names)
         self.assertIn("hant_tutorial_font_style", failed_names)
         self.assertIn("hant_chrome_labels", failed_names)
+        self.assertIn("hant_config_labels", failed_names)
+        self.assertIn("hant_help_category_labels", failed_names)
         self.assertIn("name_prompt_0", failed_names)
         self.assertIn("name_flow_skip_reading", failed_names)
         self.assertIn("memory_card_1_boot_aliases", failed_names)
-        self.assertIn("title_english_backing_geometry", failed_names)
+        self.assertIn("title_english_label_geometry", failed_names)
         self.assertIn("menu_semantic_fixed_labels", failed_names)
         self.assertIn("menu_relocated_labels", failed_names)
         self.assertNotIn("menu_unresolved_pristine", failed_names)
@@ -96,7 +102,10 @@ class StartupAcceptanceTests(unittest.TestCase):
             ("hant_tutorial_font_style", HANT_TUTORIAL_FONT_STYLE_OFFSET),
             ("hant_tutorial_row_spacing", HANT_TUTORIAL_ROW_SPACING_OFFSET),
             ("hant_chrome_labels", HANT_CHROME_LABELS[0].pointer_offset),
-            ("hant_help_topics", HANT_HELP_TOPICS[0].pointer_offset),
+            ("hant_config_labels", HANT_CONFIG_LABELS[0].pointer_offset),
+            ("hant_help_category_labels", HANT_HELP_CATEGORY_LABELS[0].pointer_offset),
+            ("hant_help_topics", HANT_ALL_HELP_TOPICS[0].pointer_offset),
+            ("hant_help_topics", HANT_ALL_HELP_TOPICS[-1].pointer_offset),
         )
         for name, offset in cases:
             with self.subTest(name=name):

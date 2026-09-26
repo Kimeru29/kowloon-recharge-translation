@@ -26,6 +26,26 @@ HANT_TUTORIAL_DESCRIPTOR_OFFSET = 0x5CBAB0
 # controller metadata list at VA 0x006C8A20 through this independent leaf.
 HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET = 0x5CBA60
 HANT_CONTROLLER_METADATA_OFFSET = 0x5C8AA0
+# The Help UI has three sibling topic pointer tables. This descriptor vector is
+# static ownership evidence independent of any one runtime screenshot:
+#   [ADV topics, ruins/exploration topics, H.A.N.T/system topics].
+# r5 translated only the third table, which explains why deeper Help pages still
+# appeared in Japanese at runtime even though the H.A.N.T-specific list was done.
+HANT_HELP_CATEGORY_DESCRIPTOR_OFFSET = 0x587890
+_HANT_HELP_CATEGORY_TABLE_OFFSETS = (0x587430, 0x587690, 0x587840)
+# Separate three-label tab/category table consumed directly by the live Help
+# renderer at VA 0x28C798..0x28C7BC. This is presentation chrome, not Help body
+# text, so it has its own owner/preimage rather than being inferred from the
+# topic-table descriptor above.
+HANT_HELP_CATEGORY_LABEL_TABLE_OFFSET = 0x587288
+_HANT_HELP_CATEGORY_RENDERER_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x18C818, 0x3C030068),  # lui v1,0x68
+    (0x18C81C, 0x24637208),  # addiu v1,v1,0x7208 -> VA 0x00687208
+    (0x18C820, 0x00711821),  # addu v1,v1,s1 -> indexed slot
+    (0x18C828, 0x8C650000),  # lw a1,0(v1) -> category label pointer
+    (0x18C82C, 0x0C062820),  # jal 0x18A080 -> text writer
+    (0x18C838, 0x2A620003),  # slti v0,s3,3 -> exactly three labels
+)
 # Mode-4 tutorial row constructor at VA 0x2908E8. Pristine style 0 is 16x18;
 # existing style 1 is 12x12 and reduces English glyph advance without a global
 # font change or injected call path.
@@ -68,6 +88,26 @@ class HantHelpTopic:
     provenance: str = "semantic"
 
 
+@dataclass(frozen=True)
+class HantConfigLabel:
+    key: str
+    source_offset: int
+    pointer_offset: int
+    source_text: str
+    english: str
+    provenance: str = "semantic"
+
+
+@dataclass(frozen=True)
+class HantHelpCategoryLabel:
+    key: str
+    source_offset: int
+    pointer_offset: int
+    source_text: str
+    english: str
+    provenance: str = "semantic"
+
+
 # Runtime ownership is proven independently of translation provenance: the seven
 # pointers at file 0x586D20 are indexed by the live H.A.N.T. chrome renderer at
 # VA 0x2881B0/0x2881C0. The owned remaster extraction does not expose the
@@ -85,11 +125,96 @@ HANT_CHROME_LABELS: tuple[HantChromeLabel, ...] = (
 )
 
 
-# The Help index shown in the H.A.N.T screenshot is a separate 15-entry pointer
-# table at file 0x587840. Each pointer resolves one visible Japanese topic label;
-# preserving the source strings while relocating those exact aliases keeps the
-# owner boundary explicit. Wording is semantic because the current owned PS4
-# extraction no longer exposes the localized bundle/TextAsset for this screen.
+# Config ownership is direct executable evidence, not adjacency: VA 0x28BC24
+# materializes 0x00686E70 (file 0x586EF0), indexes it by the loop byte offset,
+# loads the pointed label, and passes it to the generic text writer. The loop at
+# VA 0x28BC44 is bounded to exactly nine entries. Two labels live in the shared
+# high data arena; the other seven are adjacent to the pointer table. No owned
+# localized PS4 corpus is currently available, so wording is semantic.
+HANT_CONFIG_POINTER_TABLE_OFFSET = 0x586EF0
+_HANT_CONFIG_RENDERER_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x18BCA4, 0x3C030068),  # lui v1,0x68
+    (0x18BCA8, 0x24636E70),  # addiu v1,v1,0x6e70 -> table VA 0x00686E70
+    (0x18BCAC, 0x00711821),  # addu v1,v1,s1 -> indexed slot
+    (0x18BCB4, 0x8C650000),  # lw a1,0(v1) -> label pointer
+    (0x18BCB8, 0x0C062820),  # jal 0x18A080 -> text writer
+    (0x18BCC4, 0x2A420009),  # slti v0,s2,9 -> exactly nine rows
+)
+HANT_CONFIG_LABELS: tuple[HantConfigLabel, ...] = (
+    HantConfigLabel("voice_sfx_volume", 0x586E30, 0x586EF0, "声・効果音の音量", "Voice/SFX Volume"),
+    HantConfigLabel("bgm_volume", 0x586E48, 0x586EF4, "ＢＧＭの音量", "BGM Volume"),
+    HantConfigLabel("emotion_speed", 0x586E60, 0x586EF8, "感情入力の変化速度", "Emotion Speed"),
+    HantConfigLabel("walk_camera", 0x586E80, 0x586EFC, "歩行時のカメラ演出", "Walk Camera"),
+    HantConfigLabel("vibration", 0x586EA0, 0x586F00, "コントローラの振動", "Vibration"),
+    HantConfigLabel("audio", 0x695898, 0x586F04, "音響", "Audio"),
+    HantConfigLabel("message_icon", 0x586EC0, 0x586F08, "メッセージアイコン", "Message Icon"),
+    HantConfigLabel("voice_nav", 0x586ED8, 0x586F0C, "ボイスナビ", "Voice Nav"),
+    HantConfigLabel("ringtone", 0x6958A0, 0x586F10, "着メロ", "Ringtone"),
+)
+
+
+# The Help category renderer owns these three tabs independently from the three
+# topic pointer tables. The owned remaster extraction does not expose localized
+# source text for this PS2-only owner, so these concise labels are semantic.
+HANT_HELP_CATEGORY_LABELS: tuple[HantHelpCategoryLabel, ...] = (
+    HantHelpCategoryLabel("adv", 0x695908, 0x587288, "ＡＤＶ", "ADV"),
+    HantHelpCategoryLabel("exploration", 0x587278, 0x58728C, "遺跡探索", "Exploration"),
+    HantHelpCategoryLabel("other", 0x695910, 0x587290, "その他", "Other"),
+)
+
+
+# The Help root owns three sibling topic lists through the contiguous descriptor
+# vector at 0x587890. The owned PS4 extraction does not currently contain the
+# localized TextAsset/English.bytes corpus, so every newly promoted label below
+# is explicitly semantic rather than claimed as official-remaster wording.
+HANT_ADV_HELP_TOPICS: tuple[HantHelpTopic, ...] = (
+    HantHelpTopic("adv_controls", 0x5872A0, 0x587430, "ＡＤＶでの基本操作", "ADV Controls"),
+    HantHelpTopic("adv_auto_advance", 0x5872C0, 0x587434, "メッセージの自動送り", "Auto-Advance Messages"),
+    HantHelpTopic("adv_message_log", 0x5872E0, 0x587438, "メッセージログの閲覧", "Message Log"),
+    HantHelpTopic("adv_emotion_system", 0x587300, 0x58743C, "感情入力システムとは", "Emotion Input System"),
+    HantHelpTopic("adv_emotion_controls", 0x587320, 0x587440, "感情入力画面での操作", "Emotion Input Controls"),
+    HantHelpTopic("adv_06", 0x587338, 0x587444, "ＡＤＶ０６", "ADV 06"),
+    HantHelpTopic("adv_07", 0x587348, 0x587448, "ＡＤＶ０７", "ADV 07"),
+    HantHelpTopic("adv_08", 0x587358, 0x58744C, "ＡＤＶ０８", "ADV 08"),
+    HantHelpTopic("adv_09", 0x587368, 0x587450, "ＡＤＶ０９", "ADV 09"),
+    HantHelpTopic("adv_10", 0x587378, 0x587454, "ＡＤＶ１０", "ADV 10"),
+    HantHelpTopic("adv_11", 0x587388, 0x587458, "ＡＤＶ１１", "ADV 11"),
+    HantHelpTopic("adv_12", 0x587398, 0x58745C, "ＡＤＶ１２", "ADV 12"),
+    HantHelpTopic("adv_13", 0x5873A8, 0x587460, "ＡＤＶ１３", "ADV 13"),
+    HantHelpTopic("adv_14", 0x5873B8, 0x587464, "ＡＤＶ１４", "ADV 14"),
+    HantHelpTopic("adv_15", 0x5873C8, 0x587468, "ＡＤＶ１５", "ADV 15"),
+    HantHelpTopic("adv_16", 0x5873D8, 0x58746C, "ＡＤＶ１６", "ADV 16"),
+    HantHelpTopic("adv_17", 0x5873E8, 0x587470, "ＡＤＶ１７", "ADV 17"),
+    HantHelpTopic("adv_18", 0x5873F8, 0x587474, "ＡＤＶ１８", "ADV 18"),
+    HantHelpTopic("adv_19", 0x587408, 0x587478, "ＡＤＶ１９", "ADV 19"),
+    HantHelpTopic("adv_20", 0x587418, 0x58747C, "ＡＤＶ２０", "ADV 20"),
+)
+
+HANT_EXPLORATION_HELP_TOPICS: tuple[HantHelpTopic, ...] = (
+    HantHelpTopic("exploration_controls", 0x587480, 0x587690, "遺跡内探索時の操作", "Exploration Controls"),
+    HantHelpTopic("moving_in_ruins", 0x587498, 0x587694, "遺跡内での移動", "Moving in Ruins"),
+    HantHelpTopic("reading_display", 0x5874B0, 0x587698, "ディスプレイの見方", "Reading the Display"),
+    HantHelpTopic("opening_doors", 0x5874C8, 0x58769C, "扉の開き方", "Opening Doors"),
+    HantHelpTopic("opening_containers", 0x5874D8, 0x5876A0, "箱や壷の開き方", "Opening Boxes/Jars"),
+    HantHelpTopic("unlocking_locks", 0x5874E8, 0x5876A4, "鍵の外し方", "Unlocking Locks"),
+    HantHelpTopic("moving_objects", 0x587500, 0x5876A8, "設置物の動かし方", "Moving Objects"),
+    HantHelpTopic("operating_switches", 0x587520, 0x5876AC, "スイッチの動かし方", "Operating Switches"),
+    HantHelpTopic("command_palette", 0x587540, 0x5876B0, "コマンドパレット", "Command Palette"),
+    HantHelpTopic("radar_icons", 0x587560, 0x5876B4, "レーダーアイコン", "Radar Icons"),
+    HantHelpTopic("enemy_icons", 0x587580, 0x5876B8, "エネミーアイコン", "Enemy Icons"),
+    HantHelpTopic("entering_battle", 0x587598, 0x5876BC, "探索から戦闘へ", "Entering Battle"),
+    HantHelpTopic("turn_based_combat", 0x5875B0, 0x5876C0, "ターン制について", "Turn-Based Combat"),
+    HantHelpTopic("basic_attack", 0x5875D0, 0x5876C4, "基本的な攻撃手順", "Basic Attack"),
+    HantHelpTopic("battle_tips", 0x5875E8, 0x5876C8, "戦闘のコツ", "Battle Tips"),
+    HantHelpTopic("jumping", 0x587600, 0x5876CC, "ジャンプについて", "Jumping"),
+    HantHelpTopic("wire_gun", 0x587620, 0x5876D0, "ワイヤーガンの操作", "Wire Gun Controls"),
+    HantHelpTopic("buddies", 0x587638, 0x5876D4, "バディについて", "Buddies"),
+    HantHelpTopic("status_effects", 0x587650, 0x5876D8, "状態変化効果について", "Status Effects"),
+    HantHelpTopic("enemy_status_effects", 0x587670, 0x5876DC, "敵の状態変化について", "Enemy Status Effects"),
+)
+
+# r5 already translated the third, H.A.N.T/system-specific Help list. Preserve
+# those accepted semantic labels while extending coverage to its two siblings.
 HANT_HELP_TOPICS: tuple[HantHelpTopic, ...] = (
     HantHelpTopic("hant_functions", 0x5876E0, 0x587840, "Ｈ．Ａ．Ｎ．Ｔの機能", "H.A.N.T Functions"),
     HantHelpTopic("command_thumbnails", 0x587700, 0x587844, "コマンドサムネイル", "Command Thumbnails"),
@@ -106,6 +231,12 @@ HANT_HELP_TOPICS: tuple[HantHelpTopic, ...] = (
     HantHelpTopic("ammunition", 0x5877F8, 0x587870, "弾薬について", "Ammunition"),
     HantHelpTopic("level_up", 0x587810, 0x587874, "レベルアップしたら", "When You Level Up"),
     HantHelpTopic("save_load", 0x587828, 0x587878, "セーブ＆ロード", "Save & Load"),
+)
+
+HANT_ALL_HELP_TOPICS: tuple[HantHelpTopic, ...] = (
+    *HANT_ADV_HELP_TOPICS,
+    *HANT_EXPLORATION_HELP_TOPICS,
+    *HANT_HELP_TOPICS,
 )
 
 
@@ -325,7 +456,78 @@ def _validate_source(raw: bytes) -> None:
                 f"expected {expected_va:#x}, got {actual_va:#x}"
             )
 
-    for spec in HANT_HELP_TOPICS:
+    for offset, expected in _HANT_CONFIG_RENDERER_PREIMAGES:
+        if offset + 4 > len(raw):
+            raise ValueError("H.A.N.T config renderer preimage is outside executable")
+        actual = struct.unpack_from("<I", raw, offset)[0]
+        if actual != expected:
+            raise ValueError(
+                f"H.A.N.T config renderer preimage mismatch at {offset:#x}: "
+                f"expected {expected:#010x}, got {actual:#010x}"
+            )
+
+    for spec in HANT_CONFIG_LABELS:
+        encoded = spec.source_text.encode("cp932")
+        if (
+            spec.source_offset + len(encoded) >= len(raw)
+            or raw[spec.source_offset:spec.source_offset + len(encoded)] != encoded
+            or raw[spec.source_offset + len(encoded)] != 0
+        ):
+            raise ValueError(f"H.A.N.T config source preimage mismatch: {spec.key}")
+        if spec.pointer_offset + 4 > len(raw):
+            raise ValueError(f"H.A.N.T config pointer is outside executable: {spec.key}")
+        expected_va = _elf_va(spec.source_offset)
+        actual_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+        if actual_va != expected_va:
+            raise ValueError(
+                f"H.A.N.T config pointer preimage mismatch for {spec.key}: "
+                f"expected {expected_va:#x}, got {actual_va:#x}"
+            )
+
+    for offset, expected in _HANT_HELP_CATEGORY_RENDERER_PREIMAGES:
+        if offset + 4 > len(raw):
+            raise ValueError("H.A.N.T help category renderer preimage is outside executable")
+        actual = struct.unpack_from("<I", raw, offset)[0]
+        if actual != expected:
+            raise ValueError(
+                f"H.A.N.T help category renderer preimage mismatch at {offset:#x}: "
+                f"expected {expected:#010x}, got {actual:#010x}"
+            )
+
+    for spec in HANT_HELP_CATEGORY_LABELS:
+        encoded = spec.source_text.encode("cp932")
+        if (
+            spec.source_offset + len(encoded) >= len(raw)
+            or raw[spec.source_offset:spec.source_offset + len(encoded)] != encoded
+            or raw[spec.source_offset + len(encoded)] != 0
+        ):
+            raise ValueError(f"H.A.N.T help-category source preimage mismatch: {spec.key}")
+        if spec.pointer_offset + 4 > len(raw):
+            raise ValueError(f"H.A.N.T help-category pointer is outside executable: {spec.key}")
+        expected_va = _elf_va(spec.source_offset)
+        actual_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+        if actual_va != expected_va:
+            raise ValueError(
+                f"H.A.N.T help-category pointer preimage mismatch for {spec.key}: "
+                f"expected {expected_va:#x}, got {actual_va:#x}"
+            )
+
+    descriptor_size = len(_HANT_HELP_CATEGORY_TABLE_OFFSETS) * 4
+    if HANT_HELP_CATEGORY_DESCRIPTOR_OFFSET + descriptor_size > len(raw):
+        raise ValueError("H.A.N.T help category descriptor is outside executable")
+    actual_help_tables = struct.unpack_from(
+        f"<{len(_HANT_HELP_CATEGORY_TABLE_OFFSETS)}I",
+        raw,
+        HANT_HELP_CATEGORY_DESCRIPTOR_OFFSET,
+    )
+    expected_help_tables = tuple(_elf_va(offset) for offset in _HANT_HELP_CATEGORY_TABLE_OFFSETS)
+    if actual_help_tables != expected_help_tables:
+        raise ValueError(
+            "H.A.N.T help category descriptor preimage mismatch: "
+            f"expected {expected_help_tables!r}, got {actual_help_tables!r}"
+        )
+
+    for spec in HANT_ALL_HELP_TOPICS:
         encoded = spec.source_text.encode("cp932")
         if (
             spec.source_offset + len(encoded) >= len(raw)
@@ -442,11 +644,27 @@ def _base_relocated_entries(raw: bytes) -> tuple[RelocatedText, ...]:
     )
     entries.extend(
         RelocatedText(
+            key=f"hant_config_{spec.key}",
+            encoded=_encoded_wide(spec.english),
+            pointer_offsets=(spec.pointer_offset,),
+        )
+        for spec in HANT_CONFIG_LABELS
+    )
+    entries.extend(
+        RelocatedText(
+            key=f"hant_help_category_{spec.key}",
+            encoded=_encoded_wide(spec.english),
+            pointer_offsets=(spec.pointer_offset,),
+        )
+        for spec in HANT_HELP_CATEGORY_LABELS
+    )
+    entries.extend(
+        RelocatedText(
             key=f"hant_help_{spec.key}",
             encoded=_encoded_wide(spec.english),
             pointer_offsets=(spec.pointer_offset,),
         )
-        for spec in HANT_HELP_TOPICS
+        for spec in HANT_ALL_HELP_TOPICS
     )
     entries.extend(relocated_memory_card_entries(raw))
     return tuple(entries)

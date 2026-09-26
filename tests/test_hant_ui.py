@@ -35,9 +35,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(3213, info.payload_size)
+        self.assertEqual(4471, info.payload_size)
         self.assertEqual(
-            "f1752bfc3292d9fb14e206100ed1c119cec484733931f736e4cff19423296b5e",
+            "0ca076079583436cf880a4f4d39394ee32a9b207f32ccb8437de0992a9f3900f",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -191,6 +191,141 @@ class HantTutorialTests(unittest.TestCase):
                 target_file = _segment_file_offset(info, target_va)
                 translated = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
                 self.assertEqual(translated, result[target_file:target_file + len(translated)])
+
+    def test_help_descriptor_vector_proves_three_sibling_topic_tables(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        self.assertEqual(0x587890, hant_ui.HANT_HELP_CATEGORY_DESCRIPTOR_OFFSET)
+        self.assertEqual(
+            (0x006873B0, 0x00687610, 0x006877C0),
+            struct.unpack_from("<3I", RAW, hant_ui.HANT_HELP_CATEGORY_DESCRIPTOR_OFFSET),
+        )
+        self.assertEqual(20, len(hant_ui.HANT_ADV_HELP_TOPICS))
+        self.assertEqual(20, len(hant_ui.HANT_EXPLORATION_HELP_TOPICS))
+        self.assertEqual(15, len(hant_ui.HANT_HELP_TOPICS))
+        self.assertTrue(all(spec.provenance == "semantic" for spec in hant_ui.HANT_ALL_HELP_TOPICS))
+
+    def test_help_category_labels_are_owned_by_live_three_entry_renderer(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        self.assertEqual(0x587288, hant_ui.HANT_HELP_CATEGORY_LABEL_TABLE_OFFSET)
+        self.assertEqual(3, len(hant_ui.HANT_HELP_CATEGORY_LABELS))
+        self.assertEqual(
+            (0x3C030068, 0x24637208, 0x00711821, 0x8C650000, 0x0C062820, 0x2A620003),
+            tuple(
+                struct.unpack_from("<I", RAW, offset)[0]
+                for offset in (0x18C818, 0x18C81C, 0x18C820, 0x18C828, 0x18C82C, 0x18C838)
+            ),
+        )
+        self.assertEqual(
+            ("ADV", "Exploration", "Other"),
+            tuple(spec.english for spec in hant_ui.HANT_HELP_CATEGORY_LABELS),
+        )
+        self.assertTrue(all(spec.provenance == "semantic" for spec in hant_ui.HANT_HELP_CATEGORY_LABELS))
+
+    def test_relocates_help_category_labels_to_semantic_english(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        result, info = patch_hant_tutorial(RAW)
+        for spec in hant_ui.HANT_HELP_CATEGORY_LABELS:
+            with self.subTest(key=spec.key):
+                source = spec.source_text.encode("cp932") + b"\x00"
+                self.assertEqual(source, result[spec.source_offset:spec.source_offset + len(source)])
+                target_va = struct.unpack_from("<I", result, spec.pointer_offset)[0]
+                self.assertGreaterEqual(target_va, info.segment_vaddr)
+                self.assertLess(target_va, info.segment_vaddr + info.payload_size)
+                target_file = _segment_file_offset(info, target_va)
+                translated = encode_ps2_english(spec.english, collapse_spaces=False) + b"\x00"
+                self.assertEqual(translated, result[target_file:target_file + len(translated)])
+
+        tampered = bytearray(RAW)
+        tampered[0x18C81C] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T help category renderer"):
+            patch_hant_tutorial(bytes(tampered))
+
+        tampered = bytearray(RAW)
+        tampered[hant_ui.HANT_HELP_CATEGORY_LABELS[0].pointer_offset] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T help-category.*pointer"):
+            patch_hant_tutorial(bytes(tampered))
+
+    def test_relocates_all_three_proven_help_topic_lists_to_semantic_english(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        result, info = patch_hant_tutorial(RAW)
+        self.assertEqual(55, len(hant_ui.HANT_ALL_HELP_TOPICS))
+
+        for spec in hant_ui.HANT_ALL_HELP_TOPICS:
+            with self.subTest(key=spec.key):
+                source = spec.source_text.encode("cp932") + b"\x00"
+                self.assertEqual(source, result[spec.source_offset:spec.source_offset + len(source)])
+                target_va = struct.unpack_from("<I", result, spec.pointer_offset)[0]
+                self.assertGreaterEqual(target_va, info.segment_vaddr)
+                self.assertLess(target_va, info.segment_vaddr + info.payload_size)
+                target_file = _segment_file_offset(info, target_va)
+                translated = encode_ps2_english(spec.english, collapse_spaces=False) + b"\x00"
+                self.assertEqual(translated, result[target_file:target_file + len(translated)])
+
+        tampered = bytearray(RAW)
+        tampered[hant_ui.HANT_HELP_CATEGORY_DESCRIPTOR_OFFSET] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T help category descriptor"):
+            patch_hant_tutorial(bytes(tampered))
+
+        tampered = bytearray(RAW)
+        tampered[hant_ui.HANT_ADV_HELP_TOPICS[0].pointer_offset] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T help-topic.*pointer"):
+            patch_hant_tutorial(bytes(tampered))
+
+    def test_config_labels_are_owned_by_live_nine_entry_config_renderer(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        self.assertEqual(0x586EF0, hant_ui.HANT_CONFIG_POINTER_TABLE_OFFSET)
+        self.assertEqual(9, len(hant_ui.HANT_CONFIG_LABELS))
+        self.assertEqual(
+            (0x3C030068, 0x24636E70, 0x00711821, 0x8C650000, 0x0C062820, 0x2A420009),
+            tuple(
+                struct.unpack_from("<I", RAW, offset)[0]
+                for offset in (0x18BCA4, 0x18BCA8, 0x18BCAC, 0x18BCB4, 0x18BCB8, 0x18BCC4)
+            ),
+        )
+        self.assertTrue(all(spec.provenance == "semantic" for spec in hant_ui.HANT_CONFIG_LABELS))
+
+    def test_relocates_proven_config_labels_to_semantic_english(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        result, info = patch_hant_tutorial(RAW)
+        expected = (
+            "Voice/SFX Volume",
+            "BGM Volume",
+            "Emotion Speed",
+            "Walk Camera",
+            "Vibration",
+            "Audio",
+            "Message Icon",
+            "Voice Nav",
+            "Ringtone",
+        )
+        self.assertEqual(expected, tuple(spec.english for spec in hant_ui.HANT_CONFIG_LABELS))
+
+        for spec in hant_ui.HANT_CONFIG_LABELS:
+            with self.subTest(key=spec.key):
+                source = spec.source_text.encode("cp932") + b"\x00"
+                self.assertEqual(source, result[spec.source_offset:spec.source_offset + len(source)])
+                target_va = struct.unpack_from("<I", result, spec.pointer_offset)[0]
+                self.assertGreaterEqual(target_va, info.segment_vaddr)
+                self.assertLess(target_va, info.segment_vaddr + info.payload_size)
+                target_file = _segment_file_offset(info, target_va)
+                translated = encode_ps2_english(spec.english, collapse_spaces=False) + b"\x00"
+                self.assertEqual(translated, result[target_file:target_file + len(translated)])
+
+        tampered = bytearray(RAW)
+        tampered[0x18BCA8] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T config renderer"):
+            patch_hant_tutorial(bytes(tampered))
+
+        tampered = bytearray(RAW)
+        tampered[hant_ui.HANT_CONFIG_LABELS[0].pointer_offset] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T config.*pointer"):
+            patch_hant_tutorial(bytes(tampered))
 
     def test_tutorial_rows_use_existing_12px_font_style_without_global_font_patch(self) -> None:
         result, _info = patch_hant_tutorial(RAW)

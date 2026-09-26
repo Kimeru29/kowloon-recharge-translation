@@ -24,8 +24,10 @@ from tools.startup_ui import (
     TITLE_LOAD_POINTER_OFFSET,
 )
 from tools.hant_ui import (
+    HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
-    HANT_HELP_TOPICS,
+    HANT_CONFIG_LABELS,
+    HANT_HELP_CATEGORY_LABELS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
     HANT_CONTROLLER_METADATA_RECORDS,
     HANT_POINTER_TABLE_OFFSET,
@@ -83,8 +85,8 @@ class EarlyUiPatchTests(unittest.TestCase):
 
         allowed = set(range(TITLE_ARENA_START, TITLE_ARENA_END))
         allowed.update(range(TITLE_LOAD_POINTER_OFFSET, TITLE_LOAD_POINTER_OFFSET + 4))
-        allowed.update(range(0x6989C0, 0x6989C4))
-        allowed.update(range(0x1AC600, 0x1AC604))
+        allowed.update(range(0x1ABF64, 0x1ABF68))
+        allowed.update(range(0x1ABF84, 0x1ABF88))
         allowed.update(range(NAME_READING_ARENA_START, NAME_READING_ARENA_END))
         allowed.update(range(NAME_PROMPT_ARENA_START, NAME_PROMPT_ARENA_END))
         allowed.update(range(NAME_PROMPT_POINTER_TABLE_OFFSET, NAME_PROMPT_POINTER_TABLE_OFFSET + 8 * 4))
@@ -109,7 +111,12 @@ class EarlyUiPatchTests(unittest.TestCase):
         )
         allowed.update(range(HANT_TUTORIAL_FONT_STYLE_OFFSET, HANT_TUTORIAL_FONT_STYLE_OFFSET + 4))
         allowed.update(range(HANT_TUTORIAL_ROW_SPACING_OFFSET, HANT_TUTORIAL_ROW_SPACING_OFFSET + 4))
-        for spec in (*HANT_CHROME_LABELS, *HANT_HELP_TOPICS):
+        for spec in (
+            *HANT_CHROME_LABELS,
+            *HANT_CONFIG_LABELS,
+            *HANT_HELP_CATEGORY_LABELS,
+            *HANT_ALL_HELP_TOPICS,
+        ):
             allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
         allowed.update(range(0x181EAC, 0x181EB0))
         for index in MEMORY_CARD_MESSAGES:
@@ -153,7 +160,7 @@ class EarlyUiPatchTests(unittest.TestCase):
     def test_unresolved_hant_candidates_match_pristine_fixture_except_cross_owned_sources(self) -> None:
         result = build_early_ui_elf(RAW)
         entries = inventory_hant_text(RAW, None)
-        promoted_help_sources = {spec.source_offset for spec in HANT_HELP_TOPICS}
+        promoted_help_sources = {spec.source_offset for spec in HANT_ALL_HELP_TOPICS}
         candidates = [
             entry
             for entry in entries
@@ -181,12 +188,13 @@ class EarlyUiPatchTests(unittest.TestCase):
                     result[entry.source_offset:entry.source_offset + len(source)],
                 )
 
-    def test_composite_build_includes_widened_title_backing(self) -> None:
+    def test_composite_build_recenters_title_labels_and_preserves_packed_title_art(self) -> None:
         result = build_early_ui_elf(RAW)
-        scale_x, scale_y = struct.unpack_from("<ff", result, 0x6989C0)
-        self.assertAlmostEqual(17.0 / 9.0, scale_x, places=6)
-        self.assertEqual(1.0, scale_y)
-        self.assertEqual(0x2787D748, struct.unpack_from("<I", result, 0x1AC600)[0])
+
+        self.assertEqual(0x3C024210, struct.unpack_from("<I", result, 0x1ABF64)[0])
+        self.assertEqual(0x3C0243AA, struct.unpack_from("<I", result, 0x1ABF84)[0])
+        self.assertEqual(RAW[0x6989C0:0x6989C8], result[0x6989C0:0x6989C8])
+        self.assertEqual(RAW[0x1AC600:0x1AC604], result[0x1AC600:0x1AC604])
 
 
     def test_composite_build_relocates_only_proven_long_menu_labels(self) -> None:
@@ -196,7 +204,7 @@ class EarlyUiPatchTests(unittest.TestCase):
         segment_va = segment[2]
         segment_size = segment[4]
         by_key = {spec.key: spec for spec in MENU_LABELS}
-        self.assertEqual(3246, segment_size)
+        self.assertEqual(4504, segment_size)
 
         for key, expected in (("return_above_ground", b"Return above ground\x00"), ("report_card", b"Report card\x00")):
             spec = by_key[key]
@@ -209,7 +217,7 @@ class EarlyUiPatchTests(unittest.TestCase):
             target_va = targets.pop()
             self.assertGreaterEqual(target_va, segment_va)
             self.assertLess(target_va, segment_va + segment_size)
-            expected_offset = {"return_above_ground": 0xC8E, "report_card": 0xCA2}[key]
+            expected_offset = {"return_above_ground": 0x1178, "report_card": 0x118C}[key]
             self.assertEqual(segment_va + expected_offset, target_va)
             target_file = segment_file + target_va - segment_va
             self.assertEqual(expected, result[target_file:target_file + len(expected)])

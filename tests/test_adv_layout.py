@@ -94,15 +94,30 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
         self.assertTrue(changed <= allowed)
         self.assertEqual(len(RAW), len(result))
 
-    def test_horizontal_patch_also_clears_separate_speaker_name_canvas_orientation(self) -> None:
+    def test_horizontal_patch_preserves_r5_record_label_orientation_change(self) -> None:
         result = patch_adv_horizontal_layout(RAW)
 
-        # Runtime r4 proved the dialogue body and speaker label are distinct
-        # renderers: body text became horizontal while ``Old man\'s voice``
-        # remained vertical. The speaker-name state machine at VA 0x251470
-        # constructs its own font canvas at VA 0x251594 with a2=1.
+        # r5 changed the separate 0x251470 ADV record-label canvas. Runtime r5
+        # disproved it as the inline bracket-derived DG speaker owner, but there
+        # is not yet evidence that the record-label patch itself is harmful or
+        # dead. Preserve that shipped change until runtime gives a reason to
+        # remove it; the actual DG speaker owner is tested independently below.
         self.assertEqual(0x24060001, struct.unpack_from("<I", RAW, 0x151608)[0])
         self.assertEqual(0x24060000, struct.unpack_from("<I", result, 0x151608)[0])
+
+    def test_horizontal_patch_uses_horizontal_text_mode_for_inline_bracket_speaker(self) -> None:
+        result = patch_adv_horizontal_layout(RAW)
+
+        # The DG script dispatcher recognizes the CP932 opening bracket and sends
+        # that inline speaker token through 0x250B10 -> 0x250530. That parser
+        # stores the resolved name at global +0x198. VA 0x24FFF8 passes exactly
+        # that buffer to the generic text constructor at 0x190A50; its a1 mode
+        # selects the mesh path. Mode 1 is the same horizontal path used by the
+        # ordinary dialogue fragments, while pristine mode 2 takes the alternate
+        # mesh builder that produced the runtime vertical name column.
+        self.assertIn((0x15006C, 0x24050002, 0x24050001), ADV_SPEAKER_LAYOUT_PATCHES)
+        self.assertEqual(0x24050002, struct.unpack_from("<I", RAW, 0x15006C)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x15006C)[0])
 
     def test_fail_closes_if_renderer_preimages_drift(self) -> None:
         for offset in (

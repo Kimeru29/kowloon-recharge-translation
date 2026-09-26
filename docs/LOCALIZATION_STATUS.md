@@ -14,10 +14,10 @@ Status meanings:
 | Surface | Status | Evidence / next action |
 | --- | --- | --- |
 | 29 opening quotations (`TR000`-`TR028`) | **Working / runtime-proven** | v10 runtime confirmed English quotation artwork and observed different quotations across restarts. The 29 generated TMXs remain distinct and the executable selects `PRNG % 29` before formatting `TR%03d.TMX`. |
-| Pre-title memory-card status text | **Translated but buggy** | v11 runtime showed the official `Checking memory card slot 1` text reaching the stone panel but clipping horizontally. v11-r4 intentionally does **not** change this surface: the accepted single-line official payload and both boot-handler aliases (`0x4077F0`, `0x4078D0`) remain as before. The clipping defect is still pending outside the r4 four-defect scope. |
+| Pre-title memory-card status text | **Translated but buggy** | r5 runtime proved the two-line `Checking memory card` / `slot 1` presentation is substantially better than the earlier single-line version. r6 deliberately preserves that improvement unchanged because the latest test did not include a tablet screenshot precise enough to justify another geometry guess. Further centering/line polish remains a runtime-guided task. |
 | GP088 startup/title artwork — direct `GP088_03` counterpart | **Not runtime-tested** | v9 retains the v8 same-name official English `b_gp088_en/GP088_03` port into PS2 `B_GP088.BIN`. |
 | GP088 PS2 packed title atlas (`GP088_12`) | **Not runtime-tested** | v9 proves that the two GP088_12 Japanese title variants are repacked GP088_03 regions (Dice 0.8758 / 0.8765 after excluding the known flattened banner band), then rebuilds GP088_12 from the official English GP088_03 regions. The official English remaster omits the flattened gold `re:charge` banner, so v9 removes it rather than synthesizing missing artwork. `GP088_13` is a separate already-English blue `re:charge` badge and remains unchanged. |
-| Title `New Game` / `Load Game` | **Not runtime-tested** | v10 runtime proved the exact strings but exposed the undersized purple backing. v11 statically ties the backing to the paired GP088_12 title objects and widens only their animation target to `17/9`; `title_english_backing_geometry` passes in the final ISO. The resized presentation still needs PCSX2 observation. |
+| Title `New Game` / `Load Game` | **Translated but buggy** | r5 runtime showed the title composition still looks bad. That runtime result disproves the old static classification of the paired `GP088_12` instances as simple label backings: they are packed title art and must not be horizontally stretched. r6 restores their pristine `(1,1)` scale and instead recenters only the two proven live text anchors from X=68/380 to X=36/340 for the 8/9-glyph English labels. `title_english_label_geometry` passes statically; visual acceptance is pending. |
 | Name-entry English button graphics (`B_GP019.BIN`) | **Working / runtime-proven** | Back/Edit/Finish/Delete/Confirm controls render correctly. |
 | `Enter last name.` | **Working / runtime-proven** | Wide English prompt renders correctly. |
 | Lowercase Latin keyboard | **Working / runtime-proven** | Runtime accepts lowercase Latin input. |
@@ -31,11 +31,14 @@ Status meanings:
 | `Is this fine?` / `Yes / No` | **Not runtime-tested** | Official English is statically present. v10 preserves the normal-name confirmation; an affirmative result now routes directly through the existing post-reading/finalization path instead of opening the kana-reading editor. |
 | License-ID messages | **Not runtime-tested** | `Verifying license ID...` is the runtime-good 23-glyph reference at X=140. v11-r4 keeps both official strings and moves only the 25-glyph `ID verification complete.` X owner from 156 to 108 so both lines end at the same 508-pixel right edge in the traced 16-pixel renderer. The instruction preimage and final image are fail-closed; runtime proof of the unclipped completion line is pending. |
 | `Heracleion Shrine` | **Not runtime-tested** | Statically translated as wide executable text. |
-| H.A.N.T. tutorial | **Translated but buggy** | Original v11 runtime disproved the 16px presentation: the live page exposed only about 336 usable horizontal pixels and the 16-row reflow clipped vertically. v11-r4 switches only this mode-4 tutorial row constructor from existing font style 0 (16px) to existing style 1 (12px), giving a 28-cell budget across the same proven pixel span. The accepted wording now reflows to 14 rows with controller holes on rows 6/9/12; row spacing remains 21px and original sources stay pristine. Final-image checks pass; target-screen proof is pending. |
-| ADV horizontal dialogue renderer | **Translated but buggy** | Original v11 runtime proved the coordinate-origin swap was insufficient. Follow-up tracing showed the DG object constructs four font canvases and propagates one wrapper orientation argument to all four; r3 changed only a downstream canvas and therefore could leave speaker/body canvases vertical. v11-r4 keeps the proven coordinate transpose and changes the unique wrapper callsite at file `0x14E96C` from `a2=1` to `a2=0`, so all four DG canvases inherit horizontal advance. Final-image acceptance passes; corrected dialogue still needs runtime target-screen proof. |
-| First old-man DG00 English dialogue | **Translated but buggy** | The DG00 English content itself is runtime-proven, but original v11 still rendered it vertically. v11-r4 contains the upstream all-canvas orientation correction described above. The r4 ISO has **not** been launched in PCSX2; the old-man target screen still requires supervised runtime observation. |
+| H.A.N.T. tutorial | **Working / runtime-proven** | r5 runtime confirms the 12px presentation and tightened 18px row stride are readable with good spacing. Preserve this renderer/layout profile. r6 leaves the tutorial body, wrapping and controller metadata unchanged. |
+| ADV horizontal dialogue renderer | **Translated but buggy** | r5 runtime proves the body path can render `Hey, over here.` horizontally, but the visible speaker/name presentation still follows a different path and the overall block does not yet match the PS4-style dialogue target. r6 traces the inline bracket-token speaker independently: dispatcher bracket path → resolved name at global `+0x198` → live text constructor at file `0x15007C`. Its pristine text mode is `2`; r6 changes only file `0x15006C` to mode `1`, the same horizontal mesh path used by ordinary dialogue. The older `0x151608` record-label orientation patch remains preserved as a separate owner. Runtime proof is required. |
+| First old-man DG00 English dialogue | **Translated but buggy** | The English content and a horizontal body line are runtime-proven in r5, but the speaker label remained vertical/fragmented and the screen still failed the PS4-style block-layout target. r6 adds the independently traced inline-speaker text-mode correction above; no runtime-fixed claim is made until Pablo observes the result. |
 | DG00 English choices | **Not runtime-tested** | Reviewed KSF overrides/imports remain present; the accepted v10 observation did not explicitly promote this row. |
-| H.A.N.T. chrome labels | **Not runtime-tested** | v11-r4 proves the independent seven-entry live H.A.N.T. chrome owner table at file `0x586D20` and relocates `【Main Menu】`, `【Mail】`, `【Dictionary】`, `【Enemy】`, `【Memo】`, `【Help】`, and `【Config】` through those pointers. The owned remaster extraction does not expose the localized TextAsset, so these seven are explicitly **semantic translations**, not claimed official-remaster wording. Runtime proof is pending. |
+| H.A.N.T. top-level six tiles (`GP020_03`) | **Working / runtime-proven** | r5 runtime confirms `MAIL`, `DICTIONARY`, `ENEMY`, `MEMO`, `HELP`, and `CONFIG` look good. Preserve the semantic baked-art repaint and do not route these captions back through executable text. |
+| H.A.N.T. executable chrome labels | **Not runtime-tested** | The independent seven-entry live owner table at file `0x586D20` remains relocated to semantic `【Main Menu】`, `【Mail】`, `【Dictionary】`, `【Enemy】`, `【Memo】`, `【Help】`, and `【Config】`. These are not claimed as official-remaster wording because the localized TextAsset is unavailable. |
+| H.A.N.T. Help categories/topics | **Not runtime-tested** | r5 runtime showed deeper Help pages still Japanese because only the third 15-entry topic list was translated. r6 proves a three-entry category/tab renderer at `0x587288` plus three sibling topic tables at `0x587430`, `0x587690`, and `0x587840`; all **55** topic aliases and the three category labels now relocate to explicitly semantic English. Runtime proof is pending. |
+| H.A.N.T. Config labels | **Not runtime-tested** | r6 proves the live nine-entry Config renderer table at `0x586EF0` and relocates `Voice/SFX Volume`, `BGM Volume`, `Emotion Speed`, `Walk Camera`, `Vibration`, `Audio`, `Message Icon`, `Voice Nav`, and `Ringtone` as semantic English. Ringtone title content remains separately inventoried and untouched. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
@@ -43,7 +46,7 @@ Status meanings:
 | Surface | Status | Evidence / next action |
 | --- | --- | --- |
 | `メディア` | **Still Japanese / unresolved** | No exact official dictionary mapping has been proven for this PS2-only label. |
-| Additional pointer-backed H.A.N.T. candidates outside the tutorial | **Still Japanese / unresolved** | Ownership candidates are inventoried, but the expected local `English.bytes` extraction was unavailable during the proof pass; no mapping is guessed. |
+| Remaining H.A.N.T. content lists | **Still Japanese / unresolved** | r6 inventories additional pointer-backed content separately from presentation chrome. The 20-entry ringtone-title table is live-owner proven but contains proper/music titles without an owned localized corpus; dictionary kana/index tables, mail subjects, enemy/content lists, and similar data are not bulk-guessed. The enemy category table is visible statically but its executable owner was not proven in this pass, so it remains untouched. |
 | Re:charge-only memory-card clear-data messages | **Still Japanese / unresolved** | Eight pointer-table entries have no proven official remaster counterpart and remain untouched. |
 
 ## Corpus-level translation coverage
@@ -200,7 +203,7 @@ v11-r4 was intentionally limited to its four runtime defects while preserving th
 The next supervised r4 runtime acceptance should verify exactly these targets plus regression safety: `ID verification complete.` is fully visible; the H.A.N.T. tutorial is compact/readable with no bottom clipping and its seven chrome labels are English; the first old-man dialogue is horizontal; and the previously accepted title/tablet centering remains unchanged. Memory-card clipping is not an r4 acceptance criterion.
 
 
-### v11-r5 — current deterministic correction candidate; Pablo runtime test pending
+### v11-r5 — runtime-tested presentation checkpoint
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r5.iso`
 - ISO SHA-256: `2ebee6fb45125fdfd826f15cb0a9eee09a66a861f39058103704a00244deb739`
@@ -213,8 +216,25 @@ The next supervised r4 runtime acceptance should verify exactly these targets pl
 - dependency-free suite: **191 tests OK** (8 expected skips)
 - Pillow-enabled suite: **191 tests OK** (1 owned-corpus skip)
 - deterministic repeat ISO: byte-for-byte identical by `cmp`
-- PCSX2 status: **not launched**; Pablo will perform the runtime checks manually.
+- PCSX2 status: **manually runtime-tested by Pablo**.
 
-r5 preserves the r4 title/tablet geometry and adds only the remaining screenshot-driven fixes. The separate speaker-name canvas now receives horizontal orientation independently of the body canvas. The H.A.N.T. tutorial retains the 12px/28-cell reflow but uses an 18px row stride; the 15 Help index aliases relocate to semantic English; and `GRP020/GP020_03.TMX` repaints nine baked caption regions to semantic English while preserving all non-caption pixels. The pre-title memory-card text now uses two visible lines: `Checking memory card` and `slot 1`.
+r5 established the new runtime ground truth. The GP020 top-level tiles (`MAIL`, `DICTIONARY`, `ENEMY`, `MEMO`, `HELP`, `CONFIG`) look good and the 12px/18px H.A.N.T. tutorial body has good spacing; both are now preservation constraints. The two-line stone-tablet message is noticeably better but still eligible for later measured polish. The title still looks bad. The old-man body can emit horizontal English, but the visible speaker/name layout remains structurally wrong. Deeper H.A.N.T. Help/submenu labels remain Japanese, proving the 15-entry r5 Help table was incomplete.
 
-Manual acceptance targets: speaker label and dialogue body horizontal; full H.A.N.T. page visible vertically; Help/topic list and H.A.N.T. tile captions English; stone-panel text not clipped; title/tablet centering unchanged.
+### v11-r6 — current deterministic candidate; runtime proof pending
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r6.iso`
+- ISO SHA-256: `dbd25ff8ada4724d6c280a32199dd3ef7fc49442923d904db56359ed02ef32a4`
+- translated ELF SHA-256 before ROFS rewrite: `06b76b01e9ef1364f5c67473edaf1b68b367512ba0af7dd1ad533f726b64ecfa`
+- final post-ROFS ELF SHA-256: `0fe52d198679c9c2eb4784cab12a554f4569488af018fd9778c3b72ca031b0eb`
+- translated/final ELF size: 8,405,736 bytes
+- overlays: 1,145 total; 892 in place / 253 relocated
+- executable ROFS records: 1,145 patched/re-resolved
+- final-image startup acceptance: **139/139** (`local/startup-acceptance-v11-r6.json`)
+- dependency-free suite: **198 tests OK** (8 expected skips)
+- Pillow-enabled suite: **198 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r6-repeat.iso` is byte-for-byte identical and has the same SHA-256.
+- PCSX2 status: **not launched by the agent**; Pablo is the runtime tester.
+
+r6 corrects three runtime-disproven ownership assumptions without regressing the r5 wins. For dialogue, the inline bracket-derived speaker is now traced separately from the r5 record-label path and switches its proven live text constructor from mode 2 to the same horizontal mode 1 used by ordinary dialogue. For title presentation, the paired `GP088_12` objects are reclassified as packed title art: their scale remains pristine, while only the two proven label X anchors are recentered to X=36 and X=340. For deeper H.A.N.T., r6 relocates the proven three Help category labels, all three sibling Help topic tables (55 labels total), and the nine-entry Config label table to explicitly semantic English. The runtime-good GP020 tile art, tutorial 12px/18px layout, and r5 stone-tablet line split are unchanged.
+
+Manual r6 gate: confirm the speaker line is horizontal and visually grouped above a horizontal body block; confirm deeper Help category/topic labels and Config labels are English while the top-level tiles/tutorial remain unchanged; confirm `New Game` / `Load Game` composition is materially improved without stretching the title art; verify the already-improved stone tablet did not regress. Static success is not runtime acceptance.

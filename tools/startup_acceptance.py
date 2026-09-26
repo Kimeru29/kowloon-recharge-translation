@@ -7,8 +7,10 @@ from hashlib import sha256
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES, ADV_SPEAKER_LAYOUT_PATCHES
 from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells
 from tools.hant_ui import (
+    HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
-    HANT_HELP_TOPICS,
+    HANT_CONFIG_LABELS,
+    HANT_HELP_CATEGORY_LABELS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
     HANT_CONTROLLER_METADATA_OFFSET,
     HANT_CONTROLLER_METADATA_RECORDS,
@@ -21,7 +23,6 @@ from tools.hant_ui import (
 )
 from tools.localization import encode_ps2_english
 from tools.menu_ui import MENU_LABELS
-from tools.title_layout import TITLE_BACKING_SCALE_X
 from tools.memory_card_ui import (
     MEMORY_CARD_MESSAGES,
     MEMORY_CARD_POINTER_ALIASES,
@@ -256,19 +257,18 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         ))
 
     title_geometry_ok = False
-    title_geometry_detail = "title English backing geometry is missing or stale"
+    title_geometry_detail = "title English label geometry or packed title-art invariants are missing/stale"
     if (
         len(raw) >= 0x6989C8
         and len(raw) >= 0x1AC604
+        and len(raw) >= 0x1ABF88
         and len(raw) >= 0x5CBFB4
         and len(raw) >= TITLE_POINTER_TABLE_OFFSET + 8
     ):
         new_ptr, load_ptr = struct.unpack_from("<II", raw, TITLE_POINTER_TABLE_OFFSET)
-        scale_x, scale_y = struct.unpack_from("<ff", raw, 0x6989C0)
-        backing_calls = (
-            struct.unpack_from("<I", raw, 0x1AC5C0)[0],
-            struct.unpack_from("<I", raw, 0x1AC5E0)[0],
-        )
+        new_anchor_word = struct.unpack_from("<I", raw, 0x1ABF64)[0]
+        load_anchor_word = struct.unpack_from("<I", raw, 0x1ABF84)[0]
+        packed_art_scale = struct.unpack_from("<ff", raw, 0x6989C0)
         third_call = struct.unpack_from("<I", raw, 0x1AC600)[0]
         title_records_hash = sha256(raw[0x5CBE60:0x5CBFB4]).hexdigest()
         title_geometry_ok = (
@@ -276,15 +276,15 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             and raw[TITLE_LOAD_START:TITLE_LOAD_START + len(load_game)] == load_game
             and new_ptr == _ELF_MAIN_VADDR + TITLE_NEW_GAME_START - _ELF_MAIN_FILE_OFFSET
             and load_ptr == _ELF_MAIN_VADDR + TITLE_LOAD_START - _ELF_MAIN_FILE_OFFSET
-            and struct.pack("<f", scale_x) == struct.pack("<f", TITLE_BACKING_SCALE_X)
-            and scale_y == 1.0
-            and backing_calls == (0x2787D750, 0x2787D750)
-            and third_call == 0x2787D748
+            and new_anchor_word == 0x3C024210
+            and load_anchor_word == 0x3C0243AA
+            and packed_art_scale == (1.0, 1.0)
+            and third_call == 0x2787D750
             and title_records_hash == "fbb685e638f950a844c169bec567f7102943e4a9b7ef1916f02b2b0dcb530422"
         )
     checks.append(
         _check(
-            "title_english_backing_geometry",
+            "title_english_label_geometry",
             title_geometry_ok,
             title_geometry_detail,
         )
@@ -503,10 +503,54 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
                 hant_chrome_ok = False
                 break
 
+    hant_config_ok = segment is not None
+    if segment is not None:
+        p_offset, p_vaddr, p_filesz, _p_memsz = segment
+        for spec in HANT_CONFIG_LABELS:
+            source = spec.source_text.encode("cp932") + b"\x00"
+            if raw[spec.source_offset:spec.source_offset + len(source)] != source:
+                hant_config_ok = False
+                break
+            if spec.pointer_offset + 4 > len(raw):
+                hant_config_ok = False
+                break
+            target_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+            relative = target_va - p_vaddr
+            expected = encode_ps2_english(spec.english, collapse_spaces=False) + b"\x00"
+            if relative < 0 or relative + len(expected) > p_filesz:
+                hant_config_ok = False
+                break
+            target_file = p_offset + relative
+            if raw[target_file:target_file + len(expected)] != expected:
+                hant_config_ok = False
+                break
+
+    hant_help_category_ok = segment is not None
+    if segment is not None:
+        p_offset, p_vaddr, p_filesz, _p_memsz = segment
+        for spec in HANT_HELP_CATEGORY_LABELS:
+            source = spec.source_text.encode("cp932") + b"\x00"
+            if raw[spec.source_offset:spec.source_offset + len(source)] != source:
+                hant_help_category_ok = False
+                break
+            if spec.pointer_offset + 4 > len(raw):
+                hant_help_category_ok = False
+                break
+            target_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+            relative = target_va - p_vaddr
+            expected = encode_ps2_english(spec.english, collapse_spaces=False) + b"\x00"
+            if relative < 0 or relative + len(expected) > p_filesz:
+                hant_help_category_ok = False
+                break
+            target_file = p_offset + relative
+            if raw[target_file:target_file + len(expected)] != expected:
+                hant_help_category_ok = False
+                break
+
     hant_help_ok = segment is not None
     if segment is not None:
         p_offset, p_vaddr, p_filesz, _p_memsz = segment
-        for spec in HANT_HELP_TOPICS:
+        for spec in HANT_ALL_HELP_TOPICS:
             source = spec.source_text.encode("cp932") + b"\x00"
             if raw[spec.source_offset:spec.source_offset + len(source)] != source:
                 hant_help_ok = False
@@ -577,9 +621,23 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
     )
     checks.append(
         _check(
+            "hant_config_labels",
+            hant_config_ok,
+            "one or more H.A.N.T Config labels do not resolve through the proven nine-entry live renderer table",
+        )
+    )
+    checks.append(
+        _check(
+            "hant_help_category_labels",
+            hant_help_category_ok,
+            "one or more H.A.N.T Help category labels do not resolve through the proven three-entry live renderer table",
+        )
+    )
+    checks.append(
+        _check(
             "hant_help_topics",
             hant_help_ok,
-            "one or more H.A.N.T Help topic labels do not resolve through the proven 15-entry owner table",
+            "one or more H.A.N.T Help topic labels do not resolve through the proven three-list 55-entry owner set",
         )
     )
     checks.append(
