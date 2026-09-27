@@ -29,13 +29,13 @@ _TITLE_RECORD_CONSUMER_WORDS: tuple[tuple[int, int], ...] = (
     (0x1ABE84, 0x2A220011),  # loop bound 17
 )
 
-# Records 11/12 are the two (88,12) instances. Existing decoded-asset evidence
-# identifies GP088_12 as the packed two-variant TITLE atlas, and r5 runtime
-# disproved the earlier inference that these objects were menu-panel backings.
-# m_title still animates them adjacent to label creation; that temporal/alignment
-# correlation is recorded here without assigning false ownership. Record 13
-# follows the same transition but is a distinct (88,11) asset.
-_TITLE_PACKED_ART_OWNER_WORDS: tuple[tuple[int, int], ...] = (
+# Records 11/12 are the two (88,12) instances. Fresh r11 resource-table tracing
+# resolves group 88/index 12 through the group table at VA 0x485240 to sprite
+# metadata VA 0x478720. That metadata selects texture ordinal 8, which is
+# GRP088/GP088_08.TMX in B_GP088.BIN, and describes a 72x24 rectangle. This is
+# the runtime-visible title backing. m_title animates both instances from X scale
+# 0 to 1 immediately before label creation. Record 13 remains a distinct asset.
+_TITLE_BACKING_ANIMATION_OWNER_WORDS: tuple[tuple[int, int], ...] = (
     (0x1ABEA4, 0x8E020054),  # record 11 object
     (0x1ABEA8, 0xAC400060),  # initial scale X = 0
     (0x1ABEAC, 0x8E020058),  # record 12 object
@@ -70,31 +70,40 @@ _TITLE_LABEL_OWNER_WORDS: tuple[tuple[int, int], ...] = (
     (0x1AC658, 0x2A220002),  # exactly two label objects
 )
 
-# The label renderer also owns two black/chrome primitives. Both subtract the
-# same hard-coded 64px half-width from the label object's X before constructing
-# the primitive through VA 0x188AD0. That makes the pristine backing 128px wide.
-# English is deterministic here: 16px per rendered glyph, so New Game = 128px
-# and Load Game = 144px. Use an 80px half-width = 160px total, which gives the
-# longest label 8px padding on both sides and New Game 16px per side.
-_TITLE_LABEL_BACKING_OWNER_WORDS: tuple[tuple[int, int], ...] = (
-    (0x19AB34, 0xC7A100C0),  # load label X
-    (0x19AB38, 0x3C024280),  # 64.0f half-width, first backing primitive
-    (0x19ABB0, 0x0C0622B4),  # jal 0x188AD0
-    (0x19ABD4, 0xC7A100C0),  # load label X
-    (0x19ABD8, 0x3C024280),  # 64.0f half-width, second backing primitive
-    (0x19AC5C, 0x0C0622B4),  # jal 0x188AD0
+# Runtime disproves the generic-font 64px X-offset as backing width. The
+# actual backing ownership is the group 88/index 12 sprite resource described
+# above. The executable group table resolves index 12 to metadata VA 0x478720.
+# Its texture selector is ordinal 8 (GP088_08), width is 72px, height is 24px,
+# V extent is 24/64, and U extent is 72/512. The original four-glyph labels are
+# 64px wide, so the sprite supplied 4px side padding. Longest English label is
+# Load Game at 9*16=144px; preserve the same padding => shared width 152px and
+# U extent 152/512. The two title-state instances are left-edge positioned at
+# X=64/376 for 72px width, so recentering 152px on the accepted centers 100/412
+# moves them to X=24/336.
+_TITLE_BACKING_RESOURCE_OWNER_WORDS: tuple[tuple[int, int], ...] = (
+    (0x385420, 0x00484A70),  # group 88 resource table pointer
+    (0x384B50, 0x00478720),  # group 88/index 12 -> sprite metadata
+    (0x384B54, 0x00000001),  # one metadata record
+    (0x3787A0, 0x00080000),  # texture ordinal 8 = GP088_08
+    (0x3787A4, 0x42900000),  # width 72.0
+    (0x3787A8, 0x41C00000),  # height 24.0
+    (0x3787B8, 0x3EC00000),  # V extent 24/64 = 0.375
+    (0x3787BC, 0x3E100000),  # U extent 72/512 = 0.140625
+    # The disproven generic-text-canvas offsets are pinned pristine.
+    (0x19AB38, 0x3C024280),
+    (0x19ABD8, 0x3C024280),
 )
-_TITLE_BACKING_HALF_WIDTH_OFFSETS = (0x19AB38, 0x19ABD8)
-_TITLE_BACKING_HALF_WIDTH_PREIMAGE = 0x3C024280  # 64.0f
-_TITLE_BACKING_HALF_WIDTH_REPLACEMENT = 0x3C0242A0  # 80.0f
-TITLE_LABEL_BACKING_PATCHES: tuple[tuple[int, int, int], ...] = tuple(
-    (offset, _TITLE_BACKING_HALF_WIDTH_PREIMAGE, _TITLE_BACKING_HALF_WIDTH_REPLACEMENT)
-    for offset in _TITLE_BACKING_HALF_WIDTH_OFFSETS
+TITLE_LABEL_BACKING_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x3787A4, 0x42900000, 0x43180000),  # sprite width 72 -> 152
+    (0x3787BC, 0x3E100000, 0x3E980000),  # U extent 72/512 -> 152/512
+    (0x5CBF48, 0x42800000, 0x41C00000),  # first backing X 64 -> 24
+    (0x5CBF5C, 0x43BC0000, 0x43A80000),  # second backing X 376 -> 336
 )
 TITLE_GLYPH_ADVANCE = 16
 TITLE_NEW_GAME_GLYPHS = 8
 TITLE_LOAD_GAME_GLYPHS = 9
-TITLE_BACKING_WIDTH = 160
+TITLE_BACKING_WIDTH = 152
+TITLE_BACKING_HEIGHT = 24
 
 # The earlier Task-4 hypothesis incorrectly classified group 2/index 0x8E as
 # the static menu backing.  Full state-machine tracing proves it is a reveal
@@ -125,10 +134,11 @@ _TITLE_LOAD_GAME_X_PREIMAGE = 0x3C0243BE  # lui v0,0x43be -> 380.0f
 _TITLE_NEW_GAME_X_REPLACEMENT = 0x3C024210  # 36.0f
 _TITLE_LOAD_GAME_X_REPLACEMENT = 0x3C0243AA  # 340.0f
 
-# r5 changed these after misclassifying GP088_12 as a static menu backing. r6
-# deliberately leaves them pristine because GP088_12 is packed title artwork.
-_TITLE_PACKED_ART_TARGET_VECTOR_OFFSET = 0x6989C0
-_TITLE_PACKED_ART_TARGET_VECTOR_PREIMAGE = struct.pack("<ff", 1.0, 1.0)
+# Both group-88/index-12 backing objects are animated from X scale 0 to the
+# shared (1,1) target. r11 changes their source sprite geometry and left-edge X,
+# not this animation target.
+_TITLE_BACKING_TARGET_VECTOR_OFFSET = 0x6989C0
+_TITLE_BACKING_TARGET_VECTOR_PREIMAGE = struct.pack("<ff", 1.0, 1.0)
 _TITLE_THIRD_OBJECT_VECTOR_CALL_OFFSET = 0x1AC600
 _TITLE_SHARED_VECTOR_CALL_WORD = 0x2787D750
 
@@ -142,7 +152,7 @@ class TitleLayoutRecord:
 
 
 @dataclass(frozen=True)
-class TitlePackedArtGeometry:
+class TitleBackingGeometry:
     record_offset: int
     group: int
     index: int
@@ -166,7 +176,7 @@ class TitleLayoutEvidence:
     string_arena_start: int
     string_pointer_table: int
     sprite_records: tuple[TitleLayoutRecord, ...]
-    packed_title_instances: tuple[TitlePackedArtGeometry, ...]
+    backing_instances: tuple[TitleBackingGeometry, ...]
     label_anchors: tuple[tuple[float, float], ...]
     reveal_marker: TitleRevealMarkerEvidence
     unrelated_record_bytes: tuple[tuple[int, bytes], ...]
@@ -188,12 +198,12 @@ def _require_words(raw: bytes, words: tuple[tuple[int, int], ...], label: str) -
 def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
     """Return fail-closed static evidence for the title menu layout owner.
 
-    Evidence is deliberately split into three classes: the bounded m_title
-    sprite table, the paired GP088_12 packed-title objects that happen to animate
-    adjacent to label creation, and the label renderer's dynamic group-2/index-
-    0x8E/0x8C chrome path. Runtime evidence is authoritative over the discarded
-    GP088_12-as-menu-backing inference. No arbitrary floats outside the proven
-    title-state region are interpreted.
+    Evidence is deliberately split into the bounded m_title sprite table, the
+    paired group-88/index-12 backing objects plus their resource metadata, and
+    the label renderer's dynamic group-2/index-0x8E/0x8C chrome path. Runtime
+    evidence is authoritative over the discarded generic-font-X-offset
+    hypothesis. No arbitrary floats outside these proven ownership chains are
+    interpreted.
     """
 
     if _TITLE_RECORD_END > len(raw):
@@ -215,9 +225,9 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
         )
 
     _require_words(raw, _TITLE_RECORD_CONSUMER_WORDS, "m_title record consumer")
-    _require_words(raw, _TITLE_PACKED_ART_OWNER_WORDS, "packed title-art owner")
+    _require_words(raw, _TITLE_BACKING_ANIMATION_OWNER_WORDS, "title backing animation owner")
     _require_words(raw, _TITLE_LABEL_OWNER_WORDS, "title label owner")
-    _require_words(raw, _TITLE_LABEL_BACKING_OWNER_WORDS, "title label backing owner")
+    _require_words(raw, _TITLE_BACKING_RESOURCE_OWNER_WORDS, "title backing resource owner")
     _require_words(raw, _TITLE_REVEAL_MARKER_WORDS, "title reveal marker")
 
     records: list[TitleLayoutRecord] = []
@@ -237,14 +247,14 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
 
     paired = tuple(record for record in records if (record.group, record.index) == (88, 12))
     if tuple(record.file_offset for record in paired) != (0x5CBF3C, 0x5CBF50):
-        raise ValueError("title layout preimage mismatch for paired GP088_12 packed-title records")
+        raise ValueError("title layout preimage mismatch for paired title-backing records")
 
-    packed_title = tuple(
-        TitlePackedArtGeometry(
+    backing = tuple(
+        TitleBackingGeometry(
             record_offset=record.file_offset,
             group=record.group,
             index=record.index,
-            texture_name="GRP088/GP088_12.TMX",
+            texture_name="GRP088/GP088_08.TMX",
             x=record.values[1],
             y=record.values[2],
             initial_scale_x=0.0,
@@ -254,17 +264,18 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
     )
     label_anchors = ((68.0, 299.0), (380.0, 299.0))
 
-    # Keep the observed +4/+3 relationship as evidence only. r5 runtime proved
-    # that proximity does not imply that GP088_12 owns the visible menu panels.
-    for art, anchor in zip(packed_title, label_anchors, strict=True):
-        if (anchor[0] - art.x, anchor[1] - art.y) != (4.0, 3.0):
-            raise ValueError("title layout preimage mismatch for label/packed-art alignment")
+    # Original 72px backing starts 4px before each 64px Japanese label and is
+    # vertically inset by three pixels. That relationship fixes both centering
+    # and the intended 4px side padding used by the r11 English geometry.
+    for panel, anchor in zip(backing, label_anchors, strict=True):
+        if (anchor[0] - panel.x, anchor[1] - panel.y) != (4.0, 3.0):
+            raise ValueError("title layout preimage mismatch for label/backing alignment")
 
     return TitleLayoutEvidence(
         string_arena_start=TITLE_STRING_ARENA_START,
         string_pointer_table=TITLE_STRING_POINTER_TABLE,
         sprite_records=tuple(records),
-        packed_title_instances=packed_title,
+        backing_instances=backing,
         label_anchors=label_anchors,
         reveal_marker=TitleRevealMarkerEvidence(
             file_offset=0x19A118,
@@ -279,11 +290,11 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
         ),
         evidence=(
             "proven: title-state constructor copies exactly 17 20-byte GP088/GP091 records from VA 0x006CBDE0 and instantiates each through VA 0x107D60",
-            "proven: records 11/12 are the only two (group 88,index 12) instances, at (64,296) and (376,296), and resolve to GRP088/GP088_12.TMX packed title art",
-            "proven: existing decoded GP088_12 asset is the packed two-variant vertical title atlas; r5 runtime disproves treating its +4/+3 proximity to label anchors as menu-panel ownership",
+            "proven: records 11/12 are the only two (group 88,index 12) instances at (64,296)/(376,296); the group-88 resource table resolves index 12 to metadata VA 0x478720",
+            "proven: that metadata selects texture ordinal 8 = GRP088/GP088_08.TMX and defines width 72, height 24, U=72/512 and V=24/64",
             "proven: title labels use anchors (68,299)/(380,299), f16=0, and the label state adds a literal 16.0f per two-byte glyph",
-            "proven: the title label renderer builds two backing primitives with a shared 64px half-width before calling VA 0x188AD0; exact English widths are 128/144px, so an 80px half-width yields a 160px backing with 8px minimum side padding",
-            "proven: m_title initializes both GP088_12 packed-title instances with X scale 0, activates them immediately before constructing labels, and later presents both at X scale 1",
+            "proven: 72px backing around the original 64px four-glyph labels establishes 4px side padding; English therefore needs shared 152px width and centered left edges X=24/336",
+            "proven: m_title initializes both backing instances with X scale 0, activates them immediately before constructing labels, and later presents both at X scale 1",
             "proven: group 2/index 0x8E is the moving reveal marker and per-glyph group 2/index 0x8C follows the same title-label anchor path",
         ),
     )
@@ -291,28 +302,26 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
 def patch_title_layout(raw: bytes) -> bytes:
     """Recenter the exact English title labels while preserving title artwork.
 
-    r5 widened GP088_12 after a static correlation was mistaken for ownership.
-    The decoded texture and r5 runtime contradict that inference: GP088_12 is
-    packed title art. r6 therefore leaves its animation target pristine and
-    changes the two title-specific text-anchor X immediates and the renderer-owned
-    black/chrome half-width. The latter is calculated from the proven 16px glyph
-    advance: a shared 160px primitive fully covers the 128/144px English labels.
-    Packed GP088_12 title art remains untouched.
+    Preserve the accepted English label anchors. Runtime disproves the earlier
+    generic-font-X-offset width patch; r11 instead edits the resource metadata of
+    the actual group-88/index-12 backing (GP088_08) from 72 to 152 pixels and
+    recenters its two instances on the existing label centers. The separately
+    repacked GP088_12 startup title atlas remains untouched.
     """
 
     inspect_title_layout(raw)
 
     if raw[
-        _TITLE_PACKED_ART_TARGET_VECTOR_OFFSET:_TITLE_PACKED_ART_TARGET_VECTOR_OFFSET + 8
-    ] != _TITLE_PACKED_ART_TARGET_VECTOR_PREIMAGE:
-        raise ValueError("title layout preimage mismatch for packed title-art target vector")
+        _TITLE_BACKING_TARGET_VECTOR_OFFSET:_TITLE_BACKING_TARGET_VECTOR_OFFSET + 8
+    ] != _TITLE_BACKING_TARGET_VECTOR_PREIMAGE:
+        raise ValueError("title layout preimage mismatch for title-backing target vector")
     if struct.unpack_from("<I", raw, _TITLE_THIRD_OBJECT_VECTOR_CALL_OFFSET)[0] != _TITLE_SHARED_VECTOR_CALL_WORD:
-        raise ValueError("title layout preimage mismatch for third packed-art animation call")
+        raise ValueError("title layout preimage mismatch for third title-object animation call")
 
     for offset, expected in (
         (_TITLE_NEW_GAME_X_OFFSET, _TITLE_NEW_GAME_X_PREIMAGE),
         (_TITLE_LOAD_GAME_X_OFFSET, _TITLE_LOAD_GAME_X_PREIMAGE),
-        *((offset, _TITLE_BACKING_HALF_WIDTH_PREIMAGE) for offset in _TITLE_BACKING_HALF_WIDTH_OFFSETS),
+        *((offset, expected) for offset, expected, _replacement in TITLE_LABEL_BACKING_PATCHES),
     ):
         actual = struct.unpack_from("<I", raw, offset)[0]
         if actual != expected:
@@ -324,6 +333,6 @@ def patch_title_layout(raw: bytes) -> bytes:
     result = bytearray(raw)
     struct.pack_into("<I", result, _TITLE_NEW_GAME_X_OFFSET, _TITLE_NEW_GAME_X_REPLACEMENT)
     struct.pack_into("<I", result, _TITLE_LOAD_GAME_X_OFFSET, _TITLE_LOAD_GAME_X_REPLACEMENT)
-    for offset in _TITLE_BACKING_HALF_WIDTH_OFFSETS:
-        struct.pack_into("<I", result, offset, _TITLE_BACKING_HALF_WIDTH_REPLACEMENT)
+    for offset, _expected, replacement in TITLE_LABEL_BACKING_PATCHES:
+        struct.pack_into("<I", result, offset, replacement)
     return bytes(result)

@@ -61,11 +61,19 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
                 (0x14FAA0, 0x00052C3F, 0x0006343F),
                 (0x14FAF4, 0x0003343C, 0x00032C3C),
                 (0x14FAF8, 0x0006343F, 0x00052C3F),
-                # r9 runtime proves why the earlier Y patch did not work: this
-                # formula is 39 - line*114, so 114 is the multiplier, not the base.
-                # Put row zero at Y=300 and use 16px English row spacing.
-                (0x14FA70, 0x3C03421C, 0x3C034396),  # 39 -> 300 px body Y base
-                (0x14FA78, 0x3C0342E4, 0x3C034180),  # 114 -> 16 px body Y stride
+                # Runtime proves the later 0x24F9E0 fragment loop is not the
+                # visible main body origin. The actual wrapper creates the body at
+                # X=90/Y=20, and 0x24F660 then creates three primary canvases at
+                # X=base, base-39, base-78 with the same Y. Transpose those into
+                # English rows X=20, Y=300/316/332.
+                (0x14E94C, 0x3C0242B4, 0x3C0241A0),  # wrapper base X: 90 -> 20
+                (0x14E954, 0x3C0241A0, 0x3C024396),  # wrapper base Y: 20 -> 300
+                (0x14F8F8, 0x3C02421C, 0x3C024180),  # row 1 offset: 39 -> 16
+                (0x14F904, 0x4600C301, 0x4600C306),  # X1: base-16 -> base
+                (0x14F920, 0x4600BB46, 0x4600BB40),  # Y1: base -> base+16
+                (0x14F99C, 0x3C02429C, 0x3C024200),  # row 2 offset: 78 -> 32
+                (0x14F9A8, 0x4600C301, 0x4600C306),  # X2: base-32 -> base
+                (0x14F9C4, 0x4600BB46, 0x4600BB40),  # Y2: base -> base+32
                 # The live child font constructor uses style 1, whose profile is
                 # 12x12. After transposition the old Japanese 26 px column stride
                 # becomes English X spacing, so match the actual 12 px glyph
@@ -98,8 +106,16 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
         # record at VA 0x5D7800 stores width/height 12/12 in the low bytes.
         self.assertEqual(0x24050001, struct.unpack_from("<I", RAW, 0x14FB70)[0])
         self.assertEqual((12, 12), tuple(RAW[0x4D7884:0x4D7886]))
-        self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x14FA70)[0])
-        self.assertEqual(0x3C034180, struct.unpack_from("<I", result, 0x14FA78)[0])
+        self.assertEqual(0x3C0241A0, struct.unpack_from("<I", result, 0x14E94C)[0])
+        self.assertEqual(0x3C024396, struct.unpack_from("<I", result, 0x14E954)[0])
+        self.assertEqual(0x3C024180, struct.unpack_from("<I", result, 0x14F8F8)[0])
+        self.assertEqual(0x4600C306, struct.unpack_from("<I", result, 0x14F904)[0])
+        self.assertEqual(0x4600BB40, struct.unpack_from("<I", result, 0x14F920)[0])
+        self.assertEqual(0x3C024200, struct.unpack_from("<I", result, 0x14F99C)[0])
+        self.assertEqual(0x4600C306, struct.unpack_from("<I", result, 0x14F9A8)[0])
+        self.assertEqual(0x4600BB40, struct.unpack_from("<I", result, 0x14F9C4)[0])
+        # The disproven secondary-loop Y patches are gone.
+        self.assertEqual(RAW[0x14FA70:0x14FA7C], result[0x14FA70:0x14FA7C])
         self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x14FAC8)[0])
 
         changed = {i for i, (before, after) in enumerate(zip(RAW, result)) if before != after}
@@ -134,8 +150,8 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
         # (s0): only mode 0 becomes horizontal, while every existing nonzero mode
         # retains pristine vertical advance. The inline speaker is the only direct
         # 0x190A50 caller moved to mode 0. r7 proved that horizontal path; r8
-        # keeps X=20/Y=276; r10 freezes that accepted speaker and fixes the
-        # separate body formula instead of moving the speaker again.
+        # keeps X=20/Y=276; r11 freezes that accepted speaker and fixes the
+        # separate body owner instead of moving the speaker again.
         expected = (
             (0x150048, 0x3C024301, 0x3C0241A0),  # 129 -> 20 px X
             (0x150050, 0x3C0241A0, 0x3C02438A),  # 20 -> 276 px Y

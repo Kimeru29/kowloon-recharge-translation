@@ -145,7 +145,7 @@ class StartupAcceptanceTests(unittest.TestCase):
                 )
                 self.assertFalse(check["ok"])
 
-    def test_title_backing_acceptance_fails_closed_on_each_half_width_owner(self) -> None:
+    def test_title_backing_acceptance_fails_closed_on_each_resource_or_position_owner(self) -> None:
         translated = build_early_ui_elf(RAW)
         for offset, _expected, _replacement in TITLE_LABEL_BACKING_PATCHES:
             with self.subTest(offset=hex(offset)):

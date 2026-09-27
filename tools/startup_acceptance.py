@@ -260,12 +260,12 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         ))
 
     title_geometry_ok = False
-    title_geometry_detail = "title English label geometry or packed title-art invariants are missing/stale"
+    title_geometry_detail = "title English label/backing geometry or preservation invariants are missing/stale"
     if (
         len(raw) >= 0x6989C8
         and len(raw) >= 0x1AC604
         and len(raw) >= 0x1ABF88
-        and len(raw) >= 0x19ABDC
+        and len(raw) >= 0x3787C0
         and len(raw) >= 0x5CBFB4
         and len(raw) >= TITLE_POINTER_TABLE_OFFSET + 8
     ):
@@ -273,9 +273,20 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         new_anchor_word = struct.unpack_from("<I", raw, 0x1ABF64)[0]
         load_anchor_word = struct.unpack_from("<I", raw, 0x1ABF84)[0]
         backing_words = tuple(struct.unpack_from("<I", raw, offset)[0] for offset, _, _ in TITLE_LABEL_BACKING_PATCHES)
-        packed_art_scale = struct.unpack_from("<ff", raw, 0x6989C0)
+        backing_scale_target = struct.unpack_from("<ff", raw, 0x6989C0)
         third_call = struct.unpack_from("<I", raw, 0x1AC600)[0]
-        title_records_hash = sha256(raw[0x5CBE60:0x5CBFB4]).hexdigest()
+        # r11 intentionally recenters the two backing records inside this table.
+        # Normalize only those exact fields back to pristine before hashing so
+        # unrelated title-state bytes remain covered by the historical checksum.
+        normalized_title_records = bytearray(raw[0x5CBE60:0x5CBFB4])
+        for offset, pristine, _replacement in TITLE_LABEL_BACKING_PATCHES:
+            if 0x5CBE60 <= offset < 0x5CBFB4:
+                struct.pack_into("<I", normalized_title_records, offset - 0x5CBE60, pristine)
+        title_records_hash = sha256(normalized_title_records).hexdigest()
+        generic_text_offsets_pristine = (
+            struct.unpack_from("<I", raw, 0x19AB38)[0] == 0x3C024280
+            and struct.unpack_from("<I", raw, 0x19ABD8)[0] == 0x3C024280
+        )
         title_geometry_ok = (
             raw[TITLE_NEW_GAME_START:TITLE_NEW_GAME_START + len(new_game)] == new_game
             and raw[TITLE_LOAD_START:TITLE_LOAD_START + len(load_game)] == load_game
@@ -284,8 +295,9 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             and new_anchor_word == 0x3C024210
             and load_anchor_word == 0x3C0243AA
             and backing_words == tuple(replacement for _, _, replacement in TITLE_LABEL_BACKING_PATCHES)
-            and packed_art_scale == (1.0, 1.0)
+            and backing_scale_target == (1.0, 1.0)
             and third_call == 0x2787D750
+            and generic_text_offsets_pristine
             and title_records_hash == "fbb685e638f950a844c169bec567f7102943e4a9b7ef1916f02b2b0dcb530422"
         )
     checks.append(

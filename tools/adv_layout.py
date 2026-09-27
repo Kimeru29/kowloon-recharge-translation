@@ -142,8 +142,9 @@ def inspect_adv_coordinate_consumers(raw: bytes) -> tuple[AdvCoordinateConsumer,
 # to otherwise-unused direct-call mode 0. Mode 0 keeps the normal 16x18 font and
 # becomes horizontal while modes 1..7 retain their pristine vertical flag. The
 # speaker's own fixed X remains 20. r7 runtime proves the horizontal header path;
-# r8 moves only Y to 276 and runtime accepts that speaker placement. r9 freezes
-# it and moves only the body base to Y=300 so prose begins directly below it.
+# r8 moves only Y to 276 and runtime accepts that speaker placement. The next
+# runtime pass still left the body at the top, proving the body origin is upstream.
+# r11 freezes the speaker and patches only the primary body-canvas geometry.
 #
 # Keep the r5 0x251470 record-label orientation patch because it is a distinct
 # ADV record-label renderer and removing a shipped change without contrary
@@ -176,38 +177,47 @@ ADV_SPEAKER_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
 )
 
 ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
-    # First formula is actually 39 - line*114. a1 (X) -> a2 (Y). r9 runtime
-    # exposed the earlier operand mistake: changing 114 moved the multiplier but
-    # left row zero at Y=39. English needs row zero below the accepted speaker,
-    # with compact row spacing, so use 300 - line*16.
-    (0x14FA9C, 0x00032C3C, 0x0003343C),  # dsll32 a1,v1,16 -> dsll32 a2,v1,16
-    (0x14FAA0, 0x00052C3F, 0x0006343F),  # dsra32 a1,a1,16 -> dsra32 a2,a2,16
-    # Second formula becomes English X. Preserve the proven /2 byte-to-glyph
-    # normalization, but replace the Japanese 26 px column stride with the 12 px
-    # advance of the exact style-1 font profile used by these child fragments.
-    (0x14FAF4, 0x0003343C, 0x00032C3C),  # dsll32 a2,v1,16 -> dsll32 a1,v1,16
-    (0x14FAF8, 0x0006343F, 0x00052C3F),  # dsra32 a2,a2,16 -> dsra32 a1,a1,16
-    (0x14FA70, 0x3C03421C, 0x3C034396),  # 39.0f -> 300.0f body Y base
-    (0x14FA78, 0x3C0342E4, 0x3C034180),  # 114.0f -> 16.0f body Y row stride
+    # Keep the proven secondary fragment-axis transpose from r7. Runtime proves
+    # that this later 0x24F9E0 loop is not the visible primary body origin.
+    (0x14FA9C, 0x00032C3C, 0x0003343C),  # secondary fragment X -> Y
+    (0x14FAA0, 0x00052C3F, 0x0006343F),
+    (0x14FAF4, 0x0003343C, 0x00032C3C),  # secondary fragment Y -> X
+    (0x14FAF8, 0x0006343F, 0x00052C3F),
+
+    # Actual visible body owner. The wrapper at VA 0x24E8A0 supplies base
+    # X=90/Y=20 to 0x24F660. That constructor creates three primary body
+    # canvases at X=base, base-39, base-78 while keeping all three at base Y.
+    # Transpose that Japanese column layout into English rows directly below the
+    # runtime-accepted speaker: X=20, Y=300/316/332.
+    (0x14E94C, 0x3C0242B4, 0x3C0241A0),  # base X: 90 -> 20
+    (0x14E954, 0x3C0241A0, 0x3C024396),  # base Y: 20 -> 300
+    (0x14F8F8, 0x3C02421C, 0x3C024180),  # primary row 1 offset: 39 -> 16
+    (0x14F904, 0x4600C301, 0x4600C306),  # X1: base-16 -> base
+    (0x14F920, 0x4600BB46, 0x4600BB40),  # Y1: base -> base+16
+    (0x14F99C, 0x3C02429C, 0x3C024200),  # primary row 2 offset: 78 -> 32
+    (0x14F9A8, 0x4600C301, 0x4600C306),  # X2: base-32 -> base
+    (0x14F9C4, 0x4600BB46, 0x4600BB40),  # Y2: base -> base+32
+
+    # The live style-1 body fragments are 12x12. Preserve the proven /2 byte-to-
+    # glyph normalization and use 12px horizontal fragment spacing.
     (0x14FAC8, 0x3C0341D0, 0x3C034140),  # 26.0f -> 12.0f X fragment stride
-    # Unique wrapper callsite: orientation=1 is saved in s4 and reaches all four
-    # child font canvases. Clear it before construction rather than patching only
-    # one downstream fragment as the failed r3 experiment did.
-    (0x14E96C, 0x24060001, 0x24060000),  # addiu a2,zero,1 -> addiu a2,zero,0
+
+    # Unique wrapper callsite: orientation=1 is saved in s4 and reaches all child
+    # font canvases. Zero is the runtime-proven horizontal advance path.
+    (0x14E96C, 0x24060001, 0x24060000),
 )
 
 
 def patch_adv_horizontal_layout(raw: bytes) -> bytes:
     """Transpose only the proven ADV/DG glyph-layout constructor to English.
 
-    The pristine constructor computes X-like ``39 - 114 * line`` and Y-like
-    ``20 + 26 * (byte_position / 2)`` integer origins before passing them as
-    ``a1``/``a2`` to the coordinate helper. English needs the second formula as
-    X and the first as Y. Runtime r9 proves row zero still used the untouched
-    39px base, so r10 changes the transposed body formula to ``300 - 16 * line``.
-    Because the live fragments use the 12x12 style-1 font, their transposed X
-    stride remains tightened from 26 to 12 pixels. Separately,
-    the unique wrapper passes orientation=1
+    Runtime proves the visible body is not positioned by the later
+    ``39 - line*114`` fragment loop. The upstream wrapper supplies X=90/Y=20,
+    and the constructor uses that pair for its three primary body canvases at
+    X offsets 0/-39/-78. English transposes those canvases to X=20 and
+    Y=300/316/332. The later fragment-axis transpose and the proven 12px style-1
+    horizontal spacing remain intact. Separately, the unique wrapper passes
+    orientation=1
     into the ADV object constructor; that value is propagated to every child font
     canvas, and the generic callback proves nonzero advances Y while zero advances
     X. Swap the completed origins and clear that one upstream orientation flag.
