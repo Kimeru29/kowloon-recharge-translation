@@ -61,6 +61,11 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
                 (0x14FAA0, 0x00052C3F, 0x0006343F),
                 (0x14FAF4, 0x0003343C, 0x00032C3C),
                 (0x14FAF8, 0x0006343F, 0x00052C3F),
+                # r7 runtime proves orientation and spacing are now correct, but
+                # the block is still too high. After transposition this 114px
+                # Japanese column base is the live body Y origin. Move it directly below
+                # the accepted speaker line without touching line spacing.
+                (0x14FA78, 0x3C0342E4, 0x3C034396),  # 114 -> 300 px body base
                 # The live child font constructor uses style 1, whose profile is
                 # 12x12. After transposition the old Japanese 26 px column stride
                 # becomes English X spacing, so match the actual 12 px glyph
@@ -126,11 +131,12 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
         # +0x24 is nonzero. Make that orientation depend on the saved text mode
         # (s0): only mode 0 becomes horizontal, while every existing nonzero mode
         # retains pristine vertical advance. The inline speaker is the only direct
-        # 0x190A50 caller moved to mode 0. Place it at X=20/Y=80 so it forms a
-        # horizontal header aligned over the transposed body origin (X=20/Y=114).
+        # 0x190A50 caller moved to mode 0. r7 proved that horizontal path; r8
+        # keeps X=20/Y=276; r9 preserves the speaker and moves only the body
+        # upward to Y=300 so the prose starts immediately below the name.
         expected = (
             (0x150048, 0x3C024301, 0x3C0241A0),  # 129 -> 20 px X
-            (0x150050, 0x3C0241A0, 0x3C0242A0),  # 20 -> 80 px Y
+            (0x150050, 0x3C0241A0, 0x3C02438A),  # 20 -> 276 px Y
             (0x15006C, 0x24050002, 0x24050000),  # speaker mode 2 -> 0
             (0x090B30, 0x24060001, 0x0010302B),  # a2 = (mode != 0)
             (0x151608, 0x24060001, 0x24060000),  # preserved r5 record label

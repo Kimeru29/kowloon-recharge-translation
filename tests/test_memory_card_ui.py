@@ -44,7 +44,7 @@ class MemoryCardUiTests(unittest.TestCase):
 
     def test_boot_slot1_message_wraps_before_slot_number_for_stone_panel(self) -> None:
         english = MEMORY_CARD_MESSAGES[1][2]
-        self.assertEqual("\n\nChecking memory card\n       slot 1", english)
+        self.assertEqual("\n\n\nChecking memory card\n       slot 1", english)
 
         result, info = patch_hant_tutorial(RAW)
         target_va = struct.unpack_from("<I", result, MEMORY_CARD_POINTER_TABLE_OFFSET + 4)[0]

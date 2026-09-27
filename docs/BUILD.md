@@ -615,3 +615,52 @@ Measured v11-r7 static/deterministic result:
 - deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r7-repeat.iso` has the same SHA-256 and is byte-for-byte identical by `cmp`.
 
 Do not launch r7 automatically. Pablo is the runtime tester; the exact r7 visual gate is in `docs/LOCALIZATION_STATUS.md`.
+
+## Build startup v11-r8 candidate
+
+r8 is a presentation-only follow-up to Pablo's runtime-tested r7. It changes only three proven owners: ADV vertical dialogue geometry, boot-tablet line padding, and the `GP088_08` lower title-label backing. Name/license centering, H.A.N.T., title text anchors, `GP088_03`, and packed `GP088_12` are preservation constraints.
+
+For the title overlay, r8 applies the fail-closed `GP088_08` backing transformation to the verified r7 localized `B_GP088.BIN`; this changes only that TMX chunk and preserves the r7 title art path.
+
+Measured r8 result:
+- ISO SHA-256: `c2905f8bf1ebe20defb5479591c0dbf86b2e9bfbf9c6062db37ccf6f8ba6593f`;
+- pre-ROFS ELF: `62d68ec47255d37eb372f75d074815159b352367096e488247d699ed54043200`;
+- post-ROFS ELF: `d19d03a728aba3fff0102b076cc53d045e3329de7b421b4ef4c8ec54a5eb5712`;
+- 140/140 final-image checks;
+- 201 tests in both suites (10 dependency-free skips / 1 Pillow-owned-corpus skip);
+- repeat ISO byte-for-byte identical.
+
+Do not launch PCSX2 automatically. Pablo is the runtime tester.
+
+## Build startup v11-r9 candidate
+
+r9 is the runtime-polish follow-up to r8. Preserve the r8 tablet and speaker/name geometry. Regenerate the GP088 overlay with the current `port_title_startup_graphics` transform (300px lower backing), rebuild the early-UI ELF, then build from the pristine PS2 ISO exactly as previous candidates.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r9.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r9.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r9.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r9.json
+```
+
+Measured r9 result:
+- ISO SHA-256: `0abe223df878c181da784247fe112553abe030a4f7db240f972285b5aa7696d0`;
+- pre-ROFS ELF: `06e364c79be9db69a6b0490d0a2368725ea29d29753aa68e5cd5370a812bf2ca`;
+- post-ROFS ELF: `61520a390a50de641096514fe219062f7059a382b3e1a6b9cc231ba4069c3ee6`;
+- 1,145 overlays; 892 in place / 253 relocated;
+- 140/140 final-image checks;
+- 201 tests in both suites (10 dependency-free skips / 1 Pillow-owned-corpus skip);
+- repeat ISO byte-for-byte identical.
+
+Do not launch PCSX2 automatically. The r9 runtime gate is documented in `docs/LOCALIZATION_STATUS.md`.

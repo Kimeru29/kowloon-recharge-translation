@@ -14,26 +14,26 @@ Status meanings:
 | Surface | Status | Evidence / next action |
 | --- | --- | --- |
 | 29 opening quotations (`TR000`-`TR028`) | **Working / runtime-proven** | v10 runtime confirmed English quotation artwork and observed different quotations across restarts. The 29 generated TMXs remain distinct and the executable selects `PRNG % 29` before formatting `TR%03d.TMX`. |
-| Pre-title memory-card status text | **Translated but buggy** | r6 runtime confirms the message is translated and substantially improved, but the tablet block still needs centering/padding. r7 keeps the same proven table/handler ownership, adds one leading blank row, and centers `slot 1` under `Checking memory card`; runtime acceptance is pending. |
+| Pre-title memory-card status text | **Working / runtime-proven** | r8 runtime accepts the lower/better-balanced tablet presentation. Preserve the exact r8 payload and centered `slot 1`; r9 does not touch this path. |
 | GP088 startup/title artwork — direct `GP088_03` counterpart | **Not runtime-tested** | v9 retains the v8 same-name official English `b_gp088_en/GP088_03` port into PS2 `B_GP088.BIN`. |
 | GP088 PS2 packed title atlas (`GP088_12`) | **Not runtime-tested** | v9 proves that the two GP088_12 Japanese title variants are repacked GP088_03 regions (Dice 0.8758 / 0.8765 after excluding the known flattened banner band), then rebuilds GP088_12 from the official English GP088_03 regions. The official English remaster omits the flattened gold `re:charge` banner, so v9 removes it rather than synthesizing missing artwork. `GP088_13` is a separate already-English blue `re:charge` badge and remains unchanged. |
-| Title `New Game` / `Load Game` | **Translated but buggy** | r6 runtime shows the recentered labels are materially better, but the black backing still does not cover the full English text. r7 preserves r6's X=36/340 anchors and pristine packed-title scale. `GP088_08` is now proven to contain the black title chrome but is a multi-region atlas; its live sampled subregion is not yet isolated, so r7 deliberately avoids another speculative scale/repaint. |
+| Title `New Game` / `Load Game` | **Translated but buggy** | r8 runtime confirms the backing owner but shows that 150 texture pixels still render shorter than the English labels. The screenshot measures the visible strip at roughly half the intended logical width. r9 keeps the accepted X=36/340 anchors and extends only the `GP088_08` lower strip to 300 texture pixels, preserving the unrelated upper strip/title art and moving the existing marker with the edge. |
 | Name-entry English button graphics (`B_GP019.BIN`) | **Working / runtime-proven** | Back/Edit/Finish/Delete/Confirm controls render correctly. |
 | `Enter last name.` | **Working / runtime-proven** | Wide English prompt renders correctly. |
 | Lowercase Latin keyboard | **Working / runtime-proven** | Runtime accepts lowercase Latin input. |
 | Uppercase Latin keyboard | **Working / runtime-proven** | v7 runtime proved the PS2-adapted reachable rows expose uppercase alongside lowercase. |
 | Name fields / permanent name storage | **Translated but buggy** | v10 still shows the structural two-3-glyph permanent-name behavior. The editor uses two 6-byte buffers, a six-position cursor, and split/layout/delete logic at position 3; `Habaki`/`Kuro` truncate to `Hab`/`Kur`. This remains explicitly out of scope for v11. |
-| `Enter first name.` | **Not runtime-tested** | Official wide English is statically present. r6 runtime feedback shows the name-prompt class needs centering; r7 moves the shared last/first-name state X owner to 124, a midpoint that leaves either English prompt at most 8px off exact center. |
+| `Enter first name.` | **Working / runtime-proven** | r7 runtime confirms the centered English name-entry presentation looks good. Preserve the shared last/first-name geometry; r8 does not modify this path. |
 | `Enter reading for last name.` | **Translated but buggy** | The log-confirmed v8 run proved the allocator fix: the full official string survived, but the PS2 two-byte-cell renderer clipped it at the right edge (`Enter reading for las...`). v10 no longer enters this PS2-only kana-reading editor during the English flow, so this prompt should be unreachable rather than cosmetically shortened. |
 | `Enter reading for first name.` | **Not runtime-tested** | The exact official prompt remains present in the protected translation segment for provenance, but v10 should bypass the kana-reading pass before this screen is reached. |
 | Reading-input states | **Translated but buggy** | The log-confirmed v8 run reached the PS2 reading editor and showed that its prompt now survives but clips. Reverse engineering proved this is a kana-specific second pass backed by `name/namedic.bin`; v10 reuses the existing post-reading transition and skips the pass entirely for English. |
 | Finish/advance after name-reading input | **Translated but buggy** | The log-confirmed v8 run still remained stuck after Finish, so the old heap collision was not the only flow defect. State 9 passes flag `0` to the shared `M_Name` transition and deliberately enters the kana-reading editor; state 11 passes flag `1` to the same routine and commits/finalizes. v10 changes only the state-9 flag to `1`, with exact instruction preimage checks, so English should skip the problematic reading phase. Runtime proof pending. |
-| `Is this fine?` / `Yes / No` | **Not runtime-tested** | Official English is statically present and the v10 English flow still bypasses the kana-reading pass. r7 separately centers the live confirmation prompt at X=152 and the Yes/No prompt object at X=192; runtime proof is pending. |
-| License-ID messages | **Translated but buggy** | r6 runtime feedback shows this prompt class is still visibly off-center. r7 keeps the official wording and centers the two traced 16px-renderer X owners independently: `Verifying license ID...` at X=72 and `ID verification complete.` at X=56. Both preimages and final-image geometry are fail-closed; runtime acceptance is pending. |
+| `Is this fine?` / `Yes / No` | **Working / runtime-proven** | r7 runtime accepted the centered name-entry/confirmation presentation. r8 freezes the X=152 confirmation and X=192 Yes/No geometry. |
+| License-ID messages | **Working / runtime-proven** | r7 runtime confirms the centered license/name screen looks good. Preserve `Verifying license ID...` at X=72 and `ID verification complete.` at X=56; r8 does not modify either owner. |
 | `Heracleion Shrine` | **Not runtime-tested** | Statically translated as wide executable text. |
 | H.A.N.T. tutorial | **Translated but buggy** | r5 runtime proved the 12px font is readable and remains a preservation constraint. r6 runtime feedback says the page rows still need less vertical spacing, so r7 keeps the 12px font and tightens only the page-local stride from 18px to 16px, recalculating controller metadata from the same source geometry. Runtime acceptance of the tighter spacing is pending. |
-| ADV horizontal dialogue renderer | **Translated but buggy** | r6 runtime disproved the mode-only speaker hypothesis: dialogue still failed the PS4-style horizontal block target. r7 traces the real orientation owner through generic constructor VA `0x190A50` → font-object `+0x24` → glyph renderer VA `0x18DFFC`; mode 0 now gets horizontal orientation while all nonzero modes preserve pristine behavior. The speaker moves to X=20/Y=80, and the transposed body X stride changes from the Japanese 26px column spacing to the exact 12px style-1 glyph advance. Runtime proof is required. |
-| First old-man DG00 English dialogue | **Translated but buggy** | The English content is runtime-proven, but r6 still looked structurally wrong versus the PS4 reference. r7 gives the bracket-derived speaker a single horizontal header path and tightens body fragment spacing from 26px to 12px while preserving the proven coordinate transpose/reveal path. No runtime-fixed claim is made until Pablo observes the result. |
+| ADV horizontal dialogue renderer | **Translated but buggy** | r8 runtime accepts the horizontal/bracketed speaker at X=20/Y=276 and the 12px body spacing. The remaining defect is the gap before the prose. r9 freezes the speaker exactly and moves only the body base Y 312→300 so the dialogue starts directly below the name. |
+| First old-man DG00 English dialogue | **Translated but buggy** | r8 puts `[Old man's voice]` in the correct format and location and keeps the body readable, but leaves too much vertical separation between the name and prose. r9 changes only the body base to Y=300. |
 | DG00 English choices | **Not runtime-tested** | Reviewed KSF overrides/imports remain present; the accepted v10 observation did not explicitly promote this row. |
 | H.A.N.T. top-level six tiles (`GP020_03`) | **Working / runtime-proven** | r5 runtime confirms `MAIL`, `DICTIONARY`, `ENEMY`, `MEMO`, `HELP`, and `CONFIG` look good. Preserve the semantic baked-art repaint and do not route these captions back through executable text. |
 | H.A.N.T. executable chrome labels | **Not runtime-tested** | The independent seven-entry live owner table at file `0x586D20` remains relocated to semantic `【Main Menu】`, `【Mail】`, `【Dictionary】`, `【Enemy】`, `【Memo】`, `【Help】`, and `【Config】`. These are not claimed as official-remaster wording because the localized TextAsset is unavailable. |
@@ -237,7 +237,7 @@ r5 established the new runtime ground truth. The GP020 top-level tiles (`MAIL`, 
 
 Pablo's r6 runtime pass proved several improvements and exposed the remaining presentation defects. `New Game` / `Load Game` are materially better with the recentered anchors, but their black backing still does not cover the full English text. The tablet is translated and improved but still needs centering/padding. Name/license prompts need centering. Deeper H.A.N.T. submenu content is translated, but the submenu title looks awkward and page rows need less spacing. Most importantly, the dialogue still does not match the PS4 horizontal speaker/body composition, disproving the r6 mode-only speaker fix. Those observations are the r7 input contract.
 
-### v11-r7 — current deterministic candidate; runtime proof pending
+### v11-r7 — runtime-tested presentation checkpoint
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r7.iso`
 - ISO SHA-256: `2b64165f820ec208ff9d721b9fbf30d8ee17bb78b9556e7ebe540c83b27221b4`
@@ -250,10 +250,42 @@ Pablo's r6 runtime pass proved several improvements and exposed the remaining pr
 - dependency-free suite: **199 tests OK** (8 expected skips)
 - Pillow-enabled suite: **199 tests OK** (1 owned-corpus skip)
 - deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r7-repeat.iso` is byte-for-byte identical and has the same SHA-256.
-- PCSX2 status: **not launched for r7**; Pablo is the runtime tester.
+- PCSX2 status: **manually runtime-tested by Pablo**.
 
 r7 addresses only traced r6 presentation defects. Dialogue now fixes the actual generic-font orientation owner, puts the bracket-derived speaker at X=20/Y=80, and changes the transposed body fragment stride from 26px to the proven 12px style-1 advance. The M_Name prompt states and both license lines get fail-closed centered English X geometry. The tablet keeps its proven memory-card owner but adds top padding and centers `slot 1`; H.A.N.T. keeps its 12px font, tightens its page-local stride to 16px, and uses the shorter semantic Help tab `Ruins`. The translated r6 Help/Config content remains intact.
 
 The r6 title-anchor improvement is intentionally preserved unchanged. Static tracing confirms `GP088_08` contains black title chrome, but it is a multi-region atlas and the exact live sampled backing subregion has not been isolated; r7 therefore does not ship another speculative title scale/repaint. That black-backing coverage remains a known issue rather than an r7 regression.
 
 Manual r7 gate: the tablet should have visible top breathing room and a centered second line; name/confirmation/license prompts should be centered; the first old-man speaker should be one horizontal header above a tightly spaced horizontal body block; H.A.N.T. top-level tiles must not regress, deeper Help/Config content must remain English, the Help tab should read `Ruins`, and tutorial rows should be tighter without overlap. Title labels should retain the r6 improvement; incomplete black-backing coverage is a known unchanged issue. Static success is not runtime acceptance.
+
+### v11-r8 — runtime-tested presentation checkpoint
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r8.iso`
+- ISO SHA-256: `c2905f8bf1ebe20defb5479591c0dbf86b2e9bfbf9c6062db37ccf6f8ba6593f`
+- translated ELF SHA-256 before ROFS rewrite: `62d68ec47255d37eb372f75d074815159b352367096e488247d699ed54043200`
+- final post-ROFS ELF SHA-256: `d19d03a728aba3fff0102b076cc53d045e3329de7b421b4ef4c8ec54a5eb5712`
+- final-image startup acceptance: **140/140**
+- dependency-free suite: **201 tests OK** (10 expected skips)
+- Pillow-enabled suite: **201 tests OK** (1 owned-corpus skip)
+- PCSX2 status: **manually runtime-tested**.
+
+r8 improves all three target surfaces, but only the tablet is accepted as-is. The stone text now looks balanced enough and becomes a preservation constraint. The dialogue speaker/name is also now in the correct format and place, but the body begins too far below it. The title backing became wider, proving the `GP088_08` lower strip is live, but it still does not span the complete English label.
+
+### v11-r9 — current deterministic candidate; runtime proof pending
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r9.iso`
+- ISO SHA-256: `0abe223df878c181da784247fe112553abe030a4f7db240f972285b5aa7696d0`
+- translated ELF SHA-256 before ROFS rewrite: `06e364c79be9db69a6b0490d0a2368725ea29d29753aa68e5cd5370a812bf2ca`
+- final post-ROFS ELF SHA-256: `61520a390a50de641096514fe219062f7059a382b3e1a6b9cc231ba4069c3ee6`
+- translated/final ELF size: 8,405,750 bytes
+- overlays: 1,145 total; 892 in place / 253 relocated
+- executable ROFS records: 1,145 patched/re-resolved
+- final-image startup acceptance: **140/140** (`local/startup-acceptance-v11-r9.json`)
+- dependency-free suite: **201 tests OK** (10 expected skips)
+- Pillow-enabled suite: **201 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r9-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
+- PCSX2 status: **not launched for r9**.
+
+r9 is deliberately smaller than r8. It freezes the accepted tablet, speaker/name geometry, dialogue orientation/brackets/12px spacing, name/license screens, H.A.N.T., and title text anchors. It changes only two runtime-proven presentation owners: the dialogue body base moves from Y=312 to Y=300, and the `GP088_08` lower backing grows from the r8 150 texture pixels to 300 texture pixels. The existing six-pixel texture gap and trailing marker move with the new right edge.
+
+Manual r9 gate: the stone tablet and speaker line must look exactly like r8; prose should begin immediately below the speaker instead of leaving the r8 gap; `New Game` and `Load Game` should finally fit entirely within their dark backing. Everything else is a regression if it changes. Static success is not runtime acceptance.

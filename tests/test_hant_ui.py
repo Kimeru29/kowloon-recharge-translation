@@ -35,9 +35,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(4479, info.payload_size)
+        self.assertEqual(4485, info.payload_size)
         self.assertEqual(
-            "979bfbd10e200141768641051750d46108e1a90e0249e6ec79df3d41c1e0d080",
+            "6cf9f8d3ee6933d2047603824a60160c9a93fce6685f345ff40896fae0f12dd1",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
