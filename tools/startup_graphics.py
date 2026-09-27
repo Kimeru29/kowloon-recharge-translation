@@ -57,15 +57,18 @@ _TITLE_PACKED_MIN_DICE = 0.82
 # - x=1..470 / y=1..22: unrelated long footer/title chrome;
 # - x=1..70 / y=25..46: the 70px menu-label backing, followed by a 6px gap
 #   and a small green trailing marker at x=77..82 on y=29..35.
-# Four Japanese 16px glyphs need 64px + 6px backing. The longest localized
-# label, ``Load Game``, is nine glyphs: 144px + the same 6px chrome = 150px.
+# r8 proved this is the live backing. Its runtime screenshot is consistent with
+# the strip being presented at roughly half logical width. The longest
+# localized label, ``Load Game``, is nine 16px glyphs = 144 logical pixels.
+# A 300px texture strip presents at about 150 logical pixels on this path. Keep
+# the existing six-texture-pixel gap separately and move the trailing marker.
 _TITLE_BACKING_BLACK_INDEX = 1
 _TITLE_BACKING_TRANSPARENT_INDEX = 15
 _TITLE_BACKING_SOURCE_X = (1, 71)       # [start,end)
-_TITLE_BACKING_TARGET_X = (1, 151)      # 150px
+_TITLE_BACKING_TARGET_X = (1, 301)      # 300 texture px ~= 150 logical px
 _TITLE_BACKING_Y = (25, 47)
 _TITLE_BACKING_MARKER_SOURCE_X = (77, 83)
-_TITLE_BACKING_MARKER_TARGET_X = (157, 163)
+_TITLE_BACKING_MARKER_TARGET_X = (307, 313)
 _TITLE_BACKING_MARKER_Y = (29, 36)
 
 
@@ -75,7 +78,7 @@ def _extend_title_label_backing_indices(
     height: int,
     palette: list[tuple[int, int, int, int]],
 ) -> bytes:
-    """Extend only the proven GP088_08 70px menu-label backing to 150px.
+    """Extend only the proven GP088_08 menu-label backing for English width.
 
     The function is intentionally fail-closed on the pristine bar/gap geometry.
     It preserves the unrelated 470px strip and copies the existing trailing
@@ -168,8 +171,9 @@ def port_title_startup_graphics(source_bin: bytes, png_dir: Path) -> bytes:
     transforms. The official English remaster omits the flattened re:charge
     banners, so the packed target is rebuilt from only the localized title
     regions rather than synthesizing missing artwork. GP088_08 independently
-    owns the 70px Japanese menu-label backing; r8 extends only that dark strip
-    to 150px for the nine-glyph English maximum and preserves its trailing marker.
+    owns the 70px Japanese menu-label backing. Runtime r8 proves the title path
+    presents that texture at about half logical width, so r9 extends only that
+    dark strip to 300 texture pixels and preserves its trailing marker.
     """
 
     _prove_packed_title_layout(source_bin)

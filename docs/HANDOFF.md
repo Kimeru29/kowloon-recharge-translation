@@ -223,13 +223,13 @@ PS2-only lexical proxy:
 
 ## Latest runtime result and next gate
 
-Pablo manually runtime-tested **v11-r7** and considers it a major improvement. Freeze its accepted name/license centering. Dialogue speaker orientation/brackets and body spacing are also now correct; only vertical placement is wrong. The title labels are much better but the black backing is too short, and the translated tablet text still sits awkwardly.
+The latest manual runtime pass is **v11-r8**. The tablet is now accepted and must stay unchanged. The dialogue speaker/name is also finally in the right format and position; only the body is still separated too far below it. The title backing improved but remains visibly narrower than the English label, confirming that the live `GP088_08` strip needs more texture width than the first 150px estimate.
 
-The current static/deterministic candidate is **v11-r8** at `/private/tmp/kowloon-recharge-startup-en-v11-r8.iso`, SHA-256 `c2905f8bf1ebe20defb5479591c0dbf86b2e9bfbf9c6062db37ccf6f8ba6593f`. Its pre-ROFS translated ELF SHA-256 is `62d68ec47255d37eb372f75d074815159b352367096e488247d699ed54043200`; final post-ROFS ELF SHA-256 is `d19d03a728aba3fff0102b076cc53d045e3329de7b421b4ef4c8ec54a5eb5712`; final-image acceptance is **140/140**; both full suites execute **201 tests** (10 dependency-free skips, 1 Pillow-enabled owned-corpus skip); and `/private/tmp/kowloon-recharge-startup-en-v11-r8-repeat.iso` is byte-for-byte identical with the same SHA-256.
+The current static/deterministic candidate is **v11-r9** at `/private/tmp/kowloon-recharge-startup-en-v11-r9.iso`, SHA-256 `0abe223df878c181da784247fe112553abe030a4f7db240f972285b5aa7696d0`. Its pre-ROFS translated ELF SHA-256 is `06e364c79be9db69a6b0490d0a2368725ea29d29753aa68e5cd5370a812bf2ca`; final post-ROFS ELF SHA-256 is `61520a390a50de641096514fe219062f7059a382b3e1a6b9cc231ba4069c3ee6`; final-image acceptance is **140/140**; both suites execute **201 tests**; and the repeat ISO is byte-for-byte identical.
 
-r8 touches only three presentation owners: speaker Y 80→276 and body base Y 114→312 while preserving r7 horizontal dialogue behavior; one extra leading line break on the stone-tablet status; and the proven `GP088_08` lower black backing, extended from 70px to 150px with its existing marker shifted by 80px. Name/license, H.A.N.T., title text anchors, `GP088_03`, and packed `GP088_12` are preservation constraints.
+r9 changes only two things from r8: the dialogue body base Y is 300 instead of 312 while the accepted speaker remains X=20/Y=276, and the live `GP088_08` lower backing is 300 texture pixels instead of 150. The r8 tablet payload, title anchors/art, name/license geometry, H.A.N.T., dialogue orientation/brackets and 12px spacing are preservation constraints.
 
-Pablo is the runtime tester. Do not launch PCSX2 automatically. The r8 gate is exactly: full black backing behind `New Game` / `Load Game`, better-balanced tablet text, and the same good r7 dialogue now located near the bottom just above the lower-left Egyptian symbol. Everything else should remain visually unchanged.
+Do not launch PCSX2 automatically. The r9 visual gate is exactly: title backing fully contains both English labels, prose begins immediately below the already-good speaker/name line, and the r8 tablet remains unchanged.
 
 ## Resume procedure
 

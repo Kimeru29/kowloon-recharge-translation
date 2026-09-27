@@ -63,9 +63,9 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
                 (0x14FAF8, 0x0006343F, 0x00052C3F),
                 # r7 runtime proves orientation and spacing are now correct, but
                 # the block is still too high. After transposition this 114px
-                # Japanese column base is the live body Y origin. Move it near
-                # the lower dialogue-safe area without touching line spacing.
-                (0x14FA78, 0x3C0342E4, 0x3C03439C),  # 114 -> 312 px body base
+                # Japanese column base is the live body Y origin. Move it directly below
+                # the accepted speaker line without touching line spacing.
+                (0x14FA78, 0x3C0342E4, 0x3C034396),  # 114 -> 300 px body base
                 # The live child font constructor uses style 1, whose profile is
                 # 12x12. After transposition the old Japanese 26 px column stride
                 # becomes English X spacing, so match the actual 12 px glyph
@@ -132,7 +132,8 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
         # (s0): only mode 0 becomes horizontal, while every existing nonzero mode
         # retains pristine vertical advance. The inline speaker is the only direct
         # 0x190A50 caller moved to mode 0. r7 proved that horizontal path; r8
-        # keeps X=20 and moves only Y to 276, above body base X=20/Y=312.
+        # keeps X=20/Y=276; r9 preserves the speaker and moves only the body
+        # upward to Y=300 so the prose starts immediately below the name.
         expected = (
             (0x150048, 0x3C024301, 0x3C0241A0),  # 129 -> 20 px X
             (0x150050, 0x3C0241A0, 0x3C02438A),  # 20 -> 276 px Y

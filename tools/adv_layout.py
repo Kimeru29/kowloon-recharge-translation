@@ -142,8 +142,8 @@ def inspect_adv_coordinate_consumers(raw: bytes) -> tuple[AdvCoordinateConsumer,
 # to otherwise-unused direct-call mode 0. Mode 0 keeps the normal 16x18 font and
 # becomes horizontal while modes 1..7 retain their pristine vertical flag. The
 # speaker's own fixed X remains 20. r7 runtime proves the horizontal header path;
-# r8 moves only Y to 276 so it sits just above the lower-screen body block whose
-# transposed base moves to 312, matching the remaster composition more closely.
+# r8 moves only Y to 276 and runtime accepts that speaker placement. r9 freezes
+# it and moves only the body base to Y=300 so prose begins directly below it.
 #
 # Keep the r5 0x251470 record-label orientation patch because it is a distinct
 # ADV record-label renderer and removing a shipped change without contrary
@@ -184,10 +184,10 @@ ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # advance of the exact style-1 font profile used by these child fragments.
     (0x14FAF4, 0x0003343C, 0x00032C3C),  # dsll32 a2,v1,16 -> dsll32 a1,v1,16
     (0x14FAF8, 0x0006343F, 0x00052C3F),  # dsra32 a2,a2,16 -> dsra32 a1,a1,16
-    # r7 runtime proves horizontal orientation and 12px spacing. Move only the
-    # transposed body Y base from the upper Japanese layout to the lower-screen
-    # remaster-style dialogue area. The helper adds ~1px to the first fragment.
-    (0x14FA78, 0x3C0342E4, 0x3C03439C),  # 114.0f -> 312.0f body Y base
+    # r8 runtime accepts the speaker at Y=276 but shows too much vertical gap
+    # before the prose. Keep all orientation/spacing work and move only the
+    # transposed body base to Y=300, immediately below the 18px speaker line.
+    (0x14FA78, 0x3C0342E4, 0x3C034396),  # 114.0f -> 300.0f body Y base
     (0x14FAC8, 0x3C0341D0, 0x3C034140),  # 26.0f -> 12.0f X fragment stride
     # Unique wrapper callsite: orientation=1 is saved in s4 and reaches all four
     # child font canvases. Clear it before construction rather than patching only

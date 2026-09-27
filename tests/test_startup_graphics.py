@@ -106,9 +106,12 @@ class StartupGraphicsTests(unittest.TestCase):
         indices = bytearray([transparent] * (width * height))
 
         # Exact pristine GP088_08 geometry: a 470x22 footer strip and an
-        # independent 70x22 menu-label backing. Four Japanese 16px glyphs need
-        # 64px plus 6px chrome; longest English title label is nine glyphs, so
-        # preserve the same padding at 150px and move the trailing green marker.
+        # independent 70x22 menu-label backing. r8 extended this to 150 texture
+        # pixels, but its runtime screenshot is consistent with the title path
+        # presenting this strip at about half logical width.
+        # Nine 16px English glyphs need 144 logical pixels, so use a 300px texture
+        # strip (about 150 logical pixels on this path), keep the existing 6px
+        # texture gap, and move the trailing marker with it.
         for y in range(1, 23):
             indices[y * width + 1:y * width + 471] = bytes([0]) * 470
         for y in range(25, 47):
@@ -127,11 +130,11 @@ class StartupGraphicsTests(unittest.TestCase):
         # Footer/header strip is unrelated and remains byte-identical.
         self.assertEqual(indices[1 * width:23 * width], result[1 * width:23 * width])
         for y in range(25, 47):
-            self.assertEqual(bytes([black]) * 150, result[y * width + 1:y * width + 151])
-            self.assertEqual(bytes([transparent]) * 6, result[y * width + 151:y * width + 157])
+            self.assertEqual(bytes([black]) * 300, result[y * width + 1:y * width + 301])
+            self.assertEqual(bytes([transparent]) * 6, result[y * width + 301:y * width + 307])
         for y in range(29, 36):
-            self.assertEqual(bytes([marker]) * 6, result[y * width + 157:y * width + 163])
-        self.assertTrue(all(value == transparent for y in range(25, 47) for value in result[y * width + 163:(y + 1) * width]))
+            self.assertEqual(bytes([marker]) * 6, result[y * width + 307:y * width + 313])
+        self.assertTrue(all(value == transparent for y in range(25, 47) for value in result[y * width + 313:(y + 1) * width]))
 
     def test_title_backing_extension_fails_closed_on_pristine_bar_drift(self) -> None:
         width, height = 512, 64
