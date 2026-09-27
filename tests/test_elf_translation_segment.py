@@ -36,8 +36,11 @@ class ElfTranslationSegmentTests(unittest.TestCase):
         self.assertEqual(0x3C0400A0, struct.unpack_from("<I", result, 0x250)[0])
         self.assertEqual(0x24842F00, struct.unpack_from("<I", result, 0x258)[0])
 
-        # The zero-sized heap section follows the translated segment in RAM.
+        # Both heap metadata and the libkernel sbrk break must start after the
+        # reserved translation window.  Leaving the latter at 0x902F00 lets the
+        # first runtime allocation overwrite translated strings in-place.
         self.assertEqual(0xA02F00, struct.unpack_from("<I", result, 0x8030BC)[0])
+        self.assertEqual(0xA02F00, struct.unpack_from("<I", result, 0x650014)[0])
 
     def test_fail_closes_on_unexpected_program_header_or_heap_instruction(self) -> None:
         tampered = bytearray(RAW)
@@ -48,6 +51,11 @@ class ElfTranslationSegmentTests(unittest.TestCase):
         tampered = bytearray(RAW)
         tampered[0x250] ^= 1
         with self.assertRaisesRegex(ValueError, "heap-start instruction"):
+            install_translation_segment(bytes(tampered), b"x\0")
+
+        tampered = bytearray(RAW)
+        tampered[0x650014] ^= 1
+        with self.assertRaisesRegex(ValueError, "libkernel heap break"):
             install_translation_segment(bytes(tampered), b"x\0")
 
     def test_rejects_payload_larger_than_reserved_ram_window(self) -> None:

@@ -15,6 +15,7 @@ from tools.startup_ui import (
     TITLE_LOAD_START,
     TITLE_NEW_GAME_START,
     TITLE_POINTER_TABLE_OFFSET,
+    NAME_PROMPT_LAYOUT_PATCHES,
     NAME_PROMPT_POINTER_TABLE_OFFSET,
     NAME_PROMPT_TEXTS,
     NAME_READING_POINTER_OFFSETS,
@@ -55,6 +56,14 @@ class StartupUiPatchTests(unittest.TestCase):
         # title UI and must not be consumed as translation storage.
         self.assertEqual(RAW[0x5CBE58:0x5CBE5C], result[0x5CBE58:0x5CBE5C])
         self.assertEqual(RAW[0x5CBE10:0x5CBE50], result[0x5CBE10:0x5CBE50])
+
+    def test_startup_build_recenters_labels_without_rescaling_packed_title_art(self) -> None:
+        result = build_startup_ui_elf(RAW)
+
+        self.assertEqual(0x3C024210, struct.unpack_from("<I", result, 0x1ABF64)[0])  # 36.0f
+        self.assertEqual(0x3C0243AA, struct.unpack_from("<I", result, 0x1ABF84)[0])  # 340.0f
+        self.assertEqual(RAW[0x6989C0:0x6989C8], result[0x6989C0:0x6989C8])
+        self.assertEqual(RAW[0x1AC600:0x1AC604], result[0x1AC600:0x1AC604])
 
     def test_startup_manifest_covers_every_known_pre_dialogue_runtime_string(self) -> None:
         by_offset = {patch.offset: patch for patch in STARTUP_FIXED_PATCHES}
@@ -114,16 +123,61 @@ class StartupUiPatchTests(unittest.TestCase):
         self.assertEqual(RAW[0x695188:0x6951A8], result[0x695188:0x6951A8])
         self.assertEqual(RAW[0x695840:0x695860], result[0x695840:0x695860])
 
-    def test_name_keyboard_uses_official_latin_rows_with_ps2_two_byte_cell_geometry(self) -> None:
+    def test_name_and_license_prompts_use_centered_english_geometry(self) -> None:
+        result = build_startup_ui_elf(RAW)
+
+        # The live M_Name state machine owns these X positions. Entry pairs 0/1
+        # and 2/3 share one state X, so use the exact midpoint between their two
+        # ideal centered origins (an 8px maximum error). Single prompts are exact.
+        expected = (
+            (0x1819DC, 0x3C02432C, 0x3C0242F8),  # last/first: 172 -> 124
+            (0x181A68, 0x3C024304, 0x3C0241E0),  # readings: 132 -> 28
+            (0x181AF4, 0x3C024324, 0x3C024318),  # Is this fine?: 164 -> 152
+            (0x181888, 0x3C024350, 0x3C024340),  # Yes / No: 208 -> 192
+            (0x181B70, 0x3C02430C, 0x3C024290),  # verifying: 140 -> 72
+            (0x181EAC, 0x3C02431C, 0x3C024260),  # complete: 156 -> 56
+        )
+        self.assertEqual(expected, NAME_PROMPT_LAYOUT_PATCHES)
+        for offset, pristine, replacement_word in expected:
+            self.assertEqual(pristine, struct.unpack_from("<I", RAW, offset)[0])
+            self.assertEqual(replacement_word, struct.unpack_from("<I", result, offset)[0])
+
+    def test_name_prompt_layout_fails_closed_on_each_x_owner_drift(self) -> None:
+        for offset, _expected, _replacement in NAME_PROMPT_LAYOUT_PATCHES:
+            with self.subTest(offset=hex(offset)):
+                tampered = bytearray(RAW)
+                tampered[offset] ^= 1
+                with self.assertRaisesRegex(ValueError, "Name-prompt layout"):
+                    build_startup_ui_elf(bytes(tampered))
+
+    def test_english_name_flow_skips_ps2_kana_reading_editor(self) -> None:
+        result = build_startup_ui_elf(RAW)
+
+        # The state dispatcher calls the same transition routine twice.  State 9
+        # originally passes flag 0 (enter kana-reading editor), while state 11
+        # passes flag 1 (commit/finalize).  English must reuse flag 1 at state 9
+        # because the remaster suppresses the kana reading buffers.
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x186A68)[0])
+        self.assertEqual(0x0C0A1788, struct.unpack_from("<I", result, 0x186A6C)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x186A8C)[0])
+        self.assertEqual(0x0C0A1788, struct.unpack_from("<I", result, 0x186A90)[0])
+
+    def test_name_flow_patch_fails_closed_on_dispatcher_drift(self) -> None:
+        tampered = bytearray(RAW)
+        tampered[0x186A68] ^= 1
+        with self.assertRaisesRegex(ValueError, "name.*flow|Name.*flow"):
+            build_startup_ui_elf(bytes(tampered))
+
+    def test_name_keyboard_uses_ps2_adapted_latin_rows_with_two_byte_cell_geometry(self) -> None:
         result = build_startup_ui_elf(RAW)
         expected_rows = (
-            "abcde" + " " * 15,
-            "fghij" + " " * 15,
-            "klmno" + " " * 15,
-            "pqrst" + " " * 15,
-            "uvwxy" + " " * 15,
-            "z+-x/01234" + " " * 10,
-            "=.?!" + " " + "56789" + " " * 10,
+            "abcdeABCDE" + " " * 10,
+            "fghijFGHIJ" + " " * 10,
+            "klmnoKLMNO" + " " * 10,
+            "pqrstPQRST" + " " * 10,
+            "uvwxyUVWXY" + " " * 10,
+            "z+-x/Z+-X/0123456789",
+            "=.?!" + " " + "=.?!" + " " + " " * 10,
             "ABCDE" + " " * 15,
             "FGHIJ" + " " * 15,
             "KLMNO" + " " * 15,
@@ -151,18 +205,36 @@ class StartupUiPatchTests(unittest.TestCase):
         self.assertEqual(RAW[0x5868F0:0x586930], result[0x5868F0:0x586930])
         self.assertEqual(RAW[0x586930:0x5869BC], result[0x586930:0x5869BC])
 
+    def test_ps2_accessible_keyboard_rows_include_both_letter_cases(self) -> None:
+        result = build_startup_ui_elf(RAW)
+        visible = []
+        for index in range(7):
+            field = result[0x586650 + index * 0x30:0x586650 + (index + 1) * 0x30]
+            for logical_index in range(20):
+                storage_index = logical_index + logical_index // 5
+                visible.append(field[storage_index * 2:storage_index * 2 + 2].decode("cp932"))
+        normalized = unicodedata.normalize("NFKC", "".join(visible))
+        for char in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
+            self.assertIn(char, normalized)
+
     def test_build_is_fail_closed_and_changes_only_declared_startup_regions(self) -> None:
         result = build_startup_ui_elf(RAW)
         self.assertEqual(len(RAW), len(result))
 
         allowed = set(range(TITLE_ARENA_START, TITLE_ARENA_END))
         allowed.update(range(TITLE_LOAD_POINTER_OFFSET, TITLE_LOAD_POINTER_OFFSET + 4))
+        allowed.update(range(0x1ABF64, 0x1ABF68))
+        allowed.update(range(0x1ABF84, 0x1ABF88))
         allowed.update(range(0x5865F0, 0x586630))
         allowed.update(range(0x586630, 0x586650))
         allowed.update(range(0x5869C0, 0x586AF0))
         allowed.update(range(0x577C60, 0x577C78))
+        allowed.update(range(0x186A68, 0x186A6C))
         for patch in STARTUP_FIXED_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
+        # Runtime owners for the two centered English license-status lines.
+        for offset in (0x181888, 0x1819DC, 0x181A68, 0x181AF4, 0x181B70, 0x181EAC):
+            allowed.update(range(offset, offset + 4))
 
         changed = {i for i, (before, after) in enumerate(zip(RAW, result)) if before != after}
         self.assertTrue(changed)

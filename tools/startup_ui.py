@@ -4,6 +4,7 @@ import struct
 
 from tools.elf_strings import ElfFixedStringPatch, patch_fixed_strings
 from tools.localization import encode_ps2_english
+from tools.title_layout import patch_title_layout
 
 
 # The title renderer consumes two-byte JIS glyph codes.  The pristine executable
@@ -115,11 +116,14 @@ _NAME_READING_SOURCES = (
     (0x586610, "ひゆう　　　"),
     (0x586620, "たつま　　　"),
 )
-# The official English flow does not ask for kana readings.  That lets us use
-# the 64-byte reading-default arena for four wide Latin default names and the
-# existing 272-byte prompt arena for the six visible prompts.
+# The original 272-byte prompt arena cannot hold all eight wide English prompts
+# while the 64-byte reading-default arena is needed for the four wide Latin
+# default names.  This first pass therefore packs six prompts locally and stages
+# prompt indices 2/3 on the existing blank string.  The final shared translation
+# segment pass relocates those two official reading prompts out-of-line.
 _NAME_VISIBLE_PROMPT_INDICES = (0, 1, 4, 5, 6, 7)
 _NAME_READING_PROMPT_INDICES = (2, 3)
+NAME_READING_PROMPT_SOURCE_OFFSETS = {2: 0x586A00, 3: 0x586A30}
 NAME_WIDE_TEXTS = ("Habaki", "Kuro", "Hiyuu", "Tatsuma")
 NAME_DEFAULT_POINTER_OFFSETS = {
     "Habaki": (0x586630,),
@@ -148,6 +152,72 @@ _NAME_RUNTIME_READING_POINTERS = (
     (0x577C68, 0x695198, "はばき"),
     (0x577C6C, 0x6951A0, "くろう"),
 )
+
+# The PS2 state dispatcher invokes the same M_Name transition routine from
+# state 9 and state 11.  State 9 passes 0 and enters the kana-reading editor;
+# state 11 passes 1 and commits/finalizes.  The official English remaster
+# suppresses the reading buffers, so English reuses the already-existing flag-1
+# path at state 9 instead of entering the PS2-only kana pass.
+NAME_FLOW_STATE9_FLAG_OFFSET = 0x186A68
+_NAME_FLOW_STATE9_CALL_OFFSET = 0x186A6C
+_NAME_FLOW_STATE11_FLAG_OFFSET = 0x186A8C
+_NAME_FLOW_STATE11_CALL_OFFSET = 0x186A90
+_NAME_FLOW_FLAG_ZERO_WORD = 0x0000282D  # daddu a1, zero, zero
+_NAME_FLOW_FLAG_ONE_WORD = 0x24050001   # addiu a1, zero, 1
+_NAME_FLOW_TRANSITION_JAL_WORD = 0x0C0A1788  # jal 0x285e20
+
+# The M_Name prompt renderer uses one 16-pixel two-byte glyph font object and
+# repositions it per state before selecting text from NAME_PROMPT_TEXTS. Japanese
+# fixed X origins are visibly right-shifted with English. Entries 0/1 and 2/3
+# share one state X, so use the midpoint of their two exact centered origins
+# (maximum 8px error); single prompts use their exact 512px-view centers. The
+# Yes/No line uses the second prompt object created at file 0x181888.
+NAME_PROMPT_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x1819DC, 0x3C02432C, 0x3C0242F8),  # Enter last/first name: 172 -> 124
+    (0x181A68, 0x3C024304, 0x3C0241E0),  # reading prompts: 132 -> 28
+    (0x181AF4, 0x3C024324, 0x3C024318),  # Is this fine?: 164 -> 152
+    (0x181888, 0x3C024350, 0x3C024340),  # Yes / No: 208 -> 192
+    (0x181B70, 0x3C02430C, 0x3C024290),  # Verifying license ID...: 140 -> 72
+    (0x181EAC, 0x3C02431C, 0x3C024260),  # ID verification complete.: 156 -> 56
+)
+
+
+def patch_name_prompt_layout(raw: bytes) -> bytes:
+    for offset, expected, _replacement in NAME_PROMPT_LAYOUT_PATCHES:
+        if offset + 4 > len(raw):
+            raise ValueError("Name-prompt layout patch is outside executable")
+        actual = struct.unpack_from("<I", raw, offset)[0]
+        if actual != expected:
+            raise ValueError(
+                f"Name-prompt layout preimage mismatch at {offset:#x}: "
+                f"expected {expected:#010x}, got {actual:#010x}"
+            )
+
+    result = bytearray(raw)
+    for offset, _expected, replacement in NAME_PROMPT_LAYOUT_PATCHES:
+        struct.pack_into("<I", result, offset, replacement)
+    return bytes(result)
+
+def patch_name_entry_flow(raw: bytes) -> bytes:
+    expected = (
+        (NAME_FLOW_STATE9_FLAG_OFFSET, _NAME_FLOW_FLAG_ZERO_WORD),
+        (_NAME_FLOW_STATE9_CALL_OFFSET, _NAME_FLOW_TRANSITION_JAL_WORD),
+        (_NAME_FLOW_STATE11_FLAG_OFFSET, _NAME_FLOW_FLAG_ONE_WORD),
+        (_NAME_FLOW_STATE11_CALL_OFFSET, _NAME_FLOW_TRANSITION_JAL_WORD),
+    )
+    for offset, word in expected:
+        if offset + 4 > len(raw):
+            raise ValueError("Name-entry flow patch is outside executable")
+        actual = struct.unpack_from("<I", raw, offset)[0]
+        if actual != word:
+            raise ValueError(
+                f"Name-entry flow preimage mismatch at {offset:#x}: "
+                f"expected {word:#010x}, got {actual:#010x}"
+            )
+
+    result = bytearray(raw)
+    struct.pack_into("<I", result, NAME_FLOW_STATE9_FLAG_OFFSET, _NAME_FLOW_FLAG_ONE_WORD)
+    return bytes(result)
 
 
 def _validate_c_string(raw: bytes, offset: int, expected: str) -> None:
@@ -278,18 +348,23 @@ _KEYBOARD_SOURCES = (
     "マミムメモ　５６７８９　々ー　　　　＝・？！　",
 )
 
-# English.bytes localizes these exact fourteen source rows to Latin lower/upper
-# alphabets plus the listed symbol/digit rows.  The PS2 input routine copies
-# exactly two bytes per selected key, so every logical cell remains a wide/JIS
-# glyph; unused legacy kana cells become wide spaces rather than ASCII bytes.
+# English.bytes supplies the Latin lower/upper character repertoire used here.
+# Static tracing proves this PS2 build only indexes row pointers 0..6; there is no
+# R1/L1 switch to rows 7..13.  The reachable seven rows therefore fold lower and
+# upper case together while preserving the PS2 two-byte/JIS cell geometry.
 _KEYBOARD_LOGICAL_ROWS = (
-    "abcde" + " " * 15,
-    "fghij" + " " * 15,
-    "klmno" + " " * 15,
-    "pqrst" + " " * 15,
-    "uvwxy" + " " * 15,
-    "z+-x/01234" + " " * 10,
-    "=.?!" + " " + "56789" + " " * 10,
+    # PS2 m_name only indexes rows 0..6.  Unlike the remaster, it has no
+    # reachable 7..13 page, so fold upper-case keys into the accessible page.
+    "abcdeABCDE" + " " * 10,
+    "fghijFGHIJ" + " " * 10,
+    "klmnoKLMNO" + " " * 10,
+    "pqrstPQRST" + " " * 10,
+    "uvwxyUVWXY" + " " * 10,
+    "z+-x/Z+-X/0123456789",
+    "=.?!" + " " + "=.?!" + " " + " " * 10,
+    # Preserve the remaster-derived second page data even though the PS2 code
+    # never indexes it; keeping it translated avoids reintroducing kana if a
+    # later control-flow patch makes the page reachable.
     "ABCDE" + " " * 15,
     "FGHIJ" + " " * 15,
     "KLMNO" + " " * 15,
@@ -337,6 +412,9 @@ STARTUP_FIXED_PATCHES: tuple[ElfFixedStringPatch, ...] = (
 
 
 def build_startup_ui_elf(raw: bytes) -> bytes:
-    titled = patch_title_labels(raw)
+    laid_out = patch_title_layout(raw)
+    titled = patch_title_labels(laid_out)
     relocated = patch_name_prompt_arena(titled)
-    return patch_fixed_strings(relocated, STARTUP_FIXED_PATCHES)
+    flowed = patch_name_entry_flow(relocated)
+    prompt_layout = patch_name_prompt_layout(flowed)
+    return patch_fixed_strings(prompt_layout, STARTUP_FIXED_PATCHES)

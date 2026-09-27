@@ -27,3 +27,6 @@ SLPM_*
 
 # Editor/OS noise
 .DS_Store
+
+# Local linked worktrees
+.worktrees/

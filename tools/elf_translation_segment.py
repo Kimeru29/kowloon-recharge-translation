@@ -23,6 +23,7 @@ _HEAP_ADDIU_FILE_OFFSET = 0x258
 _BSS_END_LUI_FILE_OFFSET = 0x1A0
 _BSS_END_ADDIU_FILE_OFFSET = 0x1A8
 _HEAP_SECTION_ADDR_OFFSET = 0x8030BC
+_LIBKERNEL_HEAP_BREAK_FILE_OFFSET = 0x650014
 _EXPECTED_SECOND_PH = (
     _PT_LOAD,
     0x00802F80,
@@ -38,6 +39,7 @@ _EXPECTED_HEAP_ADDIU = 0x24842F00  # addiu a0, a0, 0x2f00
 _EXPECTED_BSS_LUI = 0x3C030090  # lui v1, 0x90
 _EXPECTED_BSS_ADDIU = 0x24632F00  # addiu v1, v1, 0x2f00
 _EXPECTED_HEAP_SECTION_ADDR = _TRANSLATION_VADDR
+_EXPECTED_LIBKERNEL_HEAP_BREAK = _TRANSLATION_VADDR
 
 
 def _align(value: int, alignment: int) -> int:
@@ -89,6 +91,8 @@ def install_translation_segment(
         raise ValueError("Heap section header is outside ELF")
     if struct.unpack_from("<I", raw, _HEAP_SECTION_ADDR_OFFSET)[0] != _EXPECTED_HEAP_SECTION_ADDR:
         raise ValueError("Unexpected heap section address preimage")
+    if struct.unpack_from("<I", raw, _LIBKERNEL_HEAP_BREAK_FILE_OFFSET)[0] != _EXPECTED_LIBKERNEL_HEAP_BREAK:
+        raise ValueError("Unexpected libkernel heap break preimage")
 
     heap_vaddr = _TRANSLATION_VADDR + reserve_size
     if (heap_vaddr & 0xFFFF) != (_TRANSLATION_VADDR & 0xFFFF):
@@ -123,6 +127,7 @@ def install_translation_segment(
     heap_lui = (_EXPECTED_HEAP_LUI & 0xFFFF0000) | heap_hi
     struct.pack_into("<I", result, _HEAP_LUI_FILE_OFFSET, heap_lui)
     struct.pack_into("<I", result, _HEAP_SECTION_ADDR_OFFSET, heap_vaddr)
+    struct.pack_into("<I", result, _LIBKERNEL_HEAP_BREAK_FILE_OFFSET, heap_vaddr)
 
     return bytes(result), TranslationSegmentInfo(
         file_offset=file_offset,
