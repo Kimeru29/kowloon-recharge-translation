@@ -61,6 +61,11 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
                 (0x14FAA0, 0x00052C3F, 0x0006343F),
                 (0x14FAF4, 0x0003343C, 0x00032C3C),
                 (0x14FAF8, 0x0006343F, 0x00052C3F),
+                # The live child font constructor uses style 1, whose profile is
+                # 12x12. After transposition the old Japanese 26 px column stride
+                # becomes English X spacing, so match the actual 12 px glyph
+                # advance instead of leaving every fragment 14 px too far apart.
+                (0x14FAC8, 0x3C0341D0, 0x3C034140),
                 # Unique ADV constructor callsite: orientation 1 is propagated
                 # to all four child font canvases; zero makes the full DG object
                 # horizontal instead of patching only one downstream fragment.
@@ -84,6 +89,12 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
             struct.unpack_from("<I", result, 0x14FB7C)[0],
         )
 
+        # VA 0x24FAF0 creates each body fragment with font style 1. Its profile
+        # record at VA 0x5D7800 stores width/height 12/12 in the low bytes.
+        self.assertEqual(0x24050001, struct.unpack_from("<I", RAW, 0x14FB70)[0])
+        self.assertEqual((12, 12), tuple(RAW[0x4D7884:0x4D7886]))
+        self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x14FAC8)[0])
+
         changed = {i for i, (before, after) in enumerate(zip(RAW, result)) if before != after}
         allowed = {
             byte_offset
@@ -105,32 +116,44 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
         self.assertEqual(0x24060001, struct.unpack_from("<I", RAW, 0x151608)[0])
         self.assertEqual(0x24060000, struct.unpack_from("<I", result, 0x151608)[0])
 
-    def test_horizontal_patch_uses_horizontal_text_mode_for_inline_bracket_speaker(self) -> None:
+    def test_inline_bracket_speaker_uses_horizontal_advance_and_header_geometry(self) -> None:
         result = patch_adv_horizontal_layout(RAW)
 
-        # The DG script dispatcher recognizes the CP932 opening bracket and sends
-        # that inline speaker token through 0x250B10 -> 0x250530. That parser
-        # stores the resolved name at global +0x198. VA 0x24FFF8 passes exactly
-        # that buffer to the generic text constructor at 0x190A50; its a1 mode
-        # selects the mesh path. Mode 1 is the same horizontal path used by the
-        # ordinary dialogue fragments, while pristine mode 2 takes the alternate
-        # mesh builder that produced the runtime vertical name column.
-        self.assertIn((0x15006C, 0x24050002, 0x24050001), ADV_SPEAKER_LAYOUT_PATCHES)
-        self.assertEqual(0x24050002, struct.unpack_from("<I", RAW, 0x15006C)[0])
-        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x15006C)[0])
+        # r6 runtime disproved the mode-only hypothesis: changing speaker mode
+        # 2 -> 1 still left the resolved name vertical. The generic constructor
+        # at VA 0x190A50 hardcodes a2=1 before calling 0x188AD0; 0x188AD0 stores
+        # that byte at +0x24, and the live glyph renderer advances Y whenever
+        # +0x24 is nonzero. Make that orientation depend on the saved text mode
+        # (s0): only mode 0 becomes horizontal, while every existing nonzero mode
+        # retains pristine vertical advance. The inline speaker is the only direct
+        # 0x190A50 caller moved to mode 0. Place it at X=20/Y=80 so it forms a
+        # horizontal header aligned over the transposed body origin (X=20/Y=114).
+        expected = (
+            (0x150048, 0x3C024301, 0x3C0241A0),  # 129 -> 20 px X
+            (0x150050, 0x3C0241A0, 0x3C0242A0),  # 20 -> 80 px Y
+            (0x15006C, 0x24050002, 0x24050000),  # speaker mode 2 -> 0
+            (0x090B30, 0x24060001, 0x0010302B),  # a2 = (mode != 0)
+            (0x151608, 0x24060001, 0x24060000),  # preserved r5 record label
+        )
+        self.assertEqual(expected, ADV_SPEAKER_LAYOUT_PATCHES)
+        for offset, pristine, replacement in expected:
+            self.assertEqual(pristine, struct.unpack_from("<I", RAW, offset)[0])
+            self.assertEqual(replacement, struct.unpack_from("<I", result, offset)[0])
 
     def test_fail_closes_if_renderer_preimages_drift(self) -> None:
         for offset in (
             0x14FA60,
             0x14FAA8,
             0x1514F0,
+            0x14FB70,
+            0x4D7884,
             *(patch[0] for patch in ADV_DG_LAYOUT_PATCHES),
             *(patch[0] for patch in ADV_SPEAKER_LAYOUT_PATCHES),
         ):
             with self.subTest(offset=hex(offset)):
                 tampered = bytearray(RAW)
                 tampered[offset] ^= 1
-                with self.assertRaisesRegex(ValueError, "ADV (?:speaker )?layout preimage"):
+                with self.assertRaisesRegex(ValueError, "ADV (?:speaker |body style )?layout preimage"):
                     patch_adv_horizontal_layout(bytes(tampered))
 
 

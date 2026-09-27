@@ -130,19 +130,23 @@ def inspect_adv_coordinate_consumers(raw: bytes) -> tuple[AdvCoordinateConsumer,
 # draw callback advances Y per character. English must transpose the finished
 # origins AND clear the single upstream constructor orientation. The FPU formulas
 # and signed byte-position /2 normalization remain unchanged.
-# Runtime r5 disproved the earlier assumption that the 0x251470 record renderer
-# owns the visible ``【speaker】`` label. The DG script dispatcher recognizes the
-# CP932 opening bracket (0x81,0x79), routes it to 0x250B10 -> 0x250530, and that
-# parser copies the resolved speaker name to global +0x198. The live renderer at
-# VA 0x24FFF8 passes exactly global +0x198 to 0x190A50. Its a1 text mode is stored
-# on the created object at +0x0C; modes 0/1 use the 0x192400 mesh path while mode
-# 2 takes the alternate 0x18F6F0 path. Pristine speaker mode=2 is therefore a
-# separate vertical-style path from the body fragments, which already use mode=1.
 #
-# Keep the r5 0x251470 orientation patch for now because it is a distinct ADV
-# record-label renderer and removing an already-shipped change without runtime
-# evidence would risk a regression. It is no longer classified as the inline DG
-# speaker owner.
+# Inline bracket-derived speaker names are a third, independent path. Runtime r6
+# disproved the earlier mode-only hypothesis: changing its 0x190A50 text mode
+# from 2 to 1 changed the mesh path but the visible speaker still advanced down
+# the screen. Static tracing now proves why: 0x190A50 overwrites a2 with 1 before
+# calling 0x188AD0; 0x188AD0 stores that byte at the font object +0x24; and the
+# live renderer at 0x18DFFC advances X only when +0x24 is zero, otherwise Y.
+# Preserve every existing nonzero-mode caller by replacing the hardcoded 1 with
+# ``sltu a2,zero,s0`` where s0 is the saved text mode, then move only this speaker
+# to otherwise-unused direct-call mode 0. Mode 0 keeps the normal 16x18 font and
+# becomes horizontal while modes 1..7 retain their pristine vertical flag. The
+# speaker's own fixed X/Y origin is moved to X=20/Y=80, aligned above the r6 body
+# origin X=20/Y=114, giving a proper horizontal header/body composition.
+#
+# Keep the r5 0x251470 record-label orientation patch because it is a distinct
+# ADV record-label renderer and removing a shipped change without contrary
+# runtime evidence would risk a regression. It is not the inline DG speaker.
 _ADV_SPEAKER_ROLE_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x11597C, 0x24020081),  # dispatcher: first CP932 bracket byte 0x81
     (0x115988, 0x92030001),  # dispatcher: load second bracket byte
@@ -151,27 +155,35 @@ _ADV_SPEAKER_ROLE_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x1506F8, 0x24640198),  # parser destination: global +0x198
     (0x150078, 0x24470198),  # live renderer a3 = global +0x198
     (0x15007C, 0x0C064294),  # live renderer -> jal 0x190A50
-    (0x090C98, 0x8E23000C),  # ctor reads text mode saved at object +0x0C
-    (0x090CA4, 0x24020001),  # mode 1 selects the horizontal mesh branch
+    (0x088D50, 0xA2120024),  # VA 0x188CD0 stores a2-derived orientation at +0x24
+    (0x08E07C, 0x16C00009),  # VA 0x18DFFC branches on orientation byte
     (0x1514F0, 0x27BDFF30),  # distinct r5 record-label state machine
-    (0x151614, 0x0C062FC4),  # its separate 0x18BF10 font canvas constructor
+    (0x151614, 0x0C062FC4),  # separate 0x18BF10 font canvas constructor
+)
+
+_ADV_DG_BODY_STYLE_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x14FB70, 0x24050001),  # VA 0x24FAF0: body fragments use font style 1
+    (0x4D7884, 0x01000C0C),  # style-1 profile starts with 12x12 glyph dimensions
 )
 
 ADV_SPEAKER_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
-    # Inline bracket-derived DG speaker: text mode 2 -> same horizontal mode 1
-    # used by ordinary dialogue fragments. This is the runtime-visible owner.
-    (0x15006C, 0x24050002, 0x24050001),
-    # Retain the r5 record-label orientation until runtime proves it is dead.
-    (0x151608, 0x24060001, 0x24060000),
+    (0x150048, 0x3C024301, 0x3C0241A0),  # speaker X: 129 -> 20
+    (0x150050, 0x3C0241A0, 0x3C0242A0),  # speaker Y: 20 -> 80
+    (0x15006C, 0x24050002, 0x24050000),  # speaker mode 2 -> mode 0
+    (0x090B30, 0x24060001, 0x0010302B),  # a2 = (saved text mode != 0)
+    (0x151608, 0x24060001, 0x24060000),  # preserve r5 record-label orientation
 )
 
 ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # First formula: 114 - 39 * line.  a1 (X) -> a2 (Y).
     (0x14FA9C, 0x00032C3C, 0x0003343C),  # dsll32 a1,v1,16 -> dsll32 a2,v1,16
     (0x14FAA0, 0x00052C3F, 0x0006343F),  # dsra32 a1,a1,16 -> dsra32 a2,a2,16
-    # Second formula: 20 + 26 * (byte_position / 2).  a2 (Y) -> a1 (X).
+    # Second formula becomes English X. Preserve the proven /2 byte-to-glyph
+    # normalization, but replace the Japanese 26 px column stride with the 12 px
+    # advance of the exact style-1 font profile used by these child fragments.
     (0x14FAF4, 0x0003343C, 0x00032C3C),  # dsll32 a2,v1,16 -> dsll32 a1,v1,16
     (0x14FAF8, 0x0006343F, 0x00052C3F),  # dsra32 a2,a2,16 -> dsra32 a1,a1,16
+    (0x14FAC8, 0x3C0341D0, 0x3C034140),  # 26.0f -> 12.0f X fragment stride
     # Unique wrapper callsite: orientation=1 is saved in s4 and reaches all four
     # child font canvases. Clear it before construction rather than patching only
     # one downstream fragment as the failed r3 experiment did.
@@ -184,8 +196,10 @@ def patch_adv_horizontal_layout(raw: bytes) -> bytes:
 
     The pristine constructor computes X-like ``114 - 39 * line`` and Y-like
     ``20 + 26 * (byte_position / 2)`` integer origins before passing them as
-    ``a1``/``a2`` to the coordinate helper.  English needs the second formula as
-    X and the first as Y. Separately, the unique wrapper passes orientation=1
+    ``a1``/``a2`` to the coordinate helper. English needs the second formula as
+    X and the first as Y; because the live body fragments use the 12x12 style-1
+    font, their transposed X stride is tightened from 26 to 12 pixels. Separately,
+    the unique wrapper passes orientation=1
     into the ADV object constructor; that value is propagated to every child font
     canvas, and the generic callback proves nonzero advances Y while zero advances
     X. Swap the completed origins and clear that one upstream orientation flag.
@@ -207,6 +221,12 @@ def patch_adv_horizontal_layout(raw: bytes) -> bytes:
             _require_word(raw, offset, expected)
         except ValueError as exc:
             raise ValueError(f"ADV speaker layout preimage mismatch: {exc}") from exc
+
+    for offset, expected in _ADV_DG_BODY_STYLE_PREIMAGES:
+        try:
+            _require_word(raw, offset, expected)
+        except ValueError as exc:
+            raise ValueError(f"ADV body style layout preimage mismatch: {exc}") from exc
 
     result = bytearray(raw)
     for offset, expected, replacement in (*ADV_DG_LAYOUT_PATCHES, *ADV_SPEAKER_LAYOUT_PATCHES):

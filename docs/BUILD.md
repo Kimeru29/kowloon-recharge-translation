@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v11-r6 result: 198 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11-r7 result: 199 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -577,3 +577,41 @@ Measured v11-r6 static/deterministic result:
 - deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r6-repeat.iso` has the same SHA-256 and is byte-for-byte identical by `cmp`.
 
 Do not launch r6 automatically. Pablo is the runtime tester; the exact r6 visual gate is in `docs/LOCALIZATION_STATUS.md`.
+
+## Build startup v11-r7 candidate
+
+v11-r7 is the runtime-driven follow-up to Pablo's r6 screenshots. It preserves r6's translated corpus, Help/Config ownership work and title-anchor recentering, then changes only traced presentation owners: the generic speaker orientation and header geometry, DG body fragment stride, name/license prompt X geometry, tablet line padding, the page-local H.A.N.T. row stride, and one compact Help category label. It deliberately does **not** guess at the remaining title black-backing atlas subregion.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r7.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r7.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r7.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r7.json
+```
+
+Measured v11-r7 static/deterministic result:
+
+- pristine ISO SHA-256: `29e305e344c146e1416cca498e2d288718075380552d37886d9b469717779476`;
+- translated ELF SHA-256 before ISO ROFS rewrite: `318f666a1c7cb990ec2cec91be32513c9abd8ddb16f5da4ffe186cb3976cdf7e`;
+- final post-ROFS ELF SHA-256: `e520a919dd7e2a69c148f4cbe317b8f3ef2d729faa6f36e529a6b536b929b4bc`;
+- translated/final ELF size: 8,405,744 bytes; outer extent relocated from 288 to 1,013,782;
+- ISO SHA-256: `2b64165f820ec208ff9d721b9fbf30d8ee17bb78b9556e7ebe540c83b27221b4`;
+- 1,145 overlays; 892 in place / 253 relocated; 1,145 ROFS records patched/re-resolved;
+- +900 embedded sectors; 17 shifted outer files; whole ISO remains 2,095,382,528 bytes;
+- final-image startup verifier: **140/140**;
+- dependency-free suite: **199 tests OK** (8 expected skips);
+- Pillow-enabled suite: **199 tests OK** (1 owned-corpus skip);
+- deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r7-repeat.iso` has the same SHA-256 and is byte-for-byte identical by `cmp`.
+
+Do not launch r7 automatically. Pablo is the runtime tester; the exact r7 visual gate is in `docs/LOCALIZATION_STATUS.md`.

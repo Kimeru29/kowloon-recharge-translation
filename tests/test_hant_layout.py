@@ -9,7 +9,7 @@ class HantLayoutTests(unittest.TestCase):
     def test_profile_matches_traced_hant_renderer_geometry(self) -> None:
         self.assertEqual(28, HANT_LAYOUT_PROFILE.max_cells)
         self.assertEqual(12.0, HANT_LAYOUT_PROFILE.glyph_advance)
-        self.assertEqual(18.0, HANT_LAYOUT_PROFILE.line_spacing)
+        self.assertEqual(16.0, HANT_LAYOUT_PROFILE.line_spacing)
         self.assertEqual(5, HANT_LAYOUT_PROFILE.controller_gap_cells)
         self.assertEqual(16, HANT_LAYOUT_PROFILE.max_rows)
         self.assertLess(HANT_LAYOUT_PROFILE.max_cells, 0x40 // 2)

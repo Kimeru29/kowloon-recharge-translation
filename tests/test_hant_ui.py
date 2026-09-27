@@ -35,9 +35,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(4471, info.payload_size)
+        self.assertEqual(4479, info.payload_size)
         self.assertEqual(
-            "0ca076079583436cf880a4f4d39394ee32a9b207f32ccb8437de0992a9f3900f",
+            "979bfbd10e200141768641051750d46108e1a90e0249e6ec79df3d41c1e0d080",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -82,7 +82,7 @@ class HantTutorialTests(unittest.TestCase):
             HANT_CONTROLLER_SPANS_BY_ROW,
         )
         self.assertEqual(
-            ((0, 5, 130, 120), (38, 1, 78, 173), (0, 0, 129, 227), (-1, -1, -1, -1)),
+            ((0, 5, 130, 108), (38, 1, 78, 155), (0, 0, 129, 203), (-1, -1, -1, -1)),
             HANT_CONTROLLER_METADATA_RECORDS,
         )
         for index, english in enumerate(HANT_WRAPPED_LINES):
@@ -218,7 +218,7 @@ class HantTutorialTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            ("ADV", "Exploration", "Other"),
+            ("ADV", "Ruins", "Other"),
             tuple(spec.english for spec in hant_ui.HANT_HELP_CATEGORY_LABELS),
         )
         self.assertTrue(all(spec.provenance == "semantic" for spec in hant_ui.HANT_HELP_CATEGORY_LABELS))
@@ -344,15 +344,16 @@ class HantTutorialTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "H.A.N.T.*style|H.A.N.T.*renderer"):
             patch_hant_tutorial(bytes(tampered))
 
-    def test_tutorial_rows_use_page_local_18px_vertical_spacing(self) -> None:
+    def test_tutorial_rows_use_page_local_16px_vertical_spacing(self) -> None:
         result, _info = patch_hant_tutorial(RAW)
 
         # VA 0x2907E4 materializes the page-local 21.0f row stride used by
-        # ``131 + stride * row``. r4 still clipped the final tutorial rows, so
-        # only this tutorial stride is tightened to 18.0f.
-        self.assertEqual(18.0, HANT_LAYOUT_PROFILE.line_spacing)
+        # ``131 + stride * row``. r6 runtime keeps the 12px font readable but
+        # shows the page rows are still too loose. Tighten only this page-local
+        # stride to 16.0f, leaving 4px leading around the 12px glyph height.
+        self.assertEqual(16.0, HANT_LAYOUT_PROFILE.line_spacing)
         self.assertEqual(0x3C0241A8, struct.unpack_from("<I", RAW, 0x190864)[0])
-        self.assertEqual(0x3C024190, struct.unpack_from("<I", result, 0x190864)[0])
+        self.assertEqual(0x3C024180, struct.unpack_from("<I", result, 0x190864)[0])
 
     def test_wrapping_preserves_instructional_wording_and_uses_runtime_row_budget(self) -> None:
         # The standalone H.A.N.T heading is presentation-only and redundant with

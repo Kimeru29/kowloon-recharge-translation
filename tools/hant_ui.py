@@ -54,10 +54,10 @@ _HANT_TUTORIAL_FONT_STYLE_PRISTINE_WORD = 0x0000282D  # move a1,zero
 _HANT_TUTORIAL_FONT_STYLE_ENGLISH_WORD = 0x24050001   # addiu a1,zero,1
 # VA 0x2907E4 materializes the page-local float stride used by
 # Y = 131 + stride * row. r4 runtime proved 21px still exceeds the visible
-# tutorial budget, so r5 tightens only this page to 18px.
+# tutorial budget. r7 keeps the runtime-good 12px font and tightens only this page to 16px.
 HANT_TUTORIAL_ROW_SPACING_OFFSET = 0x190864
 _HANT_TUTORIAL_ROW_SPACING_PRISTINE_WORD = 0x3C0241A8  # lui v0,0x41A8 => 21.0f
-_HANT_TUTORIAL_ROW_SPACING_ENGLISH_WORD = 0x3C024190   # lui v0,0x4190 => 18.0f
+_HANT_TUTORIAL_ROW_SPACING_ENGLISH_WORD = 0x3C024180   # lui v0,0x4180 => 16.0f
 
 _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
@@ -158,7 +158,7 @@ HANT_CONFIG_LABELS: tuple[HantConfigLabel, ...] = (
 # source text for this PS2-only owner, so these concise labels are semantic.
 HANT_HELP_CATEGORY_LABELS: tuple[HantHelpCategoryLabel, ...] = (
     HantHelpCategoryLabel("adv", 0x695908, 0x587288, "ＡＤＶ", "ADV"),
-    HantHelpCategoryLabel("exploration", 0x587278, 0x58728C, "遺跡探索", "Exploration"),
+    HantHelpCategoryLabel("exploration", 0x587278, 0x58728C, "遺跡探索", "Ruins"),
     HantHelpCategoryLabel("other", 0x695910, 0x587290, "その他", "Other"),
 )
 

@@ -166,35 +166,37 @@ _NAME_FLOW_FLAG_ZERO_WORD = 0x0000282D  # daddu a1, zero, zero
 _NAME_FLOW_FLAG_ONE_WORD = 0x24050001   # addiu a1, zero, 1
 _NAME_FLOW_TRANSITION_JAL_WORD = 0x0C0A1788  # jal 0x285e20
 
-# License-status states use the same 16-pixel text renderer but different fixed
-# X origins. `Verifying license ID...` is 23 glyphs at X=140 and is runtime-good.
-# `ID verification complete.` is 25 glyphs, so X=108 preserves the same right
-# edge (508) without changing the official wording.
-_LICENSE_VERIFY_X_OFFSET = 0x181B70
-_LICENSE_COMPLETE_X_OFFSET = 0x181EAC
-_LICENSE_VERIFY_X_WORD = 0x3C02430C  # lui v0,0x430c -> 140.0f
-_LICENSE_COMPLETE_X_PRISTINE_WORD = 0x3C02431C  # lui v0,0x431c -> 156.0f
-_LICENSE_COMPLETE_X_ENGLISH_WORD = 0x3C0242D8  # lui v0,0x42d8 -> 108.0f
+# The M_Name prompt renderer uses one 16-pixel two-byte glyph font object and
+# repositions it per state before selecting text from NAME_PROMPT_TEXTS. Japanese
+# fixed X origins are visibly right-shifted with English. Entries 0/1 and 2/3
+# share one state X, so use the midpoint of their two exact centered origins
+# (maximum 8px error); single prompts use their exact 512px-view centers. The
+# Yes/No line uses the second prompt object created at file 0x181888.
+NAME_PROMPT_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x1819DC, 0x3C02432C, 0x3C0242F8),  # Enter last/first name: 172 -> 124
+    (0x181A68, 0x3C024304, 0x3C0241E0),  # reading prompts: 132 -> 28
+    (0x181AF4, 0x3C024324, 0x3C024318),  # Is this fine?: 164 -> 152
+    (0x181888, 0x3C024350, 0x3C024340),  # Yes / No: 208 -> 192
+    (0x181B70, 0x3C02430C, 0x3C024290),  # Verifying license ID...: 140 -> 72
+    (0x181EAC, 0x3C02431C, 0x3C024260),  # ID verification complete.: 156 -> 56
+)
 
 
-def patch_license_completion_layout(raw: bytes) -> bytes:
-    for offset, expected in (
-        (_LICENSE_VERIFY_X_OFFSET, _LICENSE_VERIFY_X_WORD),
-        (_LICENSE_COMPLETE_X_OFFSET, _LICENSE_COMPLETE_X_PRISTINE_WORD),
-    ):
+def patch_name_prompt_layout(raw: bytes) -> bytes:
+    for offset, expected, _replacement in NAME_PROMPT_LAYOUT_PATCHES:
         if offset + 4 > len(raw):
-            raise ValueError("License-status layout patch is outside executable")
+            raise ValueError("Name-prompt layout patch is outside executable")
         actual = struct.unpack_from("<I", raw, offset)[0]
         if actual != expected:
             raise ValueError(
-                f"License-status layout preimage mismatch at {offset:#x}: "
+                f"Name-prompt layout preimage mismatch at {offset:#x}: "
                 f"expected {expected:#010x}, got {actual:#010x}"
             )
 
     result = bytearray(raw)
-    struct.pack_into("<I", result, _LICENSE_COMPLETE_X_OFFSET, _LICENSE_COMPLETE_X_ENGLISH_WORD)
+    for offset, _expected, replacement in NAME_PROMPT_LAYOUT_PATCHES:
+        struct.pack_into("<I", result, offset, replacement)
     return bytes(result)
-
 
 def patch_name_entry_flow(raw: bytes) -> bytes:
     expected = (
@@ -414,5 +416,5 @@ def build_startup_ui_elf(raw: bytes) -> bytes:
     titled = patch_title_labels(laid_out)
     relocated = patch_name_prompt_arena(titled)
     flowed = patch_name_entry_flow(relocated)
-    license_layout = patch_license_completion_layout(flowed)
-    return patch_fixed_strings(license_layout, STARTUP_FIXED_PATCHES)
+    prompt_layout = patch_name_prompt_layout(flowed)
+    return patch_fixed_strings(prompt_layout, STARTUP_FIXED_PATCHES)

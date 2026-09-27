@@ -20,12 +20,13 @@ class HantLayoutProfile:
 # - the page-local row constructor can select existing font style 1 (12x12)
 #   instead of style 0 (16x18), so that same proven 336 px span safely holds
 #   28 translated cells without global font changes,
-# - r4 runtime still clipped the final rows; r5 keeps the 12px font and uses a
-#   page-local 18px row stride (patched from pristine 21px), with at most 16 rows.
+# - r5 established the 12px font as readable. r6 runtime showed the remaining
+#   page spacing was still too loose, so r7 keeps the font and tightens only the
+#   page-local row stride to 16px (from pristine 21px), with at most 16 rows.
 HANT_LAYOUT_PROFILE = HantLayoutProfile(
     max_cells=28,
     glyph_advance=12.0,
-    line_spacing=18.0,
+    line_spacing=16.0,
     controller_gap_cells=5,
 )
 

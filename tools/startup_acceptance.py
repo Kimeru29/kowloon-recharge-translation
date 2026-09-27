@@ -32,6 +32,7 @@ from tools.memory_card_ui import (
 from tools.startup_ui import (
     KEYBOARD_ROW_PATCHES,
     NAME_DEFAULT_POINTER_OFFSETS,
+    NAME_PROMPT_LAYOUT_PATCHES,
     NAME_PROMPT_POINTER_TABLE_OFFSET,
     NAME_PROMPT_TEXTS,
     NAME_RUNTIME_POINTER_OFFSETS,
@@ -339,6 +340,18 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         )
     )
 
+    name_prompt_layout_ok = all(
+        offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
+        for offset, _expected, replacement in NAME_PROMPT_LAYOUT_PATCHES
+    )
+    checks.append(
+        _check(
+            "name_prompt_centered_layout",
+            name_prompt_layout_ok,
+            "M_Name prompt X owners are not using the centered English geometry",
+        )
+    )
+
     adv_ok = all(
         offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
         for offset, _expected, replacement in ADV_DG_LAYOUT_PATCHES
@@ -478,7 +491,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
     )
     hant_spacing_ok = (
         HANT_TUTORIAL_ROW_SPACING_OFFSET + 4 <= len(raw)
-        and struct.unpack_from("<I", raw, HANT_TUTORIAL_ROW_SPACING_OFFSET)[0] == 0x3C024190
+        and struct.unpack_from("<I", raw, HANT_TUTORIAL_ROW_SPACING_OFFSET)[0] == 0x3C024180
     )
 
     hant_chrome_ok = segment is not None
@@ -609,7 +622,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         _check(
             "hant_tutorial_row_spacing",
             hant_spacing_ok,
-            "H.A.N.T tutorial rows are not using the page-local 18px stride",
+            "H.A.N.T tutorial rows are not using the page-local 16px stride",
         )
     )
     checks.append(

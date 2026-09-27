@@ -118,7 +118,8 @@ class EarlyUiPatchTests(unittest.TestCase):
             *HANT_ALL_HELP_TOPICS,
         ):
             allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
-        allowed.update(range(0x181EAC, 0x181EB0))
+        for offset in (0x181888, 0x1819DC, 0x181A68, 0x181AF4, 0x181B70, 0x181EAC):
+            allowed.update(range(offset, offset + 4))
         for index in MEMORY_CARD_MESSAGES:
             off = MEMORY_CARD_POINTER_TABLE_OFFSET + index * 4
             allowed.update(range(off, off + 4))
@@ -204,7 +205,7 @@ class EarlyUiPatchTests(unittest.TestCase):
         segment_va = segment[2]
         segment_size = segment[4]
         by_key = {spec.key: spec for spec in MENU_LABELS}
-        self.assertEqual(4504, segment_size)
+        self.assertEqual(4512, segment_size)
 
         for key, expected in (("return_above_ground", b"Return above ground\x00"), ("report_card", b"Report card\x00")):
             spec = by_key[key]
@@ -217,7 +218,7 @@ class EarlyUiPatchTests(unittest.TestCase):
             target_va = targets.pop()
             self.assertGreaterEqual(target_va, segment_va)
             self.assertLess(target_va, segment_va + segment_size)
-            expected_offset = {"return_above_ground": 0x1178, "report_card": 0x118C}[key]
+            expected_offset = {"return_above_ground": 0x1180, "report_card": 0x1194}[key]
             self.assertEqual(segment_va + expected_offset, target_va)
             target_file = segment_file + target_va - segment_va
             self.assertEqual(expected, result[target_file:target_file + len(expected)])

@@ -7,6 +7,7 @@ from pathlib import Path
 from tests.local_fixtures import require_local_fixture
 from tools.early_ui import build_early_ui_elf
 from tools.adv_layout import ADV_SPEAKER_LAYOUT_PATCHES
+from tools.startup_ui import NAME_PROMPT_LAYOUT_PATCHES
 from tools.hant_ui import (
     HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
@@ -46,6 +47,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("memory_card_1", names)
         self.assertIn("memory_card_1_boot_aliases", names)
         self.assertIn("name_flow_skip_reading", names)
+        self.assertIn("name_prompt_centered_layout", names)
         self.assertIn("name_prompt_0", names)
         self.assertIn("name_prompt_2", names)
         self.assertIn("name_prompt_3", names)
@@ -69,6 +71,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_help_category_labels", failed_names)
         self.assertIn("name_prompt_0", failed_names)
         self.assertIn("name_flow_skip_reading", failed_names)
+        self.assertIn("name_prompt_centered_layout", failed_names)
         self.assertIn("memory_card_1_boot_aliases", failed_names)
         self.assertIn("title_english_label_geometry", failed_names)
         self.assertIn("menu_semantic_fixed_labels", failed_names)
@@ -114,6 +117,18 @@ class StartupAcceptanceTests(unittest.TestCase):
                 check = next(check for check in verify_startup_elf(bytes(tampered)) if check["name"] == name)
                 self.assertFalse(check["ok"])
 
+
+    def test_name_prompt_centering_acceptance_fails_closed_on_each_owner(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        for offset, _expected, _replacement in NAME_PROMPT_LAYOUT_PATCHES:
+            with self.subTest(offset=hex(offset)):
+                tampered = bytearray(translated)
+                tampered[offset] ^= 1
+                check = next(
+                    check for check in verify_startup_elf(bytes(tampered))
+                    if check["name"] == "name_prompt_centered_layout"
+                )
+                self.assertFalse(check["ok"])
 
     def test_adv_speaker_acceptance_fails_closed_on_orientation_drift(self) -> None:
         translated = build_early_ui_elf(RAW)

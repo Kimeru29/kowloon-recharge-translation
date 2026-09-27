@@ -41,7 +41,7 @@ def encode_memory_card_english(text: str) -> bytes:
 # Each item is pointer-index -> (PS2 source file offset, PS2 source, English).
 MEMORY_CARD_MESSAGES: dict[int, tuple[int, str, str]] = {
     0: (0x406B20, "＠改行＠改行データ処理を選択してください。", "＠改行＠改行Select data function."),
-    1: (0x406B50, "＠改行＠改行メモリーカード差込口１を＠改行＠改行チェック中です。", "\nChecking memory card\nslot 1"),
+    1: (0x406B50, "＠改行＠改行メモリーカード差込口１を＠改行＠改行チェック中です。", "\n\nChecking memory card\n       slot 1"),
     2: (0x406BA0, "＠改行メモリーカード差込口１に＠改行＠改行メモリーカード（ＰＳ２）が＠改行＠改行差されてません。", "\nNo memory card＠改行(PS2) inserted＠改行in slot 1."),
     3: (0x406C10, "＠改行＠改行セーブを中断して宜しいですか？", "＠改行＠改行Cancel the save?"),
     4: (0x406BA0, "＠改行メモリーカード差込口１に＠改行＠改行メモリーカード（ＰＳ２）が＠改行＠改行差されてません。", "\nNo memory card＠改行(PS2) inserted＠改行in slot 1."),
