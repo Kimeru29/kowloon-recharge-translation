@@ -10,6 +10,7 @@ from tools.menu_ui import MENU_LABELS
 from tools.hant_inventory import inventory_hant_text
 from tools.startup_ui import (
     NAME_BLANK_STRING_OFFSET,
+    NAME_CONFIRMATION_FOCUS_PATCHES,
     NAME_PROMPT_ARENA_END,
     NAME_PROMPT_ARENA_START,
     NAME_PROMPT_POINTER_TABLE_OFFSET,
@@ -43,6 +44,7 @@ from tools.memory_card_ui import (
 )
 from tools.elf_translation_segment import TRANSLATION_SEGMENT_VADDR
 from tools.localization import encode_ps2_english
+from tools.title_layout import TITLE_LABEL_BACKING_PATCHES
 from tests.local_fixtures import require_local_fixture
 
 
@@ -87,6 +89,8 @@ class EarlyUiPatchTests(unittest.TestCase):
         allowed.update(range(TITLE_LOAD_POINTER_OFFSET, TITLE_LOAD_POINTER_OFFSET + 4))
         allowed.update(range(0x1ABF64, 0x1ABF68))
         allowed.update(range(0x1ABF84, 0x1ABF88))
+        for off, _expected, _replacement in TITLE_LABEL_BACKING_PATCHES:
+            allowed.update(range(off, off + 4))
         allowed.update(range(NAME_READING_ARENA_START, NAME_READING_ARENA_END))
         allowed.update(range(NAME_PROMPT_ARENA_START, NAME_PROMPT_ARENA_END))
         allowed.update(range(NAME_PROMPT_POINTER_TABLE_OFFSET, NAME_PROMPT_POINTER_TABLE_OFFSET + 8 * 4))
@@ -119,6 +123,8 @@ class EarlyUiPatchTests(unittest.TestCase):
         ):
             allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
         for offset in (0x181888, 0x1819DC, 0x181A68, 0x181AF4, 0x181B70, 0x181EAC):
+            allowed.update(range(offset, offset + 4))
+        for offset, _expected, _replacement in NAME_CONFIRMATION_FOCUS_PATCHES:
             allowed.update(range(offset, offset + 4))
         for index in MEMORY_CARD_MESSAGES:
             off = MEMORY_CARD_POINTER_TABLE_OFFSET + index * 4

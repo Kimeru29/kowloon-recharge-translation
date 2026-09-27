@@ -176,7 +176,10 @@ ADV_SPEAKER_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
 )
 
 ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
-    # First formula: 114 - 39 * line.  a1 (X) -> a2 (Y).
+    # First formula is actually 39 - line*114. a1 (X) -> a2 (Y). r9 runtime
+    # exposed the earlier operand mistake: changing 114 moved the multiplier but
+    # left row zero at Y=39. English needs row zero below the accepted speaker,
+    # with compact row spacing, so use 300 - line*16.
     (0x14FA9C, 0x00032C3C, 0x0003343C),  # dsll32 a1,v1,16 -> dsll32 a2,v1,16
     (0x14FAA0, 0x00052C3F, 0x0006343F),  # dsra32 a1,a1,16 -> dsra32 a2,a2,16
     # Second formula becomes English X. Preserve the proven /2 byte-to-glyph
@@ -184,10 +187,8 @@ ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # advance of the exact style-1 font profile used by these child fragments.
     (0x14FAF4, 0x0003343C, 0x00032C3C),  # dsll32 a2,v1,16 -> dsll32 a1,v1,16
     (0x14FAF8, 0x0006343F, 0x00052C3F),  # dsra32 a2,a2,16 -> dsra32 a1,a1,16
-    # r8 runtime accepts the speaker at Y=276 but shows too much vertical gap
-    # before the prose. Keep all orientation/spacing work and move only the
-    # transposed body base to Y=300, immediately below the 18px speaker line.
-    (0x14FA78, 0x3C0342E4, 0x3C034396),  # 114.0f -> 300.0f body Y base
+    (0x14FA70, 0x3C03421C, 0x3C034396),  # 39.0f -> 300.0f body Y base
+    (0x14FA78, 0x3C0342E4, 0x3C034180),  # 114.0f -> 16.0f body Y row stride
     (0x14FAC8, 0x3C0341D0, 0x3C034140),  # 26.0f -> 12.0f X fragment stride
     # Unique wrapper callsite: orientation=1 is saved in s4 and reaches all four
     # child font canvases. Clear it before construction rather than patching only
@@ -199,11 +200,13 @@ ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
 def patch_adv_horizontal_layout(raw: bytes) -> bytes:
     """Transpose only the proven ADV/DG glyph-layout constructor to English.
 
-    The pristine constructor computes X-like ``114 - 39 * line`` and Y-like
+    The pristine constructor computes X-like ``39 - 114 * line`` and Y-like
     ``20 + 26 * (byte_position / 2)`` integer origins before passing them as
     ``a1``/``a2`` to the coordinate helper. English needs the second formula as
-    X and the first as Y; because the live body fragments use the 12x12 style-1
-    font, their transposed X stride is tightened from 26 to 12 pixels. Separately,
+    X and the first as Y. Runtime r9 proves row zero still used the untouched
+    39px base, so r10 changes the transposed body formula to ``300 - 16 * line``.
+    Because the live fragments use the 12x12 style-1 font, their transposed X
+    stride remains tightened from 26 to 12 pixels. Separately,
     the unique wrapper passes orientation=1
     into the ADV object constructor; that value is propagated to every child font
     canvas, and the generic callback proves nonzero advances Y while zero advances

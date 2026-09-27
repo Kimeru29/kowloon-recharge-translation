@@ -7,6 +7,7 @@ from pathlib import Path
 
 from tests.local_fixtures import require_local_fixture
 from tools.localization import encode_ps2_english
+from tools.title_layout import TITLE_LABEL_BACKING_PATCHES
 from tools.startup_ui import (
     STARTUP_FIXED_PATCHES,
     TITLE_ARENA_END,
@@ -15,6 +16,7 @@ from tools.startup_ui import (
     TITLE_LOAD_START,
     TITLE_NEW_GAME_START,
     TITLE_POINTER_TABLE_OFFSET,
+    NAME_CONFIRMATION_FOCUS_PATCHES,
     NAME_PROMPT_LAYOUT_PATCHES,
     NAME_PROMPT_POINTER_TABLE_OFFSET,
     NAME_PROMPT_TEXTS,
@@ -142,6 +144,32 @@ class StartupUiPatchTests(unittest.TestCase):
             self.assertEqual(pristine, struct.unpack_from("<I", RAW, offset)[0])
             self.assertEqual(replacement_word, struct.unpack_from("<I", result, offset)[0])
 
+    def test_yes_focus_covers_all_three_english_glyphs_without_changing_no_focus(self) -> None:
+        result = build_startup_ui_elf(RAW)
+
+        # The original Japanese confirmation renderer selected two glyphs and
+        # forced child 2 (the separator) back to the base color. In English the
+        # third Yes glyph is child 2, so it is the `s`; the separator-side child
+        # moves to child 3. The selected-Yes highlight also has to follow the
+        # accepted 208 -> 192 text shift. No focus already looks correct.
+        expected = (
+            (0x181D0C, 0x3C024350, 0x3C024340),  # Yes focus X: 208 -> 192
+            (0x181D9C, 0x24050002, 0x24050003),  # reset separator child: 2 -> 3
+        )
+        self.assertEqual(expected, NAME_CONFIRMATION_FOCUS_PATCHES)
+        for offset, pristine, replacement in expected:
+            self.assertEqual(pristine, struct.unpack_from("<I", RAW, offset)[0])
+            self.assertEqual(replacement, struct.unpack_from("<I", result, offset)[0])
+        self.assertEqual(0x3C024388, struct.unpack_from("<I", result, 0x181DC8)[0])  # No X=272
+
+    def test_name_confirmation_focus_fails_closed_on_owner_drift(self) -> None:
+        for offset, _expected, _replacement in NAME_CONFIRMATION_FOCUS_PATCHES:
+            with self.subTest(offset=hex(offset)):
+                tampered = bytearray(RAW)
+                tampered[offset] ^= 1
+                with self.assertRaisesRegex(ValueError, "confirmation.*focus|Confirmation.*focus"):
+                    build_startup_ui_elf(bytes(tampered))
+
     def test_name_prompt_layout_fails_closed_on_each_x_owner_drift(self) -> None:
         for offset, _expected, _replacement in NAME_PROMPT_LAYOUT_PATCHES:
             with self.subTest(offset=hex(offset)):
@@ -225,6 +253,8 @@ class StartupUiPatchTests(unittest.TestCase):
         allowed.update(range(TITLE_LOAD_POINTER_OFFSET, TITLE_LOAD_POINTER_OFFSET + 4))
         allowed.update(range(0x1ABF64, 0x1ABF68))
         allowed.update(range(0x1ABF84, 0x1ABF88))
+        for offset, _expected, _replacement in TITLE_LABEL_BACKING_PATCHES:
+            allowed.update(range(offset, offset + 4))
         allowed.update(range(0x5865F0, 0x586630))
         allowed.update(range(0x586630, 0x586650))
         allowed.update(range(0x5869C0, 0x586AF0))
@@ -234,6 +264,8 @@ class StartupUiPatchTests(unittest.TestCase):
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
         # Runtime owners for the two centered English license-status lines.
         for offset in (0x181888, 0x1819DC, 0x181A68, 0x181AF4, 0x181B70, 0x181EAC):
+            allowed.update(range(offset, offset + 4))
+        for offset, _expected, _replacement in NAME_CONFIRMATION_FOCUS_PATCHES:
             allowed.update(range(offset, offset + 4))
 
         changed = {i for i, (before, after) in enumerate(zip(RAW, result)) if before != after}

@@ -181,6 +181,20 @@ NAME_PROMPT_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x181EAC, 0x3C02431C, 0x3C024260),  # ID verification complete.: 156 -> 56
 )
 
+# The confirmation focus renderer has separate geometry/color ownership from the
+# static Yes / No prompt. In Japanese, selected Yes covered two glyph children
+# and child 2 was the separator, so the renderer explicitly reset child 2 to the
+# base color. English puts the third `Yes` glyph at child 2, so resetting that
+# child now erases `s`; the separator-side child starts at child 3. Runtime r9 shows
+# exactly that failure. Move the selected-Yes X with the accepted prompt shift and
+# reset child 3 instead. The No branch at 0x181DC8 (X=272) is already runtime-good.
+NAME_CONFIRMATION_FOCUS_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x181D0C, 0x3C024350, 0x3C024340),  # Yes focus X: 208 -> 192
+    (0x181D9C, 0x24050002, 0x24050003),  # separator child: 2 -> 3
+)
+_NAME_CONFIRMATION_NO_FOCUS_X_OFFSET = 0x181DC8
+_NAME_CONFIRMATION_NO_FOCUS_X_WORD = 0x3C024388  # 272.0f, preserve
+
 
 def patch_name_prompt_layout(raw: bytes) -> bytes:
     for offset, expected, _replacement in NAME_PROMPT_LAYOUT_PATCHES:
@@ -197,6 +211,26 @@ def patch_name_prompt_layout(raw: bytes) -> bytes:
     for offset, _expected, replacement in NAME_PROMPT_LAYOUT_PATCHES:
         struct.pack_into("<I", result, offset, replacement)
     return bytes(result)
+
+
+def patch_name_confirmation_focus(raw: bytes) -> bytes:
+    for offset, expected, _replacement in NAME_CONFIRMATION_FOCUS_PATCHES:
+        if offset + 4 > len(raw):
+            raise ValueError("Name confirmation focus patch is outside executable")
+        actual = struct.unpack_from("<I", raw, offset)[0]
+        if actual != expected:
+            raise ValueError(
+                f"Name confirmation focus preimage mismatch at {offset:#x}: "
+                f"expected {expected:#010x}, got {actual:#010x}"
+            )
+    if struct.unpack_from("<I", raw, _NAME_CONFIRMATION_NO_FOCUS_X_OFFSET)[0] != _NAME_CONFIRMATION_NO_FOCUS_X_WORD:
+        raise ValueError("Name confirmation focus preimage mismatch for accepted No geometry")
+
+    result = bytearray(raw)
+    for offset, _expected, replacement in NAME_CONFIRMATION_FOCUS_PATCHES:
+        struct.pack_into("<I", result, offset, replacement)
+    return bytes(result)
+
 
 def patch_name_entry_flow(raw: bytes) -> bytes:
     expected = (
@@ -417,4 +451,5 @@ def build_startup_ui_elf(raw: bytes) -> bytes:
     relocated = patch_name_prompt_arena(titled)
     flowed = patch_name_entry_flow(relocated)
     prompt_layout = patch_name_prompt_layout(flowed)
-    return patch_fixed_strings(prompt_layout, STARTUP_FIXED_PATCHES)
+    confirmation_focus = patch_name_confirmation_focus(prompt_layout)
+    return patch_fixed_strings(confirmation_focus, STARTUP_FIXED_PATCHES)
