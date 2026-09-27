@@ -141,8 +141,9 @@ def inspect_adv_coordinate_consumers(raw: bytes) -> tuple[AdvCoordinateConsumer,
 # ``sltu a2,zero,s0`` where s0 is the saved text mode, then move only this speaker
 # to otherwise-unused direct-call mode 0. Mode 0 keeps the normal 16x18 font and
 # becomes horizontal while modes 1..7 retain their pristine vertical flag. The
-# speaker's own fixed X/Y origin is moved to X=20/Y=80, aligned above the r6 body
-# origin X=20/Y=114, giving a proper horizontal header/body composition.
+# speaker's own fixed X remains 20. r7 runtime proves the horizontal header path;
+# r8 moves only Y to 276 so it sits just above the lower-screen body block whose
+# transposed base moves to 312, matching the remaster composition more closely.
 #
 # Keep the r5 0x251470 record-label orientation patch because it is a distinct
 # ADV record-label renderer and removing a shipped change without contrary
@@ -168,7 +169,7 @@ _ADV_DG_BODY_STYLE_PREIMAGES: tuple[tuple[int, int], ...] = (
 
 ADV_SPEAKER_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x150048, 0x3C024301, 0x3C0241A0),  # speaker X: 129 -> 20
-    (0x150050, 0x3C0241A0, 0x3C0242A0),  # speaker Y: 20 -> 80
+    (0x150050, 0x3C0241A0, 0x3C02438A),  # speaker Y: 20 -> 276
     (0x15006C, 0x24050002, 0x24050000),  # speaker mode 2 -> mode 0
     (0x090B30, 0x24060001, 0x0010302B),  # a2 = (saved text mode != 0)
     (0x151608, 0x24060001, 0x24060000),  # preserve r5 record-label orientation
@@ -183,6 +184,10 @@ ADV_DG_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # advance of the exact style-1 font profile used by these child fragments.
     (0x14FAF4, 0x0003343C, 0x00032C3C),  # dsll32 a2,v1,16 -> dsll32 a1,v1,16
     (0x14FAF8, 0x0006343F, 0x00052C3F),  # dsra32 a2,a2,16 -> dsra32 a1,a1,16
+    # r7 runtime proves horizontal orientation and 12px spacing. Move only the
+    # transposed body Y base from the upper Japanese layout to the lower-screen
+    # remaster-style dialogue area. The helper adds ~1px to the first fragment.
+    (0x14FA78, 0x3C0342E4, 0x3C03439C),  # 114.0f -> 312.0f body Y base
     (0x14FAC8, 0x3C0341D0, 0x3C034140),  # 26.0f -> 12.0f X fragment stride
     # Unique wrapper callsite: orientation=1 is saved in s4 and reaches all four
     # child font canvases. Clear it before construction rather than patching only

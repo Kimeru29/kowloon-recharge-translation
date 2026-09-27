@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from tests.test_tmx import make_container
-from tools.startup_graphics import port_name_entry_graphics, port_quote_graphic, port_title_startup_graphics
+from tools.startup_graphics import _extend_title_label_backing_indices, port_name_entry_graphics, port_quote_graphic, port_title_startup_graphics
 from tools.tmx import decode_tmx_rgba, find_tmx_entry, parse_standalone_tmx, replace_tmx_indexed
 
 try:
@@ -32,11 +32,10 @@ class StartupGraphicsTests(unittest.TestCase):
 
     @staticmethod
     def _make_gp088_title_container(*, valid_packed_layout: bool = True) -> bytes:
-        def entry(name: str) -> bytes:
+        def entry(name: str, *, width: int = 512, height: int = 512) -> bytes:
             encoded_name = name.encode("ascii") + b"\x00"
             prefix = bytearray(0x100)
             prefix[:len(encoded_name)] = encoded_name
-            width = height = 512
             chunk_size = 0x40 + 256 * 4 + width * height
             tmx = bytearray(chunk_size)
             struct.pack_into("<II", tmx, 0, 2, chunk_size)
@@ -45,25 +44,41 @@ class StartupGraphicsTests(unittest.TestCase):
             tmx[17] = 0
             struct.pack_into("<HH", tmx, 18, width, height)
             tmx[22] = 0x13
-            # transparent, source-title, and flattened-overlay colors
-            palette = 0x40
-            tmx[palette + 0:palette + 4] = bytes((0, 0, 0, 0))
-            tmx[palette + 4:palette + 8] = bytes((200, 50, 10, 0x80))
-            tmx[palette + 8:palette + 12] = bytes((20, 80, 200, 0x80))
             return bytes(prefix + tmx)
 
-        blob = entry("GRP088/GP088_03.TMX") + entry("GRP088/GP088_12.TMX")
+        blob = (
+            entry("GRP088/GP088_03.TMX")
+            + entry("GRP088/GP088_08.TMX", width=512, height=64)
+            + entry("GRP088/GP088_12.TMX")
+        )
+
+        title_palette = [(0, 0, 0, 0)] * 256
+        title_palette[1] = (200, 50, 10, 255)
+        title_palette[2] = (20, 80, 200, 255)
         source_indices = bytearray(512 * 512)
         for y in range(20, 390):
             for x in range(310, 320):
                 source_indices[y * 512 + x] = 1
             for x in range(375, 385):
                 source_indices[y * 512 + x] = 1
-        palette = [(0, 0, 0, 0)] * 256
-        palette[1] = (200, 50, 10, 255)
-        palette[2] = (20, 80, 200, 255)
         blob = replace_tmx_indexed(
-            blob, "GRP088/GP088_03.TMX", palette, bytes(source_indices)
+            blob, "GRP088/GP088_03.TMX", title_palette, bytes(source_indices)
+        )
+
+        backing_palette = [(0, 0, 0, 0)] * 256
+        backing_palette[0] = (0, 0, 0, 202)
+        backing_palette[1] = (0, 0, 0, 126)
+        backing_palette[2] = (18, 204, 58, 255)
+        backing_palette[15] = (255, 255, 255, 0)
+        backing_indices = bytearray([15] * (512 * 64))
+        for y in range(1, 23):
+            backing_indices[y * 512 + 1:y * 512 + 471] = bytes([0]) * 470
+        for y in range(25, 47):
+            backing_indices[y * 512 + 1:y * 512 + 71] = bytes([1]) * 70
+        for y in range(29, 36):
+            backing_indices[y * 512 + 77:y * 512 + 83] = bytes([2]) * 6
+        blob = replace_tmx_indexed(
+            blob, "GRP088/GP088_08.TMX", backing_palette, bytes(backing_indices)
         )
 
         target_indices = bytearray(512 * 512)
@@ -80,9 +95,52 @@ class StartupGraphicsTests(unittest.TestCase):
                 for x in range(250, 360):
                     target_indices[y * 512 + x] = 2
         blob = replace_tmx_indexed(
-            blob, "GRP088/GP088_12.TMX", palette, bytes(target_indices)
+            blob, "GRP088/GP088_12.TMX", title_palette, bytes(target_indices)
         )
         return blob
+
+
+    def test_extends_gp088_08_title_label_backing_to_longest_english_label(self) -> None:
+        width, height = 512, 64
+        transparent, black, marker = 15, 1, 2
+        indices = bytearray([transparent] * (width * height))
+
+        # Exact pristine GP088_08 geometry: a 470x22 footer strip and an
+        # independent 70x22 menu-label backing. Four Japanese 16px glyphs need
+        # 64px plus 6px chrome; longest English title label is nine glyphs, so
+        # preserve the same padding at 150px and move the trailing green marker.
+        for y in range(1, 23):
+            indices[y * width + 1:y * width + 471] = bytes([0]) * 470
+        for y in range(25, 47):
+            indices[y * width + 1:y * width + 71] = bytes([black]) * 70
+        for y in range(29, 36):
+            indices[y * width + 77:y * width + 83] = bytes([marker]) * 6
+
+        palette = [(0, 0, 0, 0)] * 256
+        palette[0] = (0, 0, 0, 202)
+        palette[black] = (0, 0, 0, 126)
+        palette[marker] = (18, 204, 58, 255)
+        palette[transparent] = (255, 255, 255, 0)
+
+        result = _extend_title_label_backing_indices(bytes(indices), width, height, palette)
+
+        # Footer/header strip is unrelated and remains byte-identical.
+        self.assertEqual(indices[1 * width:23 * width], result[1 * width:23 * width])
+        for y in range(25, 47):
+            self.assertEqual(bytes([black]) * 150, result[y * width + 1:y * width + 151])
+            self.assertEqual(bytes([transparent]) * 6, result[y * width + 151:y * width + 157])
+        for y in range(29, 36):
+            self.assertEqual(bytes([marker]) * 6, result[y * width + 157:y * width + 163])
+        self.assertTrue(all(value == transparent for y in range(25, 47) for value in result[y * width + 163:(y + 1) * width]))
+
+    def test_title_backing_extension_fails_closed_on_pristine_bar_drift(self) -> None:
+        width, height = 512, 64
+        palette = [(0, 0, 0, 0)] * 256
+        palette[1] = (0, 0, 0, 126)
+        palette[15] = (255, 255, 255, 0)
+        indices = bytes([15] * (width * height))
+        with self.assertRaisesRegex(ValueError, "GP088_08.*backing preimage"):
+            _extend_title_label_backing_indices(indices, width, height, palette)
 
     def test_ports_direct_and_repacked_title_logos_into_same_size_container(self) -> None:
         container = self._make_gp088_title_container()

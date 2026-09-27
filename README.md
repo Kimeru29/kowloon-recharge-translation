@@ -6,23 +6,22 @@ This repository intentionally contains **no game image, package, executable, ext
 
 ## Current status
 
-The project can build a deterministic whole-game translation candidate from the pristine PS2 ISO. The current **startup v11-r7** candidate is driven by Pablo's r6 runtime feedback and preserves the translated content that already worked while correcting measured presentation owners:
+The project can build a deterministic whole-game translation candidate from the pristine PS2 ISO. The current **startup v11-r8** candidate is a narrow runtime-polish release based on Pablo's accepted r7 improvements:
 
 - exact MTX: **962 files / 56,642** official English entries;
 - changed/template MTX: **7 files / 2,284** official entries;
 - exact KSF: **868** fitting official fields; 48 overflows and 4 ambiguous entries remain fail-closed;
-- startup executable UI: exact title/name/profile text, PS2-adapted Latin keyboard, seven semantic H.A.N.T. chrome labels, three Help category labels, all **55** Help-topic labels, nine Config labels, H.A.N.T. tutorial text/controller metadata, and the proven memory-card subset;
-- r7 dialogue layout: the bracket-derived speaker now reaches a truly horizontal generic-font orientation, is placed as a separate header, and the transposed DG body uses the actual 12px style-1 advance instead of the old 26px Japanese column stride;
-- r7 startup polish: name/confirmation/license prompt X owners are centered for English, the stone-tablet status gets additional top padding with `slot 1` centered under the first line, and the H.A.N.T. tutorial keeps its 12px font while tightening only its page-local row stride to 16px;
-- H.A.N.T. baked graphics: `GRP020/GP020_03.TMX` remains the proven six-tile semantic-English atlas (`HELP`, `CONFIG`, `MAIL`, `DICTIONARY`, `ENEMY`, `MEMO`, `RESET DEFAULTS`, `DELETE`, `PAGE`); the long Help tab `Exploration` is shortened to `Ruins` on its proven three-tab text owner;
-- title graphics: r7 deliberately preserves r6's recentered `New Game` / `Load Game` anchors and pristine packed-title scale. The remaining black-backing coverage is **known unresolved** because `GP088_08` is a multi-region title-chrome atlas and the exact live sampled subregion has not been proven;
-- startup graphics: official English `B_GP019`, semantic-English `B_GP020`, direct `B_GP088/GP088_03`, structurally repacked English `B_GP088/GP088_12`, and all **29** `BLBRD/INIT_MES/TR000–TR028.TMX` quotation images;
+- startup executable UI: exact title/name/profile text, PS2-adapted Latin keyboard, translated H.A.N.T. chrome/topics/config, tutorial text/controller metadata, and the proven memory-card subset;
+- **r7 preservation constraints:** name/confirmation/license centering is accepted; dialogue speaker orientation/brackets and 12px horizontal body spacing are accepted improvements; H.A.N.T. and working title anchors remain untouched in r8;
+- r8 dialogue geometry: speaker remains horizontal at X=20 but moves to Y=276; the body keeps its 12px stride and moves only its transposed Y base from 114 to 312;
+- r8 stone tablet: keeps the translated centered second line and adds exactly one more leading line break to lower the block;
+- r8 title backing: preserves r7's `New Game` / `Load Game` anchors and `GP088_03`/`GP088_12`, but extends only the proven `GP088_08` lower menu-label backing from 70px to 150px and shifts its existing trailing marker by 80px;
 - current candidate: **1,145 overlay assets**, 892 in place / 253 relocated, with all 1,145 executable ROFS records re-resolved;
-- v11-r7 startup final-image acceptance: **140/140 checks passed**;
-- candidate SHA-256: `2b64165f820ec208ff9d721b9fbf30d8ee17bb78b9556e7ebe540c83b27221b4`;
-- dependency-free suite: **199 tests OK** (8 expected skips); Pillow-enabled suite: **199 tests OK** (one owned-corpus skip);
+- v11-r8 startup final-image acceptance: **140/140 checks passed**;
+- candidate SHA-256: `c2905f8bf1ebe20defb5479591c0dbf86b2e9bfbf9c6062db37ccf6f8ba6593f`;
+- dependency-free suite: **201 tests OK** (10 expected skips); Pillow-enabled suite: **201 tests OK** (one owned-corpus skip);
 - deterministic repeat build is byte-for-byte identical;
-- **r7 has not been launched in PCSX2**. Pablo manually tested r6; r7 remains static/deterministic until he accepts its target screens. The structural 3+3 permanent-name storage remains an explicit unresolved limitation.
+- **r8 has not been launched in PCSX2**. Pablo is the runtime tester. The structural 3+3 permanent-name storage remains an explicit unresolved limitation.
 
 Exact file identity is deliberately not treated as sufficient proof. Indirect/dynamic localization maps, KSF overflows, ambiguous structural mappings, and unproven graphics-atlas transformations remain untouched until correspondence/layout is proven.
 

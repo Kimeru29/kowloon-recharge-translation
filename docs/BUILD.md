@@ -615,3 +615,19 @@ Measured v11-r7 static/deterministic result:
 - deterministic rebuild: `/private/tmp/kowloon-recharge-startup-en-v11-r7-repeat.iso` has the same SHA-256 and is byte-for-byte identical by `cmp`.
 
 Do not launch r7 automatically. Pablo is the runtime tester; the exact r7 visual gate is in `docs/LOCALIZATION_STATUS.md`.
+
+## Build startup v11-r8 candidate
+
+r8 is a presentation-only follow-up to Pablo's runtime-tested r7. It changes only three proven owners: ADV vertical dialogue geometry, boot-tablet line padding, and the `GP088_08` lower title-label backing. Name/license centering, H.A.N.T., title text anchors, `GP088_03`, and packed `GP088_12` are preservation constraints.
+
+For the title overlay, r8 applies the fail-closed `GP088_08` backing transformation to the verified r7 localized `B_GP088.BIN`; this changes only that TMX chunk and preserves the r7 title art path.
+
+Measured r8 result:
+- ISO SHA-256: `c2905f8bf1ebe20defb5479591c0dbf86b2e9bfbf9c6062db37ccf6f8ba6593f`;
+- pre-ROFS ELF: `62d68ec47255d37eb372f75d074815159b352367096e488247d699ed54043200`;
+- post-ROFS ELF: `d19d03a728aba3fff0102b076cc53d045e3329de7b421b4ef4c8ec54a5eb5712`;
+- 140/140 final-image checks;
+- 201 tests in both suites (10 dependency-free skips / 1 Pillow-owned-corpus skip);
+- repeat ISO byte-for-byte identical.
+
+Do not launch PCSX2 automatically. Pablo is the runtime tester.
