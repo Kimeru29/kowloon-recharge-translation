@@ -70,6 +70,32 @@ _TITLE_LABEL_OWNER_WORDS: tuple[tuple[int, int], ...] = (
     (0x1AC658, 0x2A220002),  # exactly two label objects
 )
 
+# The label renderer also owns two black/chrome primitives. Both subtract the
+# same hard-coded 64px half-width from the label object's X before constructing
+# the primitive through VA 0x188AD0. That makes the pristine backing 128px wide.
+# English is deterministic here: 16px per rendered glyph, so New Game = 128px
+# and Load Game = 144px. Use an 80px half-width = 160px total, which gives the
+# longest label 8px padding on both sides and New Game 16px per side.
+_TITLE_LABEL_BACKING_OWNER_WORDS: tuple[tuple[int, int], ...] = (
+    (0x19AB34, 0xC7A100C0),  # load label X
+    (0x19AB38, 0x3C024280),  # 64.0f half-width, first backing primitive
+    (0x19ABB0, 0x0C0622B4),  # jal 0x188AD0
+    (0x19ABD4, 0xC7A100C0),  # load label X
+    (0x19ABD8, 0x3C024280),  # 64.0f half-width, second backing primitive
+    (0x19AC5C, 0x0C0622B4),  # jal 0x188AD0
+)
+_TITLE_BACKING_HALF_WIDTH_OFFSETS = (0x19AB38, 0x19ABD8)
+_TITLE_BACKING_HALF_WIDTH_PREIMAGE = 0x3C024280  # 64.0f
+_TITLE_BACKING_HALF_WIDTH_REPLACEMENT = 0x3C0242A0  # 80.0f
+TITLE_LABEL_BACKING_PATCHES: tuple[tuple[int, int, int], ...] = tuple(
+    (offset, _TITLE_BACKING_HALF_WIDTH_PREIMAGE, _TITLE_BACKING_HALF_WIDTH_REPLACEMENT)
+    for offset in _TITLE_BACKING_HALF_WIDTH_OFFSETS
+)
+TITLE_GLYPH_ADVANCE = 16
+TITLE_NEW_GAME_GLYPHS = 8
+TITLE_LOAD_GAME_GLYPHS = 9
+TITLE_BACKING_WIDTH = 160
+
 # The earlier Task-4 hypothesis incorrectly classified group 2/index 0x8E as
 # the static menu backing.  Full state-machine tracing proves it is a reveal
 # marker: it is created separately by the label renderer and its X position at
@@ -191,6 +217,7 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
     _require_words(raw, _TITLE_RECORD_CONSUMER_WORDS, "m_title record consumer")
     _require_words(raw, _TITLE_PACKED_ART_OWNER_WORDS, "packed title-art owner")
     _require_words(raw, _TITLE_LABEL_OWNER_WORDS, "title label owner")
+    _require_words(raw, _TITLE_LABEL_BACKING_OWNER_WORDS, "title label backing owner")
     _require_words(raw, _TITLE_REVEAL_MARKER_WORDS, "title reveal marker")
 
     records: list[TitleLayoutRecord] = []
@@ -255,6 +282,7 @@ def inspect_title_layout(raw: bytes) -> TitleLayoutEvidence:
             "proven: records 11/12 are the only two (group 88,index 12) instances, at (64,296) and (376,296), and resolve to GRP088/GP088_12.TMX packed title art",
             "proven: existing decoded GP088_12 asset is the packed two-variant vertical title atlas; r5 runtime disproves treating its +4/+3 proximity to label anchors as menu-panel ownership",
             "proven: title labels use anchors (68,299)/(380,299), f16=0, and the label state adds a literal 16.0f per two-byte glyph",
+            "proven: the title label renderer builds two backing primitives with a shared 64px half-width before calling VA 0x188AD0; exact English widths are 128/144px, so an 80px half-width yields a 160px backing with 8px minimum side padding",
             "proven: m_title initializes both GP088_12 packed-title instances with X scale 0, activates them immediately before constructing labels, and later presents both at X scale 1",
             "proven: group 2/index 0x8E is the moving reveal marker and per-glyph group 2/index 0x8C follows the same title-label anchor path",
         ),
@@ -266,9 +294,10 @@ def patch_title_layout(raw: bytes) -> bytes:
     r5 widened GP088_12 after a static correlation was mistaken for ownership.
     The decoded texture and r5 runtime contradict that inference: GP088_12 is
     packed title art. r6 therefore leaves its animation target pristine and
-    changes only the two title-specific text-anchor X immediates. The label
-    renderer's own group-2 reveal/per-glyph chrome is derived from those anchors,
-    so text and its dynamic presentation move together without touching art.
+    changes the two title-specific text-anchor X immediates and the renderer-owned
+    black/chrome half-width. The latter is calculated from the proven 16px glyph
+    advance: a shared 160px primitive fully covers the 128/144px English labels.
+    Packed GP088_12 title art remains untouched.
     """
 
     inspect_title_layout(raw)
@@ -283,6 +312,7 @@ def patch_title_layout(raw: bytes) -> bytes:
     for offset, expected in (
         (_TITLE_NEW_GAME_X_OFFSET, _TITLE_NEW_GAME_X_PREIMAGE),
         (_TITLE_LOAD_GAME_X_OFFSET, _TITLE_LOAD_GAME_X_PREIMAGE),
+        *((offset, _TITLE_BACKING_HALF_WIDTH_PREIMAGE) for offset in _TITLE_BACKING_HALF_WIDTH_OFFSETS),
     ):
         actual = struct.unpack_from("<I", raw, offset)[0]
         if actual != expected:
@@ -294,4 +324,6 @@ def patch_title_layout(raw: bytes) -> bytes:
     result = bytearray(raw)
     struct.pack_into("<I", result, _TITLE_NEW_GAME_X_OFFSET, _TITLE_NEW_GAME_X_REPLACEMENT)
     struct.pack_into("<I", result, _TITLE_LOAD_GAME_X_OFFSET, _TITLE_LOAD_GAME_X_REPLACEMENT)
+    for offset in _TITLE_BACKING_HALF_WIDTH_OFFSETS:
+        struct.pack_into("<I", result, offset, _TITLE_BACKING_HALF_WIDTH_REPLACEMENT)
     return bytes(result)

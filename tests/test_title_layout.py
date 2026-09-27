@@ -70,6 +70,15 @@ class TitleLayoutTests(unittest.TestCase):
         self.assertEqual(0x3C024210, struct.unpack_from("<I", result, 0x1ABF64)[0])  # 36.0f
         self.assertEqual(0x3C0243AA, struct.unpack_from("<I", result, 0x1ABF84)[0])  # 340.0f
 
+        # The same renderer owns two 128px-wide black/chrome primitives through
+        # a hard-coded 64px half-width. English needs 8*16=128 and 9*16=144px.
+        # Use a shared 160px backing (80px half-width), leaving 8px per side for
+        # Load Game and 16px per side for New Game.
+        self.assertEqual(128, len("New Game") * 16)
+        self.assertEqual(144, len("Load Game") * 16)
+        self.assertEqual(0x3C0242A0, struct.unpack_from("<I", result, 0x19AB38)[0])  # 80.0f
+        self.assertEqual(0x3C0242A0, struct.unpack_from("<I", result, 0x19ABD8)[0])  # 80.0f
+
         # r5 widened GP088_12 after misclassifying it as menu backing. Existing
         # asset evidence and r5 runtime prove it is packed title artwork, so r6
         # must preserve both its shared (1,1) target and the third-object call.
@@ -77,14 +86,19 @@ class TitleLayoutTests(unittest.TestCase):
         self.assertEqual(RAW[0x1AC600:0x1AC604], result[0x1AC600:0x1AC604])
 
         changed = {index for index, (before, after) in enumerate(zip(RAW, result, strict=True)) if before != after}
-        allowed = set(range(0x1ABF64, 0x1ABF68)) | set(range(0x1ABF84, 0x1ABF88))
+        allowed = (
+            set(range(0x1ABF64, 0x1ABF68))
+            | set(range(0x1ABF84, 0x1ABF88))
+            | set(range(0x19AB38, 0x19AB3C))
+            | set(range(0x19ABD8, 0x19ABDC))
+        )
         self.assertTrue(changed)
         self.assertTrue(changed <= allowed)
         self.assertTrue(changed & set(range(0x1ABF64, 0x1ABF68)))
         self.assertTrue(changed & set(range(0x1ABF84, 0x1ABF88)))
 
     def test_title_layout_patch_fails_closed_on_label_anchor_drift(self) -> None:
-        for offset in (0x1ABF64, 0x1ABF84):
+        for offset in (0x1ABF64, 0x1ABF84, 0x19AB38, 0x19ABD8):
             with self.subTest(offset=hex(offset)):
                 tampered = bytearray(RAW)
                 tampered[offset] ^= 1

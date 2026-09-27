@@ -7,7 +7,8 @@ from pathlib import Path
 from tests.local_fixtures import require_local_fixture
 from tools.early_ui import build_early_ui_elf
 from tools.adv_layout import ADV_SPEAKER_LAYOUT_PATCHES
-from tools.startup_ui import NAME_PROMPT_LAYOUT_PATCHES
+from tools.startup_ui import NAME_CONFIRMATION_FOCUS_PATCHES, NAME_PROMPT_LAYOUT_PATCHES
+from tools.title_layout import TITLE_LABEL_BACKING_PATCHES
 from tools.hant_ui import (
     HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
@@ -48,6 +49,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("memory_card_1_boot_aliases", names)
         self.assertIn("name_flow_skip_reading", names)
         self.assertIn("name_prompt_centered_layout", names)
+        self.assertIn("name_confirmation_focus_layout", names)
         self.assertIn("name_prompt_0", names)
         self.assertIn("name_prompt_2", names)
         self.assertIn("name_prompt_3", names)
@@ -72,6 +74,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("name_prompt_0", failed_names)
         self.assertIn("name_flow_skip_reading", failed_names)
         self.assertIn("name_prompt_centered_layout", failed_names)
+        self.assertIn("name_confirmation_focus_layout", failed_names)
         self.assertIn("memory_card_1_boot_aliases", failed_names)
         self.assertIn("title_english_label_geometry", failed_names)
         self.assertIn("menu_semantic_fixed_labels", failed_names)
@@ -127,6 +130,30 @@ class StartupAcceptanceTests(unittest.TestCase):
                 check = next(
                     check for check in verify_startup_elf(bytes(tampered))
                     if check["name"] == "name_prompt_centered_layout"
+                )
+                self.assertFalse(check["ok"])
+
+    def test_name_confirmation_focus_acceptance_fails_closed_on_each_owner(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        for offset, _expected, _replacement in NAME_CONFIRMATION_FOCUS_PATCHES:
+            with self.subTest(offset=hex(offset)):
+                tampered = bytearray(translated)
+                tampered[offset] ^= 1
+                check = next(
+                    check for check in verify_startup_elf(bytes(tampered))
+                    if check["name"] == "name_confirmation_focus_layout"
+                )
+                self.assertFalse(check["ok"])
+
+    def test_title_backing_acceptance_fails_closed_on_each_half_width_owner(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        for offset, _expected, _replacement in TITLE_LABEL_BACKING_PATCHES:
+            with self.subTest(offset=hex(offset)):
+                tampered = bytearray(translated)
+                tampered[offset] ^= 1
+                check = next(
+                    check for check in verify_startup_elf(bytes(tampered))
+                    if check["name"] == "title_english_label_geometry"
                 )
                 self.assertFalse(check["ok"])
 

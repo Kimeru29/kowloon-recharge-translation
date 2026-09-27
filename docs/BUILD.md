@@ -664,3 +664,37 @@ Measured r9 result:
 - repeat ISO byte-for-byte identical.
 
 Do not launch PCSX2 automatically. The r9 runtime gate is documented in `docs/LOCALIZATION_STATUS.md`.
+
+## Build startup v11-r10 candidate
+
+r10 preserves the r9 startup-graphics overlay and changes executable-owned presentation only: calculated 160px title backing primitives, English Yes-focus child ownership, and the corrected dialogue body base/row-stride formula. Build from the pristine PS2 ISO.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r10.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r10.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r10.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r10.json
+```
+
+Measured r10 result:
+- ISO SHA-256: `a4f629fb22b2b095fe374eab384d86365ff881038fc37d4fa1e590297d5f928d`;
+- pre-ROFS ELF: `711ddca9d7813efaf34fc9788407fd0245a198b3ac8d08e925b851051c7b30c5`;
+- post-ROFS ELF: `76f335855ce03615f216cff575dfa63ff978b46660b7380d5954825499425a10`;
+- 1,145 overlays; 892 in place / 253 relocated;
+- 141/141 final-image checks;
+- 205 dependency-free tests (10 expected skips);
+- 205 Pillow-enabled tests (1 owned-corpus skip);
+- repeat ISO byte-for-byte identical.
+
+Do not launch PCSX2 automatically. The r10 runtime gate is documented in `docs/LOCALIZATION_STATUS.md`.

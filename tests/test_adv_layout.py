@@ -61,11 +61,11 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
                 (0x14FAA0, 0x00052C3F, 0x0006343F),
                 (0x14FAF4, 0x0003343C, 0x00032C3C),
                 (0x14FAF8, 0x0006343F, 0x00052C3F),
-                # r7 runtime proves orientation and spacing are now correct, but
-                # the block is still too high. After transposition this 114px
-                # Japanese column base is the live body Y origin. Move it directly below
-                # the accepted speaker line without touching line spacing.
-                (0x14FA78, 0x3C0342E4, 0x3C034396),  # 114 -> 300 px body base
+                # r9 runtime proves why the earlier Y patch did not work: this
+                # formula is 39 - line*114, so 114 is the multiplier, not the base.
+                # Put row zero at Y=300 and use 16px English row spacing.
+                (0x14FA70, 0x3C03421C, 0x3C034396),  # 39 -> 300 px body Y base
+                (0x14FA78, 0x3C0342E4, 0x3C034180),  # 114 -> 16 px body Y stride
                 # The live child font constructor uses style 1, whose profile is
                 # 12x12. After transposition the old Japanese 26 px column stride
                 # becomes English X spacing, so match the actual 12 px glyph
@@ -98,6 +98,8 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
         # record at VA 0x5D7800 stores width/height 12/12 in the low bytes.
         self.assertEqual(0x24050001, struct.unpack_from("<I", RAW, 0x14FB70)[0])
         self.assertEqual((12, 12), tuple(RAW[0x4D7884:0x4D7886]))
+        self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x14FA70)[0])
+        self.assertEqual(0x3C034180, struct.unpack_from("<I", result, 0x14FA78)[0])
         self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x14FAC8)[0])
 
         changed = {i for i, (before, after) in enumerate(zip(RAW, result)) if before != after}
@@ -132,8 +134,8 @@ class AdvHorizontalLayoutTests(unittest.TestCase):
         # (s0): only mode 0 becomes horizontal, while every existing nonzero mode
         # retains pristine vertical advance. The inline speaker is the only direct
         # 0x190A50 caller moved to mode 0. r7 proved that horizontal path; r8
-        # keeps X=20/Y=276; r9 preserves the speaker and moves only the body
-        # upward to Y=300 so the prose starts immediately below the name.
+        # keeps X=20/Y=276; r10 freezes that accepted speaker and fixes the
+        # separate body formula instead of moving the speaker again.
         expected = (
             (0x150048, 0x3C024301, 0x3C0241A0),  # 129 -> 20 px X
             (0x150050, 0x3C0241A0, 0x3C02438A),  # 20 -> 276 px Y

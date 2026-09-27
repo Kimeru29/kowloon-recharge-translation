@@ -31,6 +31,7 @@ from tools.memory_card_ui import (
 )
 from tools.startup_ui import (
     KEYBOARD_ROW_PATCHES,
+    NAME_CONFIRMATION_FOCUS_PATCHES,
     NAME_DEFAULT_POINTER_OFFSETS,
     NAME_PROMPT_LAYOUT_PATCHES,
     NAME_PROMPT_POINTER_TABLE_OFFSET,
@@ -42,6 +43,7 @@ from tools.startup_ui import (
     TITLE_NEW_GAME_START,
     TITLE_POINTER_TABLE_OFFSET,
 )
+from tools.title_layout import TITLE_LABEL_BACKING_PATCHES
 
 STARTUP_GRAPHICS_PATHS: tuple[str, ...] = (
     "BLBRD/B_GP019.BIN",
@@ -263,12 +265,14 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         len(raw) >= 0x6989C8
         and len(raw) >= 0x1AC604
         and len(raw) >= 0x1ABF88
+        and len(raw) >= 0x19ABDC
         and len(raw) >= 0x5CBFB4
         and len(raw) >= TITLE_POINTER_TABLE_OFFSET + 8
     ):
         new_ptr, load_ptr = struct.unpack_from("<II", raw, TITLE_POINTER_TABLE_OFFSET)
         new_anchor_word = struct.unpack_from("<I", raw, 0x1ABF64)[0]
         load_anchor_word = struct.unpack_from("<I", raw, 0x1ABF84)[0]
+        backing_words = tuple(struct.unpack_from("<I", raw, offset)[0] for offset, _, _ in TITLE_LABEL_BACKING_PATCHES)
         packed_art_scale = struct.unpack_from("<ff", raw, 0x6989C0)
         third_call = struct.unpack_from("<I", raw, 0x1AC600)[0]
         title_records_hash = sha256(raw[0x5CBE60:0x5CBFB4]).hexdigest()
@@ -279,6 +283,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             and load_ptr == _ELF_MAIN_VADDR + TITLE_LOAD_START - _ELF_MAIN_FILE_OFFSET
             and new_anchor_word == 0x3C024210
             and load_anchor_word == 0x3C0243AA
+            and backing_words == tuple(replacement for _, _, replacement in TITLE_LABEL_BACKING_PATCHES)
             and packed_art_scale == (1.0, 1.0)
             and third_call == 0x2787D750
             and title_records_hash == "fbb685e638f950a844c169bec567f7102943e4a9b7ef1916f02b2b0dcb530422"
@@ -349,6 +354,22 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "name_prompt_centered_layout",
             name_prompt_layout_ok,
             "M_Name prompt X owners are not using the centered English geometry",
+        )
+    )
+
+    name_confirmation_focus_ok = (
+        all(
+            offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
+            for offset, _expected, replacement in NAME_CONFIRMATION_FOCUS_PATCHES
+        )
+        and 0x181DCC <= len(raw)
+        and struct.unpack_from("<I", raw, 0x181DC8)[0] == 0x3C024388
+    )
+    checks.append(
+        _check(
+            "name_confirmation_focus_layout",
+            name_confirmation_focus_ok,
+            "selected Yes geometry/color ownership is stale or accepted No focus changed",
         )
     )
 
