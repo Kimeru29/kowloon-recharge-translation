@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v11-r7 result: 199 tests; the dependency-free run passes with 8 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11-r12 result: 208 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -731,4 +731,41 @@ Measured r11 result:
 - 205 Pillow-enabled tests (1 owned-corpus skip);
 - repeat ISO byte-for-byte identical.
 
-Do not launch PCSX2 automatically. The r11 runtime gate is documented in `docs/LOCALIZATION_STATUS.md`.
+r11 was later manually runtime-tested by Pablo. Its title/backing and ADV corrections are accepted, along with preservation of the tablet, quotations, and visible profile/name surfaces. That pass also proves the H.A.N.T. Help topic-label tables do not own the selected topic body pages; see `docs/LOCALIZATION_STATUS.md`.
+
+## Build startup v11-r12 candidate
+
+r12 preserves every accepted r11 presentation surface and expands only one separately proven H.A.N.T. selected Help body: `HELP → OTHERS → About the Shop` `(mode=4, category=2, topic=5)`. Build only from the pristine PS2 ISO.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r12.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r12.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r12.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r12.json
+```
+
+Measured r12 result:
+- ISO SHA-256: `ef65129b13b9b49a705a03bc8d83d434a16c76915d5024da597ba1f559f96916`;
+- pre-ROFS ELF: `3faa98a1585bc0d55ffb41a5dfbc6cbf8ae3cb0c03742dc7214fcd5f5e21407a`;
+- post-ROFS ELF: `3844b03e7fc5bc0d9464a3e9d9d256b0c7b6783c1aa90ff09afd32d83e3cf8f0`;
+- translated/final ELF size: 8,405,990 bytes;
+- 1,145 overlays; 892 in place / 253 relocated;
+- 142/142 final-image checks, including the new separate `hant_help_bodies` gate;
+- 208 dependency-free tests (10 expected skips);
+- 208 Pillow-enabled tests (1 owned-corpus skip);
+- repeat ISO `/private/tmp/kowloon-recharge-startup-en-v11-r12-repeat.iso` is byte-for-byte identical and has the same SHA-256.
+
+The promoted page has a seven-row source table and an empty metadata list, so r12 does not alter controller/icon geometry. Its Japanese source table and metadata remain byte-identical and only the proven text descriptor is redirected to the shared translation PT_LOAD. The wording is explicitly `semantic` because the owned extraction still lacks `English.bytes`. `Command Thumbnails` and other unpromoted Help bodies intentionally remain Japanese.
+
+Do not launch PCSX2 automatically. The exact r12 visual gate is documented in `docs/LOCALIZATION_STATUS.md` and `docs/HANDOFF.md`.

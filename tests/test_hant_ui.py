@@ -35,9 +35,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(4485, info.payload_size)
+        self.assertEqual(4725, info.payload_size)
         self.assertEqual(
-            "6cf9f8d3ee6933d2047603824a60160c9a93fce6685f345ff40896fae0f12dd1",
+            "9cf1840c30f29c6e55a3c0ea98df8ea82454464c653f39999316c8214f1bc34a",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -273,6 +273,88 @@ class HantTutorialTests(unittest.TestCase):
         tampered = bytearray(RAW)
         tampered[hant_ui.HANT_ADV_HELP_TOPICS[0].pointer_offset] ^= 1
         with self.assertRaisesRegex(ValueError, "H.A.N.T help-topic.*pointer"):
+            patch_hant_tutorial(bytes(tampered))
+
+    def test_about_shop_help_body_owner_is_separate_from_topic_label_owner(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        bodies = getattr(hant_ui, "HANT_HELP_BODIES", ())
+        self.assertEqual(1, len(bodies), "expected one newly promoted H.A.N.T. Help body owner")
+        spec = bodies[0]
+        self.assertEqual("shop", spec.key)
+        self.assertEqual((4, 2, 5), (spec.mode, spec.category_index, spec.topic_index))
+        self.assertEqual(0x5CBAC4, spec.descriptor_offset)
+        self.assertEqual(0x5C9B80, spec.source_table_offset)
+        self.assertEqual(0x5CBA74, spec.metadata_descriptor_offset)
+        self.assertEqual(0x698968, spec.metadata_offset)
+        self.assertEqual("semantic", spec.provenance)
+        self.assertEqual(
+            (
+                "       About the Shop",
+                "",
+                "During lunch, visit the Shop",
+                "You can buy food, supplies,",
+                "and other useful items.",
+                "",
+                "",
+            ),
+            spec.english_rows,
+        )
+        self.assertTrue(all(measured_hant_cells(row) <= HANT_LAYOUT_PROFILE.max_cells for row in spec.english_rows))
+        self.assertEqual(
+            (0x006C9A60, 0x00795FB8, 0x006C9A80, 0x006C9AB0, 0x006C9AD0, 0x00795FB8, 0x00795FB8, 0x00795FBC),
+            struct.unpack_from("<8I", RAW, spec.source_table_offset),
+        )
+        self.assertEqual(0x006C9B00, struct.unpack_from("<I", RAW, spec.descriptor_offset)[0])
+        self.assertEqual((-1, -1, -1, -1), struct.unpack_from("<hhhh", RAW, spec.metadata_offset))
+        self.assertEqual(0x007988E8, struct.unpack_from("<I", RAW, spec.metadata_descriptor_offset)[0])
+
+    def test_relocates_about_shop_help_body_without_mutating_pristine_rows_or_metadata(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        bodies = getattr(hant_ui, "HANT_HELP_BODIES", ())
+        self.assertEqual(1, len(bodies), "expected one newly promoted H.A.N.T. Help body owner")
+        spec = bodies[0]
+        result, info = patch_hant_tutorial(RAW)
+
+        target_table_va = struct.unpack_from("<I", result, spec.descriptor_offset)[0]
+        self.assertGreaterEqual(target_table_va, info.segment_vaddr)
+        self.assertLess(target_table_va, info.segment_vaddr + info.payload_size)
+        target_table_file = _segment_file_offset(info, target_table_va)
+
+        for index, english in enumerate(spec.english_rows):
+            target_va = struct.unpack_from("<I", result, target_table_file + index * 4)[0]
+            if not english:
+                self.assertEqual(0x00795FB8, target_va)
+                continue
+            self.assertGreaterEqual(target_va, info.segment_vaddr)
+            self.assertLess(target_va, info.segment_vaddr + info.payload_size)
+            target_file = _segment_file_offset(info, target_va)
+            encoded = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
+            self.assertEqual(encoded, result[target_file:target_file + len(encoded)])
+
+        self.assertEqual(0x00795FBC, struct.unpack_from("<I", result, target_table_file + len(spec.english_rows) * 4)[0])
+        self.assertEqual(
+            RAW[spec.source_table_offset:spec.source_table_offset + 8 * 4],
+            result[spec.source_table_offset:spec.source_table_offset + 8 * 4],
+        )
+        self.assertEqual(
+            RAW[spec.metadata_offset:spec.metadata_offset + 8],
+            result[spec.metadata_offset:spec.metadata_offset + 8],
+        )
+        self.assertEqual(
+            RAW[spec.metadata_descriptor_offset:spec.metadata_descriptor_offset + 4],
+            result[spec.metadata_descriptor_offset:spec.metadata_descriptor_offset + 4],
+        )
+
+        tampered = bytearray(RAW)
+        tampered[spec.descriptor_offset] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T help-body.*descriptor"):
+            patch_hant_tutorial(bytes(tampered))
+
+        tampered = bytearray(RAW)
+        tampered[spec.source_table_offset + 2 * 4] ^= 1
+        with self.assertRaisesRegex(ValueError, "H.A.N.T help-body.*table"):
             patch_hant_tutorial(bytes(tampered))
 
     def test_config_labels_are_owned_by_live_nine_entry_config_renderer(self) -> None:

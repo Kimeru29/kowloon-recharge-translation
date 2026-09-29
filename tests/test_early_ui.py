@@ -28,6 +28,7 @@ from tools.hant_ui import (
     HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
     HANT_CONFIG_LABELS,
+    HANT_HELP_BODIES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
     HANT_CONTROLLER_METADATA_RECORDS,
@@ -110,6 +111,8 @@ class EarlyUiPatchTests(unittest.TestCase):
         for off, _expected, _replacement in (*ADV_DG_LAYOUT_PATCHES, *ADV_SPEAKER_LAYOUT_PATCHES):
             allowed.update(range(off, off + 4))
         allowed.update(range(HANT_TUTORIAL_DESCRIPTOR_OFFSET, HANT_TUTORIAL_DESCRIPTOR_OFFSET + 4))
+        for spec in HANT_HELP_BODIES:
+            allowed.update(range(spec.descriptor_offset, spec.descriptor_offset + 4))
         allowed.update(
             range(HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET + 4)
         )
@@ -211,7 +214,7 @@ class EarlyUiPatchTests(unittest.TestCase):
         segment_va = segment[2]
         segment_size = segment[4]
         by_key = {spec.key: spec for spec in MENU_LABELS}
-        self.assertEqual(4518, segment_size)
+        self.assertEqual(4758, segment_size)
 
         for key, expected in (("return_above_ground", b"Return above ground\x00"), ("report_card", b"Report card\x00")):
             spec = by_key[key]
@@ -224,7 +227,7 @@ class EarlyUiPatchTests(unittest.TestCase):
             target_va = targets.pop()
             self.assertGreaterEqual(target_va, segment_va)
             self.assertLess(target_va, segment_va + segment_size)
-            expected_offset = {"return_above_ground": 0x1186, "report_card": 0x119A}[key]
+            expected_offset = {"return_above_ground": 0x1276, "report_card": 0x128A}[key]
             self.assertEqual(segment_va + expected_offset, target_va)
             target_file = segment_file + target_va - segment_va
             self.assertEqual(expected, result[target_file:target_file + len(expected)])

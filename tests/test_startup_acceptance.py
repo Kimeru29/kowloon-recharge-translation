@@ -13,6 +13,7 @@ from tools.hant_ui import (
     HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
     HANT_CONFIG_LABELS,
+    HANT_HELP_BODIES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_TUTORIAL_FONT_STYLE_OFFSET,
     HANT_TUTORIAL_ROW_SPACING_OFFSET,
@@ -41,6 +42,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_tutorial_row_spacing", names)
         self.assertIn("hant_chrome_labels", names)
         self.assertIn("hant_help_topics", names)
+        self.assertIn("hant_help_bodies", names)
         self.assertIn("hant_config_labels", names)
         self.assertIn("hant_help_category_labels", names)
         self.assertIn("adv_speaker_horizontal_layout", names)
@@ -112,6 +114,7 @@ class StartupAcceptanceTests(unittest.TestCase):
             ("hant_help_category_labels", HANT_HELP_CATEGORY_LABELS[0].pointer_offset),
             ("hant_help_topics", HANT_ALL_HELP_TOPICS[0].pointer_offset),
             ("hant_help_topics", HANT_ALL_HELP_TOPICS[-1].pointer_offset),
+            ("hant_help_bodies", HANT_HELP_BODIES[0].descriptor_offset),
         )
         for name, offset in cases:
             with self.subTest(name=name):

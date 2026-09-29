@@ -14,6 +14,13 @@ _MAIN_FILE_END = 0x699200
 _MAIN_VADDR = 0x00100000
 _HANT_TOKEN = "Ｈ．Ａ．Ｎ．Ｔ"
 _MAX_STRING_BYTES = 512
+_HELP_MODE = 4
+_HELP_CATEGORY_COUNTS = (20, 20, 15)
+_HELP_TEXT_ROOT_VA = 0x006CBAC0
+_HELP_METADATA_ROOT_VA = 0x006CBAA0
+_HELP_EOF_VA = 0x00795FBC
+_MAX_HELP_BODY_ROWS = 128
+_MAX_HELP_METADATA_RECORDS = 64
 
 
 @dataclass(frozen=True)
@@ -26,6 +33,19 @@ class HantTextEntry:
     classification: str
     owner: str
     evidence: str
+
+
+@dataclass(frozen=True)
+class HantHelpBodyOwner:
+    mode: int
+    category_index: int
+    topic_index: int
+    text_descriptor_offset: int
+    text_table_offset: int
+    row_count: int
+    metadata_descriptor_offset: int
+    metadata_offset: int
+    metadata_record_count: int
 
 
 def _va_to_file(va: int) -> int | None:
@@ -178,6 +198,125 @@ def _candidate_entries(
                 ),
             )
         )
+    return tuple(entries)
+
+
+def _read_u32_file(raw: bytes, offset: int, *, owner: str) -> int:
+    if offset < _MAIN_FILE_START or offset + 4 > min(len(raw), _MAIN_FILE_END):
+        raise ValueError(f"{owner} pointer is outside the main executable: {offset:#x}")
+    return struct.unpack_from("<I", raw, offset)[0]
+
+
+def _help_category_descriptor_base(raw: bytes, root_va: int, category_index: int, *, owner: str) -> int:
+    root_offset = _va_to_file(root_va)
+    if root_offset is None:
+        raise ValueError(f"{owner} root is outside the main executable")
+    mode_table_va = _read_u32_file(raw, root_offset + _HELP_MODE * 4, owner=owner)
+    mode_table_offset = _va_to_file(mode_table_va)
+    if mode_table_offset is None:
+        raise ValueError(f"{owner} mode-{_HELP_MODE} table is outside the main executable")
+    category_table_va = _read_u32_file(raw, mode_table_offset + category_index * 4, owner=owner)
+    category_table_offset = _va_to_file(category_table_va)
+    if category_table_offset is None:
+        raise ValueError(f"{owner} category {category_index} table is outside the main executable")
+    return category_table_offset
+
+
+def _count_help_body_rows(raw: bytes, table_offset: int) -> int:
+    for row_index in range(_MAX_HELP_BODY_ROWS + 1):
+        pointer_offset = table_offset + row_index * 4
+        target_va = _read_u32_file(raw, pointer_offset, owner="H.A.N.T Help body row table")
+        if target_va == _HELP_EOF_VA:
+            return row_index
+        if _va_to_file(target_va) is None:
+            raise ValueError(
+                "H.A.N.T Help body row targets outside the main executable: "
+                f"table={table_offset:#x}, row={row_index}, va={target_va:#x}"
+            )
+    raise ValueError(f"H.A.N.T Help body table at {table_offset:#x} lacks EOF within bounded row budget")
+
+
+def _count_help_metadata_records(raw: bytes, metadata_offset: int) -> int:
+    for record_index in range(_MAX_HELP_METADATA_RECORDS + 1):
+        offset = metadata_offset + record_index * 8
+        if offset < _MAIN_FILE_START or offset + 8 > min(len(raw), _MAIN_FILE_END):
+            raise ValueError(f"H.A.N.T Help metadata leaves the main executable at {offset:#x}")
+        record = struct.unpack_from("<hhhh", raw, offset)
+        if record[0] < 0:
+            return record_index
+    raise ValueError(
+        f"H.A.N.T Help metadata at {metadata_offset:#x} lacks a negative sentinel within bounded record budget"
+    )
+
+
+def inventory_hant_help_bodies(raw: bytes) -> tuple[HantHelpBodyOwner, ...]:
+    """Inventory the bounded 55 selected-page owners behind H.A.N.T. Help.
+
+    Runtime selection passes ``(mode=4, category, topic)`` to the generic page
+    constructor. Text and auxiliary metadata are separate three-level pointer
+    trees rooted at ``0x006CBAC0`` and ``0x006CBAA0`` respectively. This
+    inventory follows those trees only for the statically proven Help category
+    cardinalities (20 ADV, 20 exploration, 15 other) and requires every text
+    leaf to reach EOF plus every metadata leaf to reach its negative sentinel.
+    """
+
+    main_end = min(len(raw), _MAIN_FILE_END)
+    if main_end < _MAIN_FILE_END:
+        raise ValueError("H.A.N.T Help body inventory requires the complete main executable section")
+
+    entries: list[HantHelpBodyOwner] = []
+    for category_index, topic_count in enumerate(_HELP_CATEGORY_COUNTS):
+        text_descriptor_base = _help_category_descriptor_base(
+            raw,
+            _HELP_TEXT_ROOT_VA,
+            category_index,
+            owner="H.A.N.T Help text",
+        )
+        metadata_descriptor_base = _help_category_descriptor_base(
+            raw,
+            _HELP_METADATA_ROOT_VA,
+            category_index,
+            owner="H.A.N.T Help metadata",
+        )
+        for topic_index in range(topic_count):
+            text_descriptor_offset = text_descriptor_base + topic_index * 4
+            text_table_va = _read_u32_file(raw, text_descriptor_offset, owner="H.A.N.T Help text descriptor")
+            text_table_offset = _va_to_file(text_table_va)
+            if text_table_offset is None:
+                raise ValueError(
+                    f"H.A.N.T Help text leaf ({category_index},{topic_index}) targets outside main executable"
+                )
+
+            metadata_descriptor_offset = metadata_descriptor_base + topic_index * 4
+            metadata_va = _read_u32_file(
+                raw,
+                metadata_descriptor_offset,
+                owner="H.A.N.T Help metadata descriptor",
+            )
+            metadata_offset = _va_to_file(metadata_va)
+            if metadata_offset is None:
+                raise ValueError(
+                    f"H.A.N.T Help metadata leaf ({category_index},{topic_index}) targets outside main executable"
+                )
+
+            entries.append(
+                HantHelpBodyOwner(
+                    mode=_HELP_MODE,
+                    category_index=category_index,
+                    topic_index=topic_index,
+                    text_descriptor_offset=text_descriptor_offset,
+                    text_table_offset=text_table_offset,
+                    row_count=_count_help_body_rows(raw, text_table_offset),
+                    metadata_descriptor_offset=metadata_descriptor_offset,
+                    metadata_offset=metadata_offset,
+                    metadata_record_count=_count_help_metadata_records(raw, metadata_offset),
+                )
+            )
+
+    if len(entries) != sum(_HELP_CATEGORY_COUNTS):
+        raise ValueError("H.A.N.T Help body inventory cardinality drifted")
+    if len({entry.text_descriptor_offset for entry in entries}) != len(entries):
+        raise ValueError("H.A.N.T Help body inventory has duplicate text descriptor ownership")
     return tuple(entries)
 
 

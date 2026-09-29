@@ -10,6 +10,7 @@ from tools.hant_ui import (
     HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
     HANT_CONFIG_LABELS,
+    HANT_HELP_BODIES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
     HANT_CONTROLLER_METADATA_OFFSET,
@@ -60,6 +61,7 @@ _RUNTIME_HEAP_BREAK_OFFSET = 0x650014
 _EXPECTED_RUNTIME_HEAP_START = 0x00A02F00
 _VISIBLE_PROMPT_INDICES = tuple(range(len(NAME_PROMPT_TEXTS)))
 _HANT_POINTER_TABLE_SHA256 = "2282baed9b810c5dc9de2ea6a57bb7e8308154279f2efe9b57ea5b3d761205a0"
+_HANT_BLANK_VA = 0x00795FB8
 _HANT_EOF_VA = 0x00795FBC
 # Task-6 unresolved H.A.N.T. candidates. 0x3BC7E8 is cross-owned by the
 # separately proven main-menu fixed patch, so its pointer is pinned here while
@@ -615,6 +617,87 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
                 hant_help_ok = False
                 break
 
+    # Selected Help pages are not owned by the topic-label tables above. The
+    # Help handler resolves a separate mode/category/topic body tree. Verify the
+    # newly promoted body leaves independently so English menu labels cannot
+    # mask a Japanese/stale selected-page payload.
+    hant_help_bodies_ok = segment is not None
+    for spec in HANT_HELP_BODIES:
+        if not hant_help_bodies_ok:
+            break
+
+        source_by_index = {index: offset for index, offset, _text in spec.source_rows}
+        expected_source_table = tuple(
+            _ELF_MAIN_VADDR + source_by_index[index] - _ELF_MAIN_FILE_OFFSET
+            if index in source_by_index
+            else _HANT_BLANK_VA
+            for index in range(len(spec.english_rows))
+        ) + (_HANT_EOF_VA,)
+        source_table_size = len(expected_source_table) * 4
+        if spec.source_table_offset + source_table_size > len(raw):
+            hant_help_bodies_ok = False
+            break
+        actual_source_table = struct.unpack_from(
+            f"<{len(expected_source_table)}I",
+            raw,
+            spec.source_table_offset,
+        )
+        if actual_source_table != expected_source_table:
+            hant_help_bodies_ok = False
+            break
+
+        for _row_index, source_offset, source_text in spec.source_rows:
+            source = source_text.encode("cp932") + b"\x00"
+            if raw[source_offset:source_offset + len(source)] != source:
+                hant_help_bodies_ok = False
+                break
+        if not hant_help_bodies_ok:
+            break
+
+        if spec.descriptor_offset + 4 > len(raw):
+            hant_help_bodies_ok = False
+            break
+        target_table_va = struct.unpack_from("<I", raw, spec.descriptor_offset)[0]
+        if target_table_va & 3:
+            hant_help_bodies_ok = False
+            break
+        p_offset, p_vaddr, p_filesz, _p_memsz = segment
+        table_relative = target_table_va - p_vaddr
+        translated_table_size = (len(spec.english_rows) + 1) * 4
+        if table_relative < 0 or table_relative + translated_table_size > p_filesz:
+            hant_help_bodies_ok = False
+            break
+        target_table_file = p_offset + table_relative
+
+        for row_index, english in enumerate(spec.english_rows):
+            row_va = struct.unpack_from("<I", raw, target_table_file + row_index * 4)[0]
+            if not english:
+                if row_va != _HANT_BLANK_VA:
+                    hant_help_bodies_ok = False
+                    break
+                continue
+            if measured_hant_cells(english) > HANT_LAYOUT_PROFILE.max_cells:
+                hant_help_bodies_ok = False
+                break
+            if not _read_wide_at_va(raw, row_va, english):
+                hant_help_bodies_ok = False
+                break
+        if not hant_help_bodies_ok:
+            break
+        if struct.unpack_from("<I", raw, target_table_file + len(spec.english_rows) * 4)[0] != _HANT_EOF_VA:
+            hant_help_bodies_ok = False
+            break
+
+        expected_metadata_va = _ELF_MAIN_VADDR + spec.metadata_offset - _ELF_MAIN_FILE_OFFSET
+        if (
+            spec.metadata_descriptor_offset + 4 > len(raw)
+            or struct.unpack_from("<I", raw, spec.metadata_descriptor_offset)[0] != expected_metadata_va
+            or spec.metadata_offset + 8 > len(raw)
+            or struct.unpack_from("<hhhh", raw, spec.metadata_offset) != (-1, -1, -1, -1)
+        ):
+            hant_help_bodies_ok = False
+            break
+
     for source_offset, pointer_offsets, source_text in _HANT_UNRESOLVED_SIGNATURES:
         expected_va = _ELF_MAIN_VADDR + source_offset - _ELF_MAIN_FILE_OFFSET
         if source_text is not None:
@@ -684,6 +767,13 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "hant_help_topics",
             hant_help_ok,
             "one or more H.A.N.T Help topic labels do not resolve through the proven three-list 55-entry owner set",
+        )
+    )
+    checks.append(
+        _check(
+            "hant_help_bodies",
+            hant_help_bodies_ok,
+            "one or more selected H.A.N.T Help bodies do not resolve through the proven mode/category/topic body owner",
         )
     )
     checks.append(

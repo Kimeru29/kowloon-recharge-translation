@@ -6,7 +6,7 @@ import struct
 
 from tools.elf_translation_segment import TranslationSegmentInfo
 from tools.executable_text import RelocatedText, install_executable_text
-from tools.hant_layout import HANT_LAYOUT_PROFILE, wrap_hant_text
+from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells, wrap_hant_text
 from tools.localization import encode_ps2_english
 from tools.memory_card_ui import relocated_memory_card_entries
 from tools.startup_ui import (
@@ -85,6 +85,21 @@ class HantHelpTopic:
     pointer_offset: int
     source_text: str
     english: str
+    provenance: str = "semantic"
+
+
+@dataclass(frozen=True)
+class HantHelpBody:
+    key: str
+    mode: int
+    category_index: int
+    topic_index: int
+    descriptor_offset: int
+    source_table_offset: int
+    metadata_descriptor_offset: int
+    metadata_offset: int
+    source_rows: tuple[tuple[int, int, str], ...]
+    english_rows: tuple[str, ...]
     provenance: str = "semantic"
 
 
@@ -237,6 +252,43 @@ HANT_ALL_HELP_TOPICS: tuple[HantHelpTopic, ...] = (
     *HANT_ADV_HELP_TOPICS,
     *HANT_EXPLORATION_HELP_TOPICS,
     *HANT_HELP_TOPICS,
+)
+
+
+# Selected Help-topic bodies are a separate ownership class from the menu labels
+# above. The live Help handler at VA 0x28D210..0x28D24C passes
+# (mode=4, category, topic) to the generic page constructor; resolver VA 0x2A9FE0
+# then indexes the text hierarchy rooted at VA 0x006CBAC0. Tuple (4,2,0) is the
+# already-accepted H.A.N.T Functions/tutorial body. The first newly promoted body
+# deliberately uses (4,2,5): it has a short seven-row table and its parallel
+# metadata leaf is an immediate negative sentinel, so no icon geometry changes
+# are required. English.bytes is absent locally, therefore wording is semantic.
+HANT_HELP_BODIES: tuple[HantHelpBody, ...] = (
+    HantHelpBody(
+        key="shop",
+        mode=4,
+        category_index=2,
+        topic_index=5,
+        descriptor_offset=0x5CBAC4,
+        source_table_offset=0x5C9B80,
+        metadata_descriptor_offset=0x5CBA74,
+        metadata_offset=0x698968,
+        source_rows=(
+            (0, 0x5C9AE0, "\u3000\u3000\u3000\u3000\u3000\u3000＜売店について＞"),
+            (2, 0x5C9B00, "昼休みの自由移動で「売店」へ行くと、"),
+            (3, 0x5C9B30, "食品や学用品などの"),
+            (4, 0x5C9B50, "アイテムを購入することができます。"),
+        ),
+        english_rows=(
+            "       About the Shop",
+            "",
+            "During lunch, visit the Shop",
+            "You can buy food, supplies,",
+            "and other useful items.",
+            "",
+            "",
+        ),
+    ),
 )
 
 
@@ -409,6 +461,16 @@ def _expected_hant_pointer_table() -> tuple[int, ...]:
     return tuple(values)
 
 
+def _expected_help_body_table(spec: HantHelpBody) -> tuple[int, ...]:
+    source_by_index = {index: offset for index, offset, _text in spec.source_rows}
+    values = [
+        _elf_va(source_by_index[index]) if index in source_by_index else _HANT_BLANK_VA
+        for index in range(len(spec.english_rows))
+    ]
+    values.append(_HANT_EOF_VA)
+    return tuple(values)
+
+
 def _read_metadata_records(raw: bytes, offset: int) -> tuple[tuple[int, int, int, int], ...]:
     size = len(HANT_PRISTINE_CONTROLLER_METADATA_RECORDS) * 8
     if offset + size > len(raw):
@@ -545,6 +607,55 @@ def _validate_source(raw: bytes) -> None:
                 f"expected {expected_va:#x}, got {actual_va:#x}"
             )
 
+    for spec in HANT_HELP_BODIES:
+        if spec.descriptor_offset + 4 > len(raw):
+            raise ValueError(f"H.A.N.T help-body descriptor is outside executable: {spec.key}")
+        expected_table_va = _elf_va(spec.source_table_offset)
+        actual_table_va = struct.unpack_from("<I", raw, spec.descriptor_offset)[0]
+        if actual_table_va != expected_table_va:
+            raise ValueError(
+                f"H.A.N.T help-body descriptor preimage mismatch for {spec.key}: "
+                f"expected {expected_table_va:#x}, got {actual_table_va:#x}"
+            )
+
+        table_words = len(spec.english_rows) + 1
+        table_size = table_words * 4
+        if spec.source_table_offset + table_size > len(raw):
+            raise ValueError(f"H.A.N.T help-body source table is outside executable: {spec.key}")
+        actual_table = struct.unpack_from(f"<{table_words}I", raw, spec.source_table_offset)
+        expected_table = _expected_help_body_table(spec)
+        if actual_table != expected_table:
+            raise ValueError(f"H.A.N.T help-body table preimage mismatch for {spec.key}")
+
+        for row_index, source_offset, source_text in spec.source_rows:
+            if row_index >= len(spec.english_rows):
+                raise ValueError(f"H.A.N.T help-body source row index is invalid: {spec.key}/{row_index}")
+            encoded = source_text.encode("cp932")
+            if (
+                source_offset + len(encoded) >= len(raw)
+                or raw[source_offset:source_offset + len(encoded)] != encoded
+                or raw[source_offset + len(encoded)] != 0
+            ):
+                raise ValueError(f"H.A.N.T help-body source preimage mismatch: {spec.key}/{row_index}")
+
+        for row_index, english in enumerate(spec.english_rows):
+            if measured_hant_cells(english) > HANT_LAYOUT_PROFILE.max_cells:
+                raise ValueError(f"H.A.N.T help-body row exceeds visible width: {spec.key}/{row_index}")
+
+        if spec.metadata_descriptor_offset + 4 > len(raw):
+            raise ValueError(f"H.A.N.T help-body metadata descriptor is outside executable: {spec.key}")
+        expected_metadata_va = _elf_va(spec.metadata_offset)
+        actual_metadata_va = struct.unpack_from("<I", raw, spec.metadata_descriptor_offset)[0]
+        if actual_metadata_va != expected_metadata_va:
+            raise ValueError(
+                f"H.A.N.T help-body metadata descriptor preimage mismatch for {spec.key}: "
+                f"expected {expected_metadata_va:#x}, got {actual_metadata_va:#x}"
+            )
+        if spec.metadata_offset + 8 > len(raw):
+            raise ValueError(f"H.A.N.T help-body metadata is outside executable: {spec.key}")
+        if struct.unpack_from("<hhhh", raw, spec.metadata_offset) != (-1, -1, -1, -1):
+            raise ValueError(f"H.A.N.T help-body metadata is not empty: {spec.key}")
+
     for index, (offset, source) in _HANT_SOURCES.items():
         encoded = source.encode("cp932")
         if raw[offset:offset + len(encoded)] != encoded or raw[offset + len(encoded)] != 0:
@@ -596,6 +707,15 @@ def _encoded_wide(text: str) -> bytes:
 
 def _controller_metadata_bytes() -> bytes:
     return b"".join(struct.pack("<hhhh", *record) for record in HANT_CONTROLLER_METADATA_RECORDS)
+
+
+def _packed_payload_size(entries: Sequence[RelocatedText]) -> int:
+    cursor = 0
+    for entry in entries:
+        if cursor & 1:
+            cursor += 1
+        cursor += len(entry.encoded)
+    return cursor
 
 
 def _base_relocated_entries(raw: bytes) -> tuple[RelocatedText, ...]:
@@ -666,6 +786,34 @@ def _base_relocated_entries(raw: bytes) -> tuple[RelocatedText, ...]:
         )
         for spec in HANT_ALL_HELP_TOPICS
     )
+
+    for spec in HANT_HELP_BODIES:
+        for row_index, english in enumerate(spec.english_rows):
+            if not english:
+                continue
+            entries.append(
+                RelocatedText(
+                    key=f"hant_help_body_{spec.key}_row_{row_index}",
+                    encoded=_encoded_wide(english),
+                    pointer_offsets=(),
+                )
+            )
+
+        # ``install_executable_text`` aligns entries to two bytes. Help body
+        # pointer tables are consumed with ``lw`` and must be word-aligned, so
+        # add a body-owned two-byte pad only when the next packed entry would
+        # otherwise begin at address +2 mod 4.
+        next_offset = (_packed_payload_size(entries) + 1) & ~1
+        if next_offset & 3:
+            entries.append(RelocatedText(f"hant_help_body_{spec.key}_alignment", b"\x00\x00", ()))
+        entries.append(
+            RelocatedText(
+                key=f"hant_help_body_{spec.key}_table",
+                encoded=b"\x00" * ((len(spec.english_rows) + 1) * 4),
+                pointer_offsets=(spec.descriptor_offset,),
+            )
+        )
+
     entries.extend(relocated_memory_card_entries(raw))
     return tuple(entries)
 
@@ -728,5 +876,24 @@ def patch_hant_tutorial(
     for index in range(len(HANT_WRAPPED_LINES)):
         struct.pack_into("<I", result, table_file + index * 4, installed.target_vas[f"hant_row_{index}"])
     struct.pack_into("<I", result, table_file + len(HANT_WRAPPED_LINES) * 4, _HANT_EOF_VA)
+
+    for spec in HANT_HELP_BODIES:
+        body_table_va = installed.target_vas[f"hant_help_body_{spec.key}_table"]
+        if body_table_va & 3:
+            raise ValueError(f"H.A.N.T help-body translation table lost word alignment: {spec.key}")
+        body_table_file = installed.info.file_offset + (body_table_va - installed.info.segment_vaddr)
+        for row_index, english in enumerate(spec.english_rows):
+            target_va = (
+                installed.target_vas[f"hant_help_body_{spec.key}_row_{row_index}"]
+                if english
+                else _HANT_BLANK_VA
+            )
+            struct.pack_into("<I", result, body_table_file + row_index * 4, target_va)
+        struct.pack_into(
+            "<I",
+            result,
+            body_table_file + len(spec.english_rows) * 4,
+            _HANT_EOF_VA,
+        )
 
     return bytes(result), installed.info

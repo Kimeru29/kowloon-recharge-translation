@@ -17,7 +17,7 @@ Status meanings:
 | Pre-title memory-card status text | **Working / runtime-proven** | r8 runtime accepts the lower/better-balanced tablet presentation. Preserve the exact r8 payload and centered `slot 1`; r11 does not touch this path. |
 | GP088 startup/title artwork — direct `GP088_03` counterpart | **Not runtime-tested** | v9 retains the v8 same-name official English `b_gp088_en/GP088_03` port into PS2 `B_GP088.BIN`. |
 | GP088 PS2 packed title atlas (`GP088_12`) | **Not runtime-tested** | v9 proves that the two GP088_12 Japanese title variants are repacked GP088_03 regions (Dice 0.8758 / 0.8765 after excluding the known flattened banner band), then rebuilds GP088_12 from the official English GP088_03 regions. The official English remaster omits the flattened gold `re:charge` banner, so v9 removes it rather than synthesizing missing artwork. `GP088_13` is a separate already-English blue `re:charge` badge and remains unchanged. |
-| Title `New Game` / `Load Game` | **Translated but buggy** | r10 runtime proves the generic text-canvas 64→80px patch did not widen the visible backing. r11 traces title-state `(88,12)` through the group-88 resource table to `GP088_08` sprite metadata: pristine width 72px around a 64px Japanese label establishes 4px side padding. r11 sets the shared backing to 152px for the 144px `Load Game`, updates U to 152/512, and recenters the two backing instances at X=24/336 while preserving accepted text X=36/340. Runtime proof pending. |
+| Title `New Game` / `Load Game` | **Working / runtime-proven** | Pablo manually accepted v11-r11: both English labels render correctly and the widened backing rectangles now have the correct width/presentation. Preserve the r11 owner correction: shared backing width 152px, U extent 152/512, backing X=24/336, and accepted text X=36/340. |
 | Name-entry English button graphics (`B_GP019.BIN`) | **Working / runtime-proven** | Back/Edit/Finish/Delete/Confirm controls render correctly. |
 | `Enter last name.` | **Working / runtime-proven** | Wide English prompt renders correctly. |
 | Lowercase Latin keyboard | **Working / runtime-proven** | Runtime accepts lowercase Latin input. |
@@ -32,12 +32,13 @@ Status meanings:
 | License-ID messages | **Working / runtime-proven** | r7 runtime confirms the centered license/name screen looks good. Preserve `Verifying license ID...` at X=72 and `ID verification complete.` at X=56; r8 does not modify either owner. |
 | `Heracleion Shrine` | **Not runtime-tested** | Statically translated as wide executable text. |
 | H.A.N.T. tutorial | **Working / runtime-proven** | r9 runtime accepts the actual H.A.N.T. page: translated content, 12px font, 16px page-local row spacing and controller presentation all look good. Freeze this path. |
-| ADV horizontal dialogue renderer | **Translated but buggy** | r10 runtime confirms the speaker/name at X=20/Y=276 remains correct, but the body still renders near the top. That disproves the later `39 - line*114` fragment loop as the visible primary body origin. r11 traces the upstream wrapper at VA `0x24E8A0` and primary constructor at `0x24F660`, then transposes the three primary canvases from X=90/51/12,Y=20 into X=20,Y=300/316/332 while preserving the accepted speaker and 12px secondary-fragment spacing. Runtime proof pending. |
-| First old-man DG00 English dialogue | **Translated but buggy** | r10 keeps `[Old man's voice]` correct but still leaves `Hey; over here.` near the top, proving the r10 body formula was not the visible primary owner. r11 patches the upstream primary body canvases to X=20,Y=300/316/332. Runtime proof pending. |
+| ADV horizontal dialogue renderer | **Working / runtime-proven** | Pablo manually accepted v11-r11: English dialogue is horizontal and the speaker/body composition and formatting look correct. Preserve speaker X=20/Y=276, primary body X=20/Y=300/316/332, and the proven 12px secondary-fragment spacing. Moving the block slightly lower is optional future polish, not an active defect. |
+| First old-man DG00 English dialogue | **Working / runtime-proven** | Pablo manually accepted v11-r11's first dialogue presentation: English body text is horizontal and correctly formatted under the speaker. Preserve the r11 primary body canvases at X=20,Y=300/316/332. |
 | DG00 English choices | **Not runtime-tested** | Reviewed KSF overrides/imports remain present; the accepted v10 observation did not explicitly promote this row. |
 | H.A.N.T. top-level six tiles (`GP020_03`) | **Working / runtime-proven** | r5 runtime confirms `MAIL`, `DICTIONARY`, `ENEMY`, `MEMO`, `HELP`, and `CONFIG` look good. Preserve the semantic baked-art repaint and do not route these captions back through executable text. |
 | H.A.N.T. executable chrome labels | **Working / runtime-proven** | r9 runtime accepts the H.A.N.T. menus/submenus as presented. Preserve the seven-entry translated chrome owner table. |
-| H.A.N.T. Help categories/topics | **Working / runtime-proven** | r9 runtime accepts the translated H.A.N.T. menus/submenus. Preserve all **55** topic aliases and the three-tab owner including `Ruins`. |
+| H.A.N.T. Help category/topic labels + navigation | **Working / runtime-proven** | v11-r11 manual runtime confirms the Help category/topic menu presentation is substantially English and navigation works. Preserve all **55 topic labels** and the three-tab owner including `Ruins`. This status applies to labels/navigation only, not selected topic body text. |
+| H.A.N.T. selected Help topic bodies | **Still Japanese / unresolved** | v11-r11 manual runtime proves most selected Help pages still show Japanese body content even when the topic label is English. Confirmed English exception: `HELP → OTHERS → H.A.N.T Functions`, whose `(4,2,0)` body resolves to the already-translated tutorial table. v11-r12 statically promotes only `HELP → OTHERS → About the Shop` `(4,2,5)` with explicitly **semantic** English; runtime proof is pending for that new body. |
 | H.A.N.T. Config labels | **Working / runtime-proven** | r9 runtime accepts the H.A.N.T. submenu presentation; preserve the nine-entry Config renderer table and its semantic English labels. Ringtone title content remains separately inventoried and untouched. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
@@ -305,7 +306,7 @@ r9 was manually runtime-tested. The tablet remains accepted. The name-entry/conf
 
 r10 was manually runtime-tested. The confirmation-focus fix is accepted: focused `Yes` is complete and `No` remains correct. The tablet and H.A.N.T. surfaces remain accepted, and the dialogue speaker/name remains correctly placed at X=20/Y=276. Two r10 hypotheses are disproven: changing generic text-canvas offsets 64→80 does not widen the visible title backing, and changing the later `39 - line*114` fragment formula does not move the visible primary dialogue body. Those two failures define r11.
 
-### v11-r11 — current deterministic candidate; runtime proof pending
+### v11-r11 — manually runtime-tested presentation checkpoint
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r11.iso`
 - ISO SHA-256: `c99f43b6f4047f63d3b0f4fd228fb893556933d3c1a65cb46e112ba6395325de`
@@ -318,8 +319,27 @@ r10 was manually runtime-tested. The confirmation-focus fix is accepted: focused
 - dependency-free suite: **205 tests OK** (10 expected skips)
 - Pillow-enabled suite: **205 tests OK** (1 owned-corpus skip)
 - deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r11-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
-- PCSX2 status: **not launched for r11**.
+- PCSX2 status: **manually runtime-tested by Pablo**.
 
-r11 replaces only the two r10 runtime-disproven owners. Title-state `(88,12)` now follows its actual resource chain to `GP088_08`: sprite width 72→152, U extent 72/512→152/512, and the two backing left edges 64/376→24/336. The generic text-canvas 64px offsets are restored/pinned pristine. Dialogue leaves the accepted speaker untouched and moves the actual primary body canvases by changing wrapper base X/Y to 20/300 and transposing the three canvas origins to Y=300/316/332; the later secondary fragment loop remains only the secondary transpose/12px spacing path. The r10 Yes/No correction, H.A.N.T., tablet, name/license geometry, and packed title artwork remain frozen.
+r11 was manually runtime-tested and accepted for the visible presentation surfaces it targeted. `New Game` / `Load Game` and their widened backing are correct; the memory-card tablet and opening quotations remain correct; the visible first/last-name, confirmation, and profile presentation is good; and ADV dialogue is horizontal with the accepted speaker/body composition. The deeper structural 3+3 protagonist-name storage limitation remains unresolved.
 
-Manual r11 gate: both `New Game` and `Load Game` must sit fully inside the widened black backing; focused `Yes`/`No` must remain exactly as accepted in r10; the first dialogue body must begin immediately below the accepted speaker/name at X=20/Y=276; H.A.N.T. menus/submenus/page, tablet, name/license screens, and title artwork must show no regression. Static success is not runtime acceptance.
+The same runtime pass corrected the project's H.A.N.T. interpretation: translated Help category/topic labels and working navigation do **not** imply translated selected-page bodies. Most selected Help topic bodies remain Japanese. `HELP → OTHERS → H.A.N.T Functions` is the confirmed English body exception because tuple `(4,2,0)` resolves to the already-translated tutorial body table.
+
+### v11-r12 — current deterministic H.A.N.T. body candidate; runtime proof pending
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r12.iso`
+- ISO SHA-256: `ef65129b13b9b49a705a03bc8d83d434a16c76915d5024da597ba1f559f96916`
+- translated ELF SHA-256 before ROFS rewrite: `3faa98a1585bc0d55ffb41a5dfbc6cbf8ae3cb0c03742dc7214fcd5f5e21407a`
+- final post-ROFS ELF SHA-256: `3844b03e7fc5bc0d9464a3e9d9d256b0c7b6783c1aa90ff09afd32d83e3cf8f0`
+- translated/final ELF size: 8,405,990 bytes
+- overlays: 1,145 total; 892 in place / 253 relocated
+- executable ROFS records: 1,145 patched/re-resolved
+- final-image startup acceptance: **142/142** (`local/startup-acceptance-v11-r12.json`)
+- dependency-free suite: **208 tests OK** (10 expected skips)
+- Pillow-enabled suite: **208 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r12-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
+- PCSX2 status: **not launched for r12**.
+
+r12 adds a bounded inventory of all 55 selected Help-body leaves behind mode 4 and promotes only `HELP → OTHERS → About the Shop` `(4,2,5)`. Its pristine descriptor is file `0x5CBAC4`, text table `0x5C9B80`, metadata descriptor `0x5CBA74`, and metadata leaf `0x698968`; the metadata leaf is an immediate negative sentinel, so this page has no icon records to reposition. The Japanese source table/strings and metadata remain byte-identical; only the proven body descriptor is redirected to a new EOF-terminated English table in the shared translation PT_LOAD. Because the owned local extraction still lacks `English.bytes`, the new wording is explicitly **semantic**, not claimed official.
+
+The new final-image check `hant_help_bodies` is deliberately separate from `hant_help_topics`. `Command Thumbnails` and every other unpromoted body remain untouched even when their menu labels are English. Static success is not runtime acceptance; Pablo must visually test r12 before `About the Shop` is promoted to runtime-proven.

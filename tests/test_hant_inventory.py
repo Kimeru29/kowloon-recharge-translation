@@ -39,6 +39,45 @@ class HantInventoryTests(unittest.TestCase):
         self.assertEqual("unresolved", candidates[0x5876E0].classification)
         self.assertGreaterEqual(len(candidates), 10)
 
+    def test_help_body_inventory_models_all_55_mode4_topic_leaves(self) -> None:
+        import tools.hant_inventory as hant_inventory
+
+        inventory = getattr(hant_inventory, "inventory_hant_help_bodies", None)
+        self.assertIsNotNone(inventory, "expected bounded H.A.N.T. Help body inventory")
+        entries = inventory(RAW)
+
+        self.assertEqual(55, len(entries))
+        self.assertEqual((20, 20, 15), tuple(
+            sum(entry.category_index == category for entry in entries)
+            for category in range(3)
+        ))
+        by_tuple = {(entry.mode, entry.category_index, entry.topic_index): entry for entry in entries}
+
+        hant_functions = by_tuple[(4, 2, 0)]
+        self.assertEqual(0x5CBAB0, hant_functions.text_descriptor_offset)
+        self.assertEqual(0x5C8C70, hant_functions.text_table_offset)
+        self.assertEqual(16, hant_functions.row_count)
+        self.assertEqual(0x5CBA60, hant_functions.metadata_descriptor_offset)
+        self.assertEqual(0x5C8AA0, hant_functions.metadata_offset)
+        self.assertEqual(3, hant_functions.metadata_record_count)
+
+        command_thumbnails = by_tuple[(4, 2, 1)]
+        self.assertEqual(0x5CBAB4, command_thumbnails.text_descriptor_offset)
+        self.assertEqual(0x5C9180, command_thumbnails.text_table_offset)
+        self.assertEqual(55, command_thumbnails.row_count)
+        self.assertEqual(2, command_thumbnails.metadata_record_count)
+
+        shop = by_tuple[(4, 2, 5)]
+        self.assertEqual(0x5CBAC4, shop.text_descriptor_offset)
+        self.assertEqual(0x5C9B80, shop.text_table_offset)
+        self.assertEqual(7, shop.row_count)
+        self.assertEqual(0x5CBA74, shop.metadata_descriptor_offset)
+        self.assertEqual(0x698968, shop.metadata_offset)
+        self.assertEqual(0, shop.metadata_record_count)
+
+        self.assertEqual(55, len({entry.text_descriptor_offset for entry in entries}))
+        self.assertEqual(55, len({(entry.category_index, entry.topic_index) for entry in entries}))
+
     def test_official_rows_classify_exact_and_documented_semantic_matches(self) -> None:
         rows = (
             ("Ｈ．Ａ．Ｎ．Ｔは、", "The H.A.N.T is", 0x100),
