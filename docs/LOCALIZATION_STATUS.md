@@ -38,8 +38,11 @@ Status meanings:
 | H.A.N.T. top-level six tiles (`GP020_03`) | **Working / runtime-proven** | r5 runtime confirms `MAIL`, `DICTIONARY`, `ENEMY`, `MEMO`, `HELP`, and `CONFIG` look good. Preserve the semantic baked-art repaint and do not route these captions back through executable text. |
 | H.A.N.T. executable chrome labels | **Working / runtime-proven** | r9 runtime accepts the H.A.N.T. menus/submenus as presented. Preserve the seven-entry translated chrome owner table. |
 | H.A.N.T. Help category/topic labels + navigation | **Working / runtime-proven** | v11-r11 manual runtime confirms the Help category/topic menu presentation is substantially English and navigation works. Preserve all **55 topic labels** and the three-tab owner including `Ruins`. This status applies to labels/navigation only, not selected topic body text. |
-| H.A.N.T. selected Help topic bodies | **Still Japanese / unresolved** | v11-r11 manual runtime proves most selected Help pages still show Japanese body content even when the topic label is English. Confirmed English exception: `HELP → OTHERS → H.A.N.T Functions`, whose `(4,2,0)` body resolves to the already-translated tutorial table. v11-r12 statically promotes only `HELP → OTHERS → About the Shop` `(4,2,5)` with explicitly **semantic** English; runtime proof is pending for that new body. |
-| H.A.N.T. Config labels | **Working / runtime-proven** | r9 runtime accepts the H.A.N.T. submenu presentation; preserve the nine-entry Config renderer table and its semantic English labels. Ringtone title content remains separately inventoried and untouched. |
+| H.A.N.T. selected Help topic bodies | **Not runtime-tested** | r12 runtime confirms `H.A.N.T Functions` is English but `ADV Controls`, `Exploration Controls`, and `Moving in Ruins` still render Japanese. r13 promotes those three exact body owners while preserving their original icon/controller metadata and also keeps r12's `About the Shop` body. Runtime proof of the new bodies is pending. |
+| H.A.N.T. Config labels / values | **Not runtime-tested** | r12 confirms the nine Config labels are English but selected values remain mixed: `Stereo`, language, and ringtone values can still be Japanese. r13 relocates the proven `Stereo/Mono`, `Japanese/English`, and all 20 live ringtone-title aliases to semantic English; runtime proof is pending. |
+| H.A.N.T. Mail empty state | **Not runtime-tested** | r12 runtime shows `受信メールがありません。` in the empty inbox. r13 redirects its sole proven pointer alias to `No mail received.`; other actual mail messages/subjects remain a separate content class. |
+| H.A.N.T. Enemy category tabs | **Not runtime-tested** | r12 runtime shows the L1/R1 category names in Japanese. r13 translates the proven three-entry live table to `Small`, `Large`, and `Human`. |
+| H.A.N.T. Dictionary tabs + term lists | **Not runtime-tested** | r12 runtime shows the kana tabs and nearly all selectable terms in Japanese. r13 translates the 10 live tab aliases to `A/K/S/T/N/H/M/Y/R/W` and all **208 real selectable term pointers** to semantic English/romanized names while leaving placeholder slots pristine. Definition pages opened after selecting a term are tracked separately and are not claimed translated. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
@@ -47,7 +50,7 @@ Status meanings:
 | Surface | Status | Evidence / next action |
 | --- | --- | --- |
 | `メディア` | **Still Japanese / unresolved** | No exact official dictionary mapping has been proven for this PS2-only label. |
-| Remaining H.A.N.T. content lists | **Still Japanese / unresolved** | r6 inventories additional pointer-backed content separately from presentation chrome. The 20-entry ringtone-title table is live-owner proven but contains proper/music titles without an owned localized corpus; dictionary kana/index tables, mail subjects, enemy/content lists, and similar data are not bulk-guessed. The enemy category table is visible statically but its executable owner was not proven in this pass, so it remains untouched. |
+| Remaining H.A.N.T. content | **Still Japanese / unresolved** | r13 covers the runtime-observed Config values/ringtones, empty-Mail state, Enemy category tabs, Dictionary tabs and 208 selectable Dictionary terms. Unobserved/independent content remains fail-closed, including non-empty Mail subjects/bodies and the 208 Dictionary definition pages reached after choosing a term. |
 | Re:charge-only memory-card clear-data messages | **Still Japanese / unresolved** | Eight pointer-table entries have no proven official remaster counterpart and remain untouched. |
 
 ## Corpus-level translation coverage
@@ -325,7 +328,7 @@ r11 was manually runtime-tested and accepted for the visible presentation surfac
 
 The same runtime pass corrected the project's H.A.N.T. interpretation: translated Help category/topic labels and working navigation do **not** imply translated selected-page bodies. Most selected Help topic bodies remain Japanese. `HELP → OTHERS → H.A.N.T Functions` is the confirmed English body exception because tuple `(4,2,0)` resolves to the already-translated tutorial body table.
 
-### v11-r12 — current deterministic H.A.N.T. body candidate; runtime proof pending
+### v11-r12 — runtime-tested H.A.N.T. content checkpoint
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r12.iso`
 - ISO SHA-256: `ef65129b13b9b49a705a03bc8d83d434a16c76915d5024da597ba1f559f96916`
@@ -338,8 +341,28 @@ The same runtime pass corrected the project's H.A.N.T. interpretation: translate
 - dependency-free suite: **208 tests OK** (10 expected skips)
 - Pillow-enabled suite: **208 tests OK** (1 owned-corpus skip)
 - deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r12-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
-- PCSX2 status: **not launched for r12**.
+- PCSX2 status: **manually runtime-tested by Pablo**.
 
 r12 adds a bounded inventory of all 55 selected Help-body leaves behind mode 4 and promotes only `HELP → OTHERS → About the Shop` `(4,2,5)`. Its pristine descriptor is file `0x5CBAC4`, text table `0x5C9B80`, metadata descriptor `0x5CBA74`, and metadata leaf `0x698968`; the metadata leaf is an immediate negative sentinel, so this page has no icon records to reposition. The Japanese source table/strings and metadata remain byte-identical; only the proven body descriptor is redirected to a new EOF-terminated English table in the shared translation PT_LOAD. Because the owned local extraction still lacks `English.bytes`, the new wording is explicitly **semantic**, not claimed official.
 
-The new final-image check `hant_help_bodies` is deliberately separate from `hant_help_topics`. `Command Thumbnails` and every other unpromoted body remain untouched even when their menu labels are English. Static success is not runtime acceptance; Pablo must visually test r12 before `About the Shop` is promoted to runtime-proven.
+The r12 runtime pass preserves everything before H.A.N.T. exactly as accepted in r11 and confirms the main H.A.N.T. screen/navigation remain good. It also exposes the next independent content owners: `ADV Controls`, `Exploration Controls`, and `Moving in Ruins` bodies remain Japanese; Mail's empty state is Japanese; Config values are mixed; Enemy L1/R1 category names are Japanese; and Dictionary tabs/term lists are predominantly Japanese. Those observations define r13. `About the Shop` itself was not explicitly reported in this pass, so its runtime status remains unpromoted.
+
+
+### v11-r13 — current deterministic H.A.N.T. content candidate; runtime proof pending
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r13.iso`
+- ISO SHA-256: `53bf85f051ff3f3c8714e41be134dbd5fa9fcd0fd4ba2e3bd58091bf2acc1648`
+- translated ELF SHA-256 before ROFS rewrite: `a0b9b3fcb83c6579d5d2f93ab74749636d62fd0cb7aae7f8b0bd5a365d15b2bf`
+- final post-ROFS ELF SHA-256: `062d0380ba7f8ee094ac4230799ffee5a4f1029b7230734bca2caafd9d4b6b6f`
+- translated/final ELF size: 8,414,614 bytes
+- overlays: 1,145 total; 892 in place / 253 relocated
+- executable ROFS records: 1,145 patched/re-resolved
+- final-image startup acceptance: **146/146** (`local/startup-acceptance-v11-r13.json`)
+- dependency-free suite: **212 tests OK** (10 expected skips)
+- Pillow-enabled suite: **212 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r13-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
+- PCSX2 status: **not launched for r13**.
+
+r13 is scoped to the runtime-observed Japanese H.A.N.T. layers. It translates the selected bodies `(4,0,0)` ADV Controls, `(4,1,0)` Exploration Controls and `(4,1,1)` Moving in Ruins while keeping their pristine row counts and exact metadata/icon records. It additionally translates the empty-Mail message, four Config enum values, all 20 proven ringtone aliases, the three Enemy category tabs, all 10 Dictionary index tabs and all 208 real Dictionary term-list pointers. All Japanese source strings/tables remain byte-identical provenance; only proven aliases/descriptors redirect into the shared translation PT_LOAD. Wording is `semantic` because the owned extraction still lacks the localized `English.bytes` TextAsset.
+
+Manual r13 gate: everything before H.A.N.T. must remain exactly as accepted; H.A.N.T. main/chrome/navigation and `H.A.N.T Functions` must remain unchanged; ADV Controls, Exploration Controls and Moving in Ruins bodies should now be readable English with controller icons still aligned; empty Mail should say `No mail received.`; Config selected values/ringtones should be English and unclipped; Enemy L1/R1 tabs should read `Small / Large / Human`; and Dictionary should show Latin A/K/S/T/N/H/M/Y/R/W tabs plus English/romanized selectable terms. Definition pages after selecting a Dictionary term are not part of this r13 acceptance claim.

@@ -10,7 +10,11 @@ from tools.hant_ui import (
     HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
     HANT_CONFIG_LABELS,
+    HANT_CONTENT_LABELS,
+    HANT_DICTIONARY_TABS,
+    HANT_DICTIONARY_TERMS,
     HANT_HELP_BODIES,
+    HANT_RINGTONES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
     HANT_CONTROLLER_METADATA_OFFSET,
@@ -689,16 +693,70 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             break
 
         expected_metadata_va = _ELF_MAIN_VADDR + spec.metadata_offset - _ELF_MAIN_FILE_OFFSET
+        metadata_size = (len(spec.metadata_records) + 1) * 8
+        expected_metadata = (*spec.metadata_records, (-1, -1, -1, -1))
+        actual_metadata = (
+            tuple(
+                struct.unpack_from("<hhhh", raw, spec.metadata_offset + index * 8)
+                for index in range(len(expected_metadata))
+            )
+            if spec.metadata_offset + metadata_size <= len(raw)
+            else ()
+        )
         if (
             spec.metadata_descriptor_offset + 4 > len(raw)
             or struct.unpack_from("<I", raw, spec.metadata_descriptor_offset)[0] != expected_metadata_va
-            or spec.metadata_offset + 8 > len(raw)
-            or struct.unpack_from("<hhhh", raw, spec.metadata_offset) != (-1, -1, -1, -1)
+            or actual_metadata != expected_metadata
         ):
             hant_help_bodies_ok = False
             break
 
+    def verify_relocated_hant_content(specs, *, hashed: bool) -> bool:
+        if segment is None:
+            return False
+        p_offset, p_vaddr, p_filesz, _p_memsz = segment
+        for spec in specs:
+            if hashed:
+                end = raw.find(b"\x00", spec.source_offset, min(len(raw), spec.source_offset + 256))
+                if end < 0 or sha256(raw[spec.source_offset:end + 1]).hexdigest() != spec.source_sha256:
+                    return False
+            else:
+                source = spec.source_text.encode("cp932") + b"\x00"
+                if raw[spec.source_offset:spec.source_offset + len(source)] != source:
+                    return False
+            if not spec.pointer_offsets:
+                return False
+            targets = set()
+            for pointer_offset in spec.pointer_offsets:
+                if pointer_offset + 4 > len(raw):
+                    return False
+                targets.add(struct.unpack_from("<I", raw, pointer_offset)[0])
+            if len(targets) != 1:
+                return False
+            target_va = targets.pop()
+            expected = encode_ps2_english(spec.english, collapse_spaces=False) + b"\x00"
+            relative = target_va - p_vaddr
+            if relative < 0 or relative + len(expected) > p_filesz:
+                return False
+            target_file = p_offset + relative
+            if raw[target_file:target_file + len(expected)] != expected:
+                return False
+        return True
+
+    hant_content_values_ok = verify_relocated_hant_content(HANT_CONTENT_LABELS, hashed=False)
+    hant_ringtones_ok = verify_relocated_hant_content(HANT_RINGTONES, hashed=True)
+    hant_dictionary_tabs_ok = verify_relocated_hant_content(HANT_DICTIONARY_TABS, hashed=True)
+    hant_dictionary_terms_ok = verify_relocated_hant_content(HANT_DICTIONARY_TERMS, hashed=True)
+
+    promoted_hant_sources = {
+        *(spec.source_offset for spec in HANT_CONTENT_LABELS),
+        *(spec.source_offset for spec in HANT_RINGTONES),
+        *(spec.source_offset for spec in HANT_DICTIONARY_TABS),
+        *(spec.source_offset for spec in HANT_DICTIONARY_TERMS),
+    }
     for source_offset, pointer_offsets, source_text in _HANT_UNRESOLVED_SIGNATURES:
+        if source_offset in promoted_hant_sources:
+            continue
         expected_va = _ELF_MAIN_VADDR + source_offset - _ELF_MAIN_FILE_OFFSET
         if source_text is not None:
             encoded = source_text.encode("cp932") + b"\x00"
@@ -776,6 +834,10 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "one or more selected H.A.N.T Help bodies do not resolve through the proven mode/category/topic body owner",
         )
     )
+    checks.append(_check("hant_content_values", hant_content_values_ok, "Mail/Config/Enemy H.A.N.T content values are stale or unresolved"))
+    checks.append(_check("hant_ringtones", hant_ringtones_ok, "one or more H.A.N.T ringtone titles are stale or unresolved"))
+    checks.append(_check("hant_dictionary_tabs", hant_dictionary_tabs_ok, "one or more H.A.N.T Dictionary tabs are stale or unresolved"))
+    checks.append(_check("hant_dictionary_terms", hant_dictionary_terms_ok, "one or more H.A.N.T Dictionary terms are stale or unresolved"))
     checks.append(
         _check(
             "hant_unresolved_pristine",

@@ -28,7 +28,11 @@ from tools.hant_ui import (
     HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
     HANT_CONFIG_LABELS,
+    HANT_CONTENT_LABELS,
+    HANT_DICTIONARY_TABS,
+    HANT_DICTIONARY_TERMS,
     HANT_HELP_BODIES,
+    HANT_RINGTONES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
     HANT_CONTROLLER_METADATA_RECORDS,
@@ -125,6 +129,9 @@ class EarlyUiPatchTests(unittest.TestCase):
             *HANT_ALL_HELP_TOPICS,
         ):
             allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
+        for spec in (*HANT_CONTENT_LABELS, *HANT_RINGTONES, *HANT_DICTIONARY_TABS, *HANT_DICTIONARY_TERMS):
+            for pointer_offset in spec.pointer_offsets:
+                allowed.update(range(pointer_offset, pointer_offset + 4))
         for offset in (0x181888, 0x1819DC, 0x181A68, 0x181AF4, 0x181B70, 0x181EAC):
             allowed.update(range(offset, offset + 4))
         for offset, _expected, _replacement in NAME_CONFIRMATION_FOCUS_PATCHES:
@@ -170,13 +177,17 @@ class EarlyUiPatchTests(unittest.TestCase):
     def test_unresolved_hant_candidates_match_pristine_fixture_except_cross_owned_sources(self) -> None:
         result = build_early_ui_elf(RAW)
         entries = inventory_hant_text(RAW, None)
-        promoted_help_sources = {spec.source_offset for spec in HANT_ALL_HELP_TOPICS}
+        promoted_hant_sources = {spec.source_offset for spec in HANT_ALL_HELP_TOPICS}
+        promoted_hant_sources.update(spec.source_offset for spec in HANT_CONTENT_LABELS)
+        promoted_hant_sources.update(spec.source_offset for spec in HANT_RINGTONES)
+        promoted_hant_sources.update(spec.source_offset for spec in HANT_DICTIONARY_TABS)
+        promoted_hant_sources.update(spec.source_offset for spec in HANT_DICTIONARY_TERMS)
         candidates = [
             entry
             for entry in entries
             if entry.owner == "executable_hant_candidate"
             and entry.classification == "unresolved"
-            and entry.source_offset not in promoted_help_sources
+            and entry.source_offset not in promoted_hant_sources
         ]
         self.assertTrue(candidates)
         cross_owned_sources = {
@@ -214,7 +225,7 @@ class EarlyUiPatchTests(unittest.TestCase):
         segment_va = segment[2]
         segment_size = segment[4]
         by_key = {spec.key: spec for spec in MENU_LABELS}
-        self.assertEqual(4758, segment_size)
+        self.assertEqual(13382, segment_size)
 
         for key, expected in (("return_above_ground", b"Return above ground\x00"), ("report_card", b"Report card\x00")):
             spec = by_key[key]
@@ -227,7 +238,7 @@ class EarlyUiPatchTests(unittest.TestCase):
             target_va = targets.pop()
             self.assertGreaterEqual(target_va, segment_va)
             self.assertLess(target_va, segment_va + segment_size)
-            expected_offset = {"return_above_ground": 0x1276, "report_card": 0x128A}[key]
+            expected_offset = {"return_above_ground": 0x3426, "report_card": 0x343A}[key]
             self.assertEqual(segment_va + expected_offset, target_va)
             target_file = segment_file + target_va - segment_va
             self.assertEqual(expected, result[target_file:target_file + len(expected)])

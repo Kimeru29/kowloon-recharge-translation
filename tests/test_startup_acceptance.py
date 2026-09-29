@@ -13,7 +13,11 @@ from tools.hant_ui import (
     HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
     HANT_CONFIG_LABELS,
+    HANT_CONTENT_LABELS,
+    HANT_DICTIONARY_TABS,
+    HANT_DICTIONARY_TERMS,
     HANT_HELP_BODIES,
+    HANT_RINGTONES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_TUTORIAL_FONT_STYLE_OFFSET,
     HANT_TUTORIAL_ROW_SPACING_OFFSET,
@@ -43,6 +47,10 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_chrome_labels", names)
         self.assertIn("hant_help_topics", names)
         self.assertIn("hant_help_bodies", names)
+        self.assertIn("hant_content_values", names)
+        self.assertIn("hant_ringtones", names)
+        self.assertIn("hant_dictionary_tabs", names)
+        self.assertIn("hant_dictionary_terms", names)
         self.assertIn("hant_config_labels", names)
         self.assertIn("hant_help_category_labels", names)
         self.assertIn("adv_speaker_horizontal_layout", names)
@@ -72,6 +80,10 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_tutorial_font_style", failed_names)
         self.assertIn("hant_chrome_labels", failed_names)
         self.assertIn("hant_config_labels", failed_names)
+        self.assertIn("hant_content_values", failed_names)
+        self.assertIn("hant_ringtones", failed_names)
+        self.assertIn("hant_dictionary_tabs", failed_names)
+        self.assertIn("hant_dictionary_terms", failed_names)
         self.assertIn("hant_help_category_labels", failed_names)
         self.assertIn("name_prompt_0", failed_names)
         self.assertIn("name_flow_skip_reading", failed_names)
@@ -115,6 +127,11 @@ class StartupAcceptanceTests(unittest.TestCase):
             ("hant_help_topics", HANT_ALL_HELP_TOPICS[0].pointer_offset),
             ("hant_help_topics", HANT_ALL_HELP_TOPICS[-1].pointer_offset),
             ("hant_help_bodies", HANT_HELP_BODIES[0].descriptor_offset),
+            ("hant_content_values", HANT_CONTENT_LABELS[0].pointer_offsets[0]),
+            ("hant_ringtones", HANT_RINGTONES[0].pointer_offsets[0]),
+            ("hant_dictionary_tabs", HANT_DICTIONARY_TABS[0].pointer_offsets[0]),
+            ("hant_dictionary_terms", HANT_DICTIONARY_TERMS[0].pointer_offsets[0]),
+            ("hant_dictionary_terms", HANT_DICTIONARY_TERMS[-1].pointer_offsets[0]),
         )
         for name, offset in cases:
             with self.subTest(name=name):

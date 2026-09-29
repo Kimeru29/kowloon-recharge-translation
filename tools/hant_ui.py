@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+import hashlib
 import struct
 
 from tools.elf_translation_segment import TranslationSegmentInfo
 from tools.executable_text import RelocatedText, install_executable_text
 from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells, wrap_hant_text
+from tools.hant_content_data import HANT_DICTIONARY_TAB_DATA, HANT_DICTIONARY_TERM_DATA, HANT_RINGTONE_DATA
 from tools.localization import encode_ps2_english
 from tools.memory_card_ui import relocated_memory_card_entries
 from tools.startup_ui import (
@@ -100,6 +102,27 @@ class HantHelpBody:
     metadata_offset: int
     source_rows: tuple[tuple[int, int, str], ...]
     english_rows: tuple[str, ...]
+    metadata_records: tuple[tuple[int, int, int, int], ...] = ()
+    provenance: str = "semantic"
+
+
+@dataclass(frozen=True)
+class HantContentLabel:
+    key: str
+    source_offset: int
+    pointer_offsets: tuple[int, ...]
+    source_text: str
+    english: str
+    provenance: str = "semantic"
+
+
+@dataclass(frozen=True)
+class HantHashedText:
+    key: str
+    source_offset: int
+    pointer_offsets: tuple[int, ...]
+    source_sha256: str
+    english: str
     provenance: str = "semantic"
 
 
@@ -166,6 +189,41 @@ HANT_CONFIG_LABELS: tuple[HantConfigLabel, ...] = (
     HantConfigLabel("voice_nav", 0x586ED8, 0x586F0C, "ボイスナビ", "Voice Nav"),
     HantConfigLabel("ringtone", 0x6958A0, 0x586F10, "着メロ", "Ringtone"),
 )
+
+# Runtime r12 screenshots prove these selected values/content strings are live
+# independently from the already-English Config/chrome labels. Each alias is
+# exact and source-preimage validated before relocation.
+HANT_CONTENT_LABELS: tuple[HantContentLabel, ...] = (
+    HantContentLabel("config_stereo", 0x586F48, (0x6958C8,), "ステレオ", "Stereo"),
+    HantContentLabel("config_mono", 0x586F58, (0x6958CC,), "モノラル", "Mono"),
+    HantContentLabel("config_japanese", 0x6958D0, (0x6958E0,), "日本語", "Japanese"),
+    HantContentLabel("config_english", 0x6958D8, (0x6958E4,), "英語", "English"),
+    HantContentLabel("mail_empty", 0x589960, (0x695BD8,), "受信メールがありません。", "No mail received."),
+    HantContentLabel("enemy_small", 0x695BE8, (0x5899F8,), "小型", "Small"),
+    HantContentLabel("enemy_large", 0x695BF0, (0x5899FC,), "大型", "Large"),
+    HantContentLabel("enemy_human", 0x695BF8, (0x589A00,), "人物", "Human"),
+)
+
+
+def _hashed_specs(data: tuple[tuple[str, int, int, str, str], ...]) -> tuple[HantHashedText, ...]:
+    return tuple(HantHashedText(key, source, (pointer,), digest, english) for key, source, pointer, digest, english in data)
+
+
+HANT_RINGTONES: tuple[HantHashedText, ...] = _hashed_specs(HANT_RINGTONE_DATA)
+HANT_DICTIONARY_TABS: tuple[HantHashedText, ...] = _hashed_specs(HANT_DICTIONARY_TAB_DATA)
+HANT_DICTIONARY_TERMS: tuple[HantHashedText, ...] = _hashed_specs(HANT_DICTIONARY_TERM_DATA)
+
+_HANT_RINGTONE_RENDERER_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x18B674, 0x3C020068), (0x18B678, 0x24427160),
+    (0x18BE9C, 0x3C020068), (0x18BEA0, 0x24427160),
+)
+_HANT_DICTIONARY_TAB_RENDERER_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x18E428, 0x3C030068), (0x18E42C, 0x24637840),
+)
+_HANT_ENEMY_CATEGORY_RENDERER_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x195D7C, 0x3C030069), (0x195D80, 0x24639978),
+)
+
 
 
 # The Help category renderer owns these three tabs independently from the three
@@ -259,34 +317,272 @@ HANT_ALL_HELP_TOPICS: tuple[HantHelpTopic, ...] = (
 # above. The live Help handler at VA 0x28D210..0x28D24C passes
 # (mode=4, category, topic) to the generic page constructor; resolver VA 0x2A9FE0
 # then indexes the text hierarchy rooted at VA 0x006CBAC0. Tuple (4,2,0) is the
-# already-accepted H.A.N.T Functions/tutorial body. The first newly promoted body
-# deliberately uses (4,2,5): it has a short seven-row table and its parallel
-# metadata leaf is an immediate negative sentinel, so no icon geometry changes
-# are required. English.bytes is absent locally, therefore wording is semantic.
+# already-accepted H.A.N.T Functions/tutorial body. r12 promoted metadata-free
+# (4,2,5) About the Shop; r13 adds the three runtime-observed Japanese bodies
+# (4,0,0), (4,1,0), and (4,1,1) while preserving each pristine row count and
+# controller/icon metadata list byte-for-byte. English.bytes is absent locally,
+# therefore all newly written wording is explicitly semantic.
 HANT_HELP_BODIES: tuple[HantHelpBody, ...] = (
     HantHelpBody(
-        key="shop",
+        key='adv_controls',
+        mode=4,
+        category_index=0,
+        topic_index=0,
+        descriptor_offset=0x5c4390,
+        source_table_offset=0x5c2e30,
+        metadata_descriptor_offset=0x5c4340,
+        metadata_offset=0x5c2c70,
+        source_rows=(
+            (0, 6040768, '\u3000\u3000\u3000\u3000\u3000＜ＡＤＶでの基本操作＞'),
+            (2, 6040816, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000各ボタンの働き'),
+            (3, 6040848, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000￣￣￣￣￣￣￣'),
+            (4, 6040880, '\u3000\u3000\u3000：感情入力時の選択／カーソル移動'),
+            (5, 6040928, '\u3000\u3000\u3000：メッセージを送る／決定'),
+            (6, 6040960, '\u3000＋\u3000：メッセージを高速で送る'),
+            (7, 6040992, '\u3000\u3000\u3000：メッセージを自動送りにする'),
+            (8, 6041040, '\u3000\u3000\u3000：コマンドサムネイルを表示する'),
+            (9, 6041088, '\u3000\u3000\u3000：過去メッセージログを表示する'),
+        ),
+        english_rows=(
+            '       ADV Controls',
+            '',
+            '       Button Functions',
+            '       ----------------',
+            '      Emotion choice / move',
+            '      Advance / confirm',
+            '   +  Fast-forward messages',
+            '      Auto-advance messages',
+            '      Command thumbnails',
+            '      Show message log',
+            '',
+        ),
+        metadata_records=(
+            (38, 0, 0, 5),
+            (38, 1, 26, 96),
+            (0, 0, 27, 117),
+            (0, 6, 4, 138),
+            (0, 0, 45, 138),
+            (0, 3, 27, 159),
+            (0, 5, 27, 180),
+            (0, 4, 27, 201),
+        ),
+    ),
+    HantHelpBody(
+        key='exploration_controls',
+        mode=4,
+        category_index=1,
+        topic_index=0,
+        descriptor_offset=0x5c8a50,
+        source_table_offset=0x5c4650,
+        metadata_descriptor_offset=0x5c8a00,
+        metadata_offset=0x5c43e0,
+        source_rows=(
+            (0, 6046816, '\u3000\u3000\u3000\u3000\u3000＜遺跡内での基本操作＞'),
+            (2, 6046864, '\u3000\u3000\u3000：移動／方向転換／カーソル移動'),
+            (3, 6046912, '\u3000＋\u3000：高速移動'),
+            (4, 6046944, '\u3000＋\u3000：平行移動'),
+            (5, 6046976, '\u3000\u3000\u3000：調べる／決定'),
+            (6, 6047008, '\u3000\u3000\u3000：ジャンプ／ワイヤーガンを撃つ'),
+            (7, 6047056, '\u3000\u3000\u3000：アイテム画面を呼び出す'),
+            (8, 6041040, '\u3000\u3000\u3000：コマンドサムネイルを表示する'),
+            (9, 6047088, '\u3000\u3000\u3000：暗視ゴーグルの使用'),
+            (10, 6047120, '\u3000\u3000\u3000：《探索態勢》《戦闘態勢》の切替'),
+            (11, 6047168, '\u3000\u3000\u3000：レーダー表示／非表示'),
+            (13, 6047200, '\u3000\u3000暗視ゴーグル使用中は、'),
+            (14, 6047232, '\u3000\u3000バッテリーが減っていき、'),
+            (15, 6047264, '\u3000\u3000０になると使用できなくなります。'),
+        ),
+        english_rows=(
+            '    Exploration Controls',
+            '',
+            '      Move / turn / cursor',
+            '   +  Move faster',
+            '   +  Strafe',
+            '      Examine / confirm',
+            '      Jump / fire wire gun',
+            '      Open item screen',
+            '      Command thumbnails',
+            '      Toggle night vision',
+            '      Explore / battle mode',
+            '      Radar on / off',
+            '',
+            'Night vision uses battery.',
+            'It drains while active.',
+            'At zero, it cannot be used.',
+            '',
+        ),
+        metadata_records=(
+            (38, 0, 0, 5),
+            (38, 1, 29, 53),
+            (38, 1, 6, 76),
+            (0, 1, 44, 76),
+            (38, 1, 6, 97),
+            (0, 6, 44, 97),
+            (0, 0, 30, 118),
+            (0, 3, 30, 139),
+            (0, 2, 30, 160),
+            (0, 5, 30, 181),
+            (0, 4, 30, 202),
+            (0, 7, 28, 223),
+            (0, 8, 28, 244),
+            (38, 10, 10, 290),
+        ),
+    ),
+    HantHelpBody(
+        key='moving_in_ruins',
+        mode=4,
+        category_index=1,
+        topic_index=1,
+        descriptor_offset=0x5c8a54,
+        source_table_offset=0x5c4b20,
+        metadata_descriptor_offset=0x5c8a04,
+        metadata_offset=0x5c46a0,
+        source_rows=(
+            (0, 6047680, '遺跡内での基本的な'),
+            (1, 6047712, '移動の仕方について説明します。'),
+            (3, 6047744, '＜前進＞'),
+            (4, 6047760, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000\u3000方向キーを↑に'),
+            (5, 6047792, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000入力すると'),
+            (6, 6047824, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000１歩前進します。'),
+            (8, 6047856, '＜右を向く＞'),
+            (9, 6047872, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000\u3000方向キーを→に'),
+            (10, 6047792, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000入力すると'),
+            (11, 6047904, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000右を向きます。'),
+            (13, 6047936, '＜左を向く＞'),
+            (14, 6047952, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000\u3000方向キーを←に'),
+            (15, 6047792, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000入力すると'),
+            (16, 6047984, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000左を向きます。'),
+            (18, 6048016, '＜後ろを向く＞'),
+            (19, 6048032, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000\u3000方向キーを↓に'),
+            (20, 6047792, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000入力すると'),
+            (21, 6048064, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000後ろを向きます。'),
+            (23, 6048096, '＜正面を向いたまま右に１歩移動＞'),
+            (24, 6048144, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000\u3000ボタンを押しながら'),
+            (25, 6048192, '＋\u3000\u3000\u3000\u3000\u3000\u3000\u3000方向キーを→に'),
+            (26, 6047792, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000入力すると'),
+            (27, 6048224, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000正面を向いたまま'),
+            (28, 6048256, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000右に１歩移動します。'),
+            (30, 6048304, '＜正面を見たまま左に１歩移動＞'),
+            (31, 6048144, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000\u3000ボタンを押しながら'),
+            (32, 6048336, '＋\u3000\u3000\u3000\u3000\u3000\u3000\u3000方向キーを←に'),
+            (33, 6047792, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000入力すると'),
+            (34, 6048224, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000正面を向いたまま'),
+            (35, 6048368, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000左に１歩移動します。'),
+            (37, 6048416, '＜正面を見たまま後ろに１歩移動＞'),
+            (38, 6048144, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000\u3000ボタンを押しながら'),
+            (39, 6048464, '＋\u3000\u3000\u3000\u3000\u3000\u3000\u3000方向キーを↓に'),
+            (40, 6047792, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000入力すると'),
+            (41, 6048224, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000正面を向いたまま'),
+            (42, 6048496, '\u3000\u3000\u3000\u3000\u3000\u3000\u3000後ろに１歩移動します。'),
+        ),
+        english_rows=(
+            'Basic movement in the ruins',
+            'is explained below.',
+            '',
+            '<Forward>',
+            '        Press Up',
+            '',
+            '        move one step ahead.',
+            '',
+            '<Turn Right>',
+            '        Press Right',
+            '',
+            '        to turn right.',
+            '',
+            '<Turn Left>',
+            '        Press Left',
+            '',
+            '        to turn left.',
+            '',
+            '<Turn Around>',
+            '        Press Down',
+            '',
+            '        to turn around.',
+            '',
+            '<Step Right Facing Forward>',
+            '        Hold the button',
+            ' +      and press Right',
+            '',
+            '        stay facing forward',
+            '        and step right.',
+            '',
+            '<Step Left Facing Forward>',
+            '        Hold the button',
+            ' +      and press Left',
+            '',
+            '        stay facing forward',
+            '        and step left.',
+            '',
+            '<Step Back Facing Forward>',
+            '        Hold the button',
+            ' +      and press Down',
+            '',
+            '        stay facing forward',
+            '        and step backward.',
+            '',
+        ),
+        metadata_records=(
+            (29, 0, 10, 114),
+            (29, 1, 10, 220),
+            (29, 2, 10, 326),
+            (29, 3, 10, 430),
+            (29, 1, 5, 553),
+            (29, 2, 5, 698),
+            (29, 3, 5, 846),
+            (29, 12, 47, 102),
+            (29, 12, 47, 206),
+            (29, 12, 47, 311),
+            (29, 12, 47, 416),
+            (29, 12, 47, 524),
+            (29, 12, 47, 668),
+            (29, 12, 47, 816),
+            (38, 1, 120, 95),
+            (38, 1, 120, 200),
+            (38, 1, 120, 305),
+            (38, 1, 120, 410),
+            (38, 1, 120, 537),
+            (38, 1, 120, 683),
+            (38, 1, 120, 830),
+            (0, 6, 121, 516),
+            (0, 6, 121, 663),
+            (0, 6, 121, 810),
+            (29, 4, 76, 131),
+            (29, 5, 76, 235),
+            (29, 6, 76, 340),
+            (29, 7, 76, 445),
+            (29, 8, 76, 553),
+            (29, 9, 76, 697),
+            (29, 10, 76, 845),
+            (0, 6, 10, 520),
+            (0, 6, 10, 665),
+            (0, 6, 10, 812),
+        ),
+    ),
+    HantHelpBody(
+        key='shop',
         mode=4,
         category_index=2,
         topic_index=5,
-        descriptor_offset=0x5CBAC4,
-        source_table_offset=0x5C9B80,
-        metadata_descriptor_offset=0x5CBA74,
+        descriptor_offset=0x5cbac4,
+        source_table_offset=0x5c9b80,
+        metadata_descriptor_offset=0x5cba74,
         metadata_offset=0x698968,
         source_rows=(
-            (0, 0x5C9AE0, "\u3000\u3000\u3000\u3000\u3000\u3000＜売店について＞"),
-            (2, 0x5C9B00, "昼休みの自由移動で「売店」へ行くと、"),
-            (3, 0x5C9B30, "食品や学用品などの"),
-            (4, 0x5C9B50, "アイテムを購入することができます。"),
+            (0, 6068960, '\u3000\u3000\u3000\u3000\u3000\u3000＜売店について＞'),
+            (2, 6068992, '昼休みの自由移動で「売店」へ行くと、'),
+            (3, 6069040, '食品や学用品などの'),
+            (4, 6069072, 'アイテムを購入することができます。'),
         ),
         english_rows=(
-            "       About the Shop",
-            "",
-            "During lunch, visit the Shop",
-            "You can buy food, supplies,",
-            "and other useful items.",
-            "",
-            "",
+            '       About the Shop',
+            '',
+            'During lunch, visit the Shop',
+            'You can buy food, supplies,',
+            'and other useful items.',
+            '',
+            '',
+        ),
+        metadata_records=(
         ),
     ),
 )
@@ -651,10 +947,43 @@ def _validate_source(raw: bytes) -> None:
                 f"H.A.N.T help-body metadata descriptor preimage mismatch for {spec.key}: "
                 f"expected {expected_metadata_va:#x}, got {actual_metadata_va:#x}"
             )
-        if spec.metadata_offset + 8 > len(raw):
+        metadata_size = (len(spec.metadata_records) + 1) * 8
+        if spec.metadata_offset + metadata_size > len(raw):
             raise ValueError(f"H.A.N.T help-body metadata is outside executable: {spec.key}")
-        if struct.unpack_from("<hhhh", raw, spec.metadata_offset) != (-1, -1, -1, -1):
-            raise ValueError(f"H.A.N.T help-body metadata is not empty: {spec.key}")
+        actual_metadata = tuple(
+            struct.unpack_from("<hhhh", raw, spec.metadata_offset + index * 8)
+            for index in range(len(spec.metadata_records) + 1)
+        )
+        expected_metadata = (*spec.metadata_records, (-1, -1, -1, -1))
+        if actual_metadata != expected_metadata:
+            raise ValueError(f"H.A.N.T help-body metadata preimage mismatch: {spec.key}")
+
+    for offset, expected in (*_HANT_RINGTONE_RENDERER_PREIMAGES, *_HANT_DICTIONARY_TAB_RENDERER_PREIMAGES, *_HANT_ENEMY_CATEGORY_RENDERER_PREIMAGES):
+        if offset + 4 > len(raw) or struct.unpack_from("<I", raw, offset)[0] != expected:
+            raise ValueError(f"H.A.N.T content renderer preimage mismatch at {offset:#x}")
+
+    for spec in HANT_CONTENT_LABELS:
+        encoded = spec.source_text.encode("cp932")
+        if raw[spec.source_offset:spec.source_offset + len(encoded) + 1] != encoded + b"\x00":
+            raise ValueError(f"H.A.N.T content source preimage mismatch: {spec.key}")
+        expected_va = _elf_va(spec.source_offset)
+        for pointer_offset in spec.pointer_offsets:
+            if pointer_offset + 4 > len(raw) or struct.unpack_from("<I", raw, pointer_offset)[0] != expected_va:
+                raise ValueError(f"H.A.N.T content pointer preimage mismatch: {spec.key}")
+
+    for spec in (*HANT_RINGTONES, *HANT_DICTIONARY_TABS, *HANT_DICTIONARY_TERMS):
+        if spec.source_offset >= len(raw):
+            raise ValueError(f"H.A.N.T hashed source is outside executable: {spec.key}")
+        end = raw.find(b"\x00", spec.source_offset, min(len(raw), spec.source_offset + 256))
+        if end < 0:
+            raise ValueError(f"H.A.N.T hashed source lacks terminator: {spec.key}")
+        payload = raw[spec.source_offset:end + 1]
+        if hashlib.sha256(payload).hexdigest() != spec.source_sha256:
+            raise ValueError(f"H.A.N.T hashed source preimage mismatch: {spec.key}")
+        expected_va = _elf_va(spec.source_offset)
+        for pointer_offset in spec.pointer_offsets:
+            if pointer_offset + 4 > len(raw) or struct.unpack_from("<I", raw, pointer_offset)[0] != expected_va:
+                raise ValueError(f"H.A.N.T hashed pointer preimage mismatch: {spec.key}")
 
     for index, (offset, source) in _HANT_SOURCES.items():
         encoded = source.encode("cp932")
@@ -785,6 +1114,23 @@ def _base_relocated_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             pointer_offsets=(spec.pointer_offset,),
         )
         for spec in HANT_ALL_HELP_TOPICS
+    )
+
+    entries.extend(
+        RelocatedText(
+            key=f"hant_content_{spec.key}",
+            encoded=_encoded_wide(spec.english),
+            pointer_offsets=spec.pointer_offsets,
+        )
+        for spec in HANT_CONTENT_LABELS
+    )
+    entries.extend(
+        RelocatedText(
+            key=f"hant_owned_{spec.key}",
+            encoded=_encoded_wide(spec.english),
+            pointer_offsets=spec.pointer_offsets,
+        )
+        for spec in (*HANT_RINGTONES, *HANT_DICTIONARY_TABS, *HANT_DICTIONARY_TERMS)
     )
 
     for spec in HANT_HELP_BODIES:

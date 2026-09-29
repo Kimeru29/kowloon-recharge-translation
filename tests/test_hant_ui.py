@@ -35,9 +35,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(4725, info.payload_size)
+        self.assertEqual(13349, info.payload_size)
         self.assertEqual(
-            "9cf1840c30f29c6e55a3c0ea98df8ea82454464c653f39999316c8214f1bc34a",
+            "1edd0a81f4bb8f68f018576c9c99169766414cb8e945cdc3db49b61325d61c82",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -278,9 +278,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_about_shop_help_body_owner_is_separate_from_topic_label_owner(self) -> None:
         import tools.hant_ui as hant_ui
 
-        bodies = getattr(hant_ui, "HANT_HELP_BODIES", ())
-        self.assertEqual(1, len(bodies), "expected one newly promoted H.A.N.T. Help body owner")
-        spec = bodies[0]
+        bodies = {body.key: body for body in getattr(hant_ui, "HANT_HELP_BODIES", ())}
+        self.assertIn("shop", bodies)
+        spec = bodies["shop"]
         self.assertEqual("shop", spec.key)
         self.assertEqual((4, 2, 5), (spec.mode, spec.category_index, spec.topic_index))
         self.assertEqual(0x5CBAC4, spec.descriptor_offset)
@@ -312,9 +312,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_relocates_about_shop_help_body_without_mutating_pristine_rows_or_metadata(self) -> None:
         import tools.hant_ui as hant_ui
 
-        bodies = getattr(hant_ui, "HANT_HELP_BODIES", ())
-        self.assertEqual(1, len(bodies), "expected one newly promoted H.A.N.T. Help body owner")
-        spec = bodies[0]
+        bodies = {body.key: body for body in getattr(hant_ui, "HANT_HELP_BODIES", ())}
+        self.assertIn("shop", bodies)
+        spec = bodies["shop"]
         result, info = patch_hant_tutorial(RAW)
 
         target_table_va = struct.unpack_from("<I", result, spec.descriptor_offset)[0]
@@ -356,6 +356,104 @@ class HantTutorialTests(unittest.TestCase):
         tampered[spec.source_table_offset + 2 * 4] ^= 1
         with self.assertRaisesRegex(ValueError, "H.A.N.T help-body.*table"):
             patch_hant_tutorial(bytes(tampered))
+
+    def test_runtime_reported_help_bodies_are_promoted_as_separate_owners(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        bodies = {spec.key: spec for spec in getattr(hant_ui, "HANT_HELP_BODIES", ())}
+        self.assertEqual(
+            {"adv_controls", "exploration_controls", "moving_in_ruins", "shop"},
+            set(bodies),
+        )
+        expected = {
+            "adv_controls": ((4, 0, 0), 0x5C4390, 0x5C2E30, 0x5C4340, 0x5C2C70, 8),
+            "exploration_controls": ((4, 1, 0), 0x5C8A50, 0x5C4650, 0x5C8A00, 0x5C43E0, 14),
+            "moving_in_ruins": ((4, 1, 1), 0x5C8A54, 0x5C4B20, 0x5C8A04, 0x5C46A0, 34),
+            "shop": ((4, 2, 5), 0x5CBAC4, 0x5C9B80, 0x5CBA74, 0x698968, 0),
+        }
+        for key, (indices, descriptor, table, metadata_descriptor, metadata, metadata_count) in expected.items():
+            with self.subTest(key=key):
+                spec = bodies[key]
+                self.assertEqual(indices, (spec.mode, spec.category_index, spec.topic_index))
+                self.assertEqual(descriptor, spec.descriptor_offset)
+                self.assertEqual(table, spec.source_table_offset)
+                self.assertEqual(metadata_descriptor, spec.metadata_descriptor_offset)
+                self.assertEqual(metadata, spec.metadata_offset)
+                self.assertEqual(metadata_count, len(spec.metadata_records))
+                self.assertEqual("semantic", spec.provenance)
+                self.assertTrue(all(measured_hant_cells(row) <= HANT_LAYOUT_PROFILE.max_cells for row in spec.english_rows))
+
+    def test_runtime_reported_help_body_patch_preserves_pristine_metadata(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        result, info = patch_hant_tutorial(RAW)
+        for spec in hant_ui.HANT_HELP_BODIES:
+            with self.subTest(key=spec.key):
+                metadata_size = (len(spec.metadata_records) + 1) * 8
+                self.assertEqual(
+                    RAW[spec.metadata_offset:spec.metadata_offset + metadata_size],
+                    result[spec.metadata_offset:spec.metadata_offset + metadata_size],
+                )
+                self.assertEqual(
+                    RAW[spec.metadata_descriptor_offset:spec.metadata_descriptor_offset + 4],
+                    result[spec.metadata_descriptor_offset:spec.metadata_descriptor_offset + 4],
+                )
+                target_table_va = struct.unpack_from("<I", result, spec.descriptor_offset)[0]
+                self.assertGreaterEqual(target_table_va, info.segment_vaddr)
+                self.assertLess(target_table_va, info.segment_vaddr + info.payload_size)
+
+    def test_runtime_reported_hant_content_owner_manifest(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        values = getattr(hant_ui, "HANT_CONTENT_LABELS", ())
+        by_key = {spec.key: spec for spec in values}
+        self.assertEqual({"config_stereo", "config_mono", "config_japanese", "config_english", "mail_empty", "enemy_small", "enemy_large", "enemy_human"}, set(by_key))
+        expected = {
+            "config_stereo": (0x586F48, (0x6958C8,), "ステレオ", "Stereo"),
+            "config_mono": (0x586F58, (0x6958CC,), "モノラル", "Mono"),
+            "config_japanese": (0x6958D0, (0x6958E0,), "日本語", "Japanese"),
+            "config_english": (0x6958D8, (0x6958E4,), "英語", "English"),
+            "mail_empty": (0x589960, (0x695BD8,), "受信メールがありません。", "No mail received."),
+            "enemy_small": (0x695BE8, (0x5899F8,), "小型", "Small"),
+            "enemy_large": (0x695BF0, (0x5899FC,), "大型", "Large"),
+            "enemy_human": (0x695BF8, (0x589A00,), "人物", "Human"),
+        }
+        for key, row in expected.items():
+            with self.subTest(key=key):
+                spec = by_key[key]
+                self.assertEqual(row, (spec.source_offset, spec.pointer_offsets, spec.source_text, spec.english))
+                self.assertEqual("semantic", spec.provenance)
+
+    def test_dictionary_tabs_and_real_terms_have_semantic_english_owners(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        tabs = getattr(hant_ui, "HANT_DICTIONARY_TABS", ())
+        self.assertEqual(10, len(tabs))
+        self.assertEqual(tuple("AKSTNHMYRW"), tuple(spec.english for spec in tabs))
+        self.assertEqual(tuple(range(0x5878C0, 0x5878E8, 4)), tuple(spec.pointer_offsets[0] for spec in tabs))
+
+        terms = getattr(hant_ui, "HANT_DICTIONARY_TERMS", ())
+        self.assertEqual(208, len(terms))
+        self.assertEqual(208, len({spec.pointer_offsets[0] for spec in terms}))
+        self.assertTrue(all(spec.provenance == "semantic" for spec in terms))
+
+        ringtones = getattr(hant_ui, "HANT_RINGTONES", ())
+        self.assertEqual(20, len(ringtones))
+        self.assertEqual(20, len({spec.pointer_offsets[0] for spec in ringtones}))
+        self.assertTrue(all(len(spec.english) <= 14 for spec in ringtones))
+
+        by_source = {spec.source_offset: spec for spec in terms}
+        for source_offset, en in (
+            (0x587910, "King Akhenaten"),
+            (0x587958, "Anubis"),
+            (0x587978, "Amaterasu"),
+            (0x5884B8, "Heracleion"),
+            (0x588A90, "Rosetta Stone"),
+            (0x588B90, "Watatsumi"),
+        ):
+            self.assertIn(source_offset, by_source)
+            self.assertEqual(en, by_source[source_offset].english)
+            self.assertEqual("semantic", by_source[source_offset].provenance)
 
     def test_config_labels_are_owned_by_live_nine_entry_config_renderer(self) -> None:
         import tools.hant_ui as hant_ui
@@ -453,13 +551,17 @@ class HantTutorialTests(unittest.TestCase):
         result, _info = patch_hant_tutorial(RAW)
         from tools.hant_ui import HANT_HELP_TOPICS
 
-        promoted_help_sources = {spec.source_offset for spec in HANT_HELP_TOPICS}
+        import tools.hant_ui as hant_ui
+        promoted_sources = {spec.source_offset for spec in HANT_HELP_TOPICS}
+        promoted_sources.update(spec.source_offset for spec in hant_ui.HANT_DICTIONARY_TERMS)
+        promoted_sources.update(spec.source_offset for spec in hant_ui.HANT_RINGTONES)
+        promoted_sources.update(spec.source_offset for spec in hant_ui.HANT_CONTENT_LABELS)
         candidates = [
             entry for entry in inventory_hant_text(RAW, None)
             if entry.owner == "executable_hant_candidate"
-            and entry.source_offset not in promoted_help_sources
+            and entry.source_offset not in promoted_sources
         ]
-        self.assertGreaterEqual(len(candidates), 9)
+        self.assertGreaterEqual(len(candidates), 8)
 
         for entry in candidates:
             with self.subTest(key=entry.key):
