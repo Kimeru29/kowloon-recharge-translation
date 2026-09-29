@@ -35,9 +35,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(13349, info.payload_size)
+        self.assertEqual(14969, info.payload_size)
         self.assertEqual(
-            "1edd0a81f4bb8f68f018576c9c99169766414cb8e945cdc3db49b61325d61c82",
+            "70a90d748f67df1a61d8a6b8b118cddc799bce2ce9a5e7fbdb8e23fefb290516",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -383,37 +383,115 @@ class HantTutorialTests(unittest.TestCase):
                 self.assertEqual("semantic", spec.provenance)
                 self.assertTrue(all(measured_hant_cells(row) <= HANT_LAYOUT_PROFILE.max_cells for row in spec.english_rows))
 
-    def test_runtime_reported_help_body_patch_preserves_pristine_metadata(self) -> None:
+    def test_runtime_reported_help_body_metadata_moves_with_english_geometry(self) -> None:
         import tools.hant_ui as hant_ui
 
         result, info = patch_hant_tutorial(RAW)
+        expected_edges = {
+            "adv_controls": ((38, 0, 4, 5), (0, 4, 23, 156)),
+            "exploration_controls": ((38, 0, 4, 5), (38, 10, 10, 225)),
+            "moving_in_ruins": ((29, 0, 10, 89), (0, 6, 10, 622)),
+        }
         for spec in hant_ui.HANT_HELP_BODIES:
             with self.subTest(key=spec.key):
                 metadata_size = (len(spec.metadata_records) + 1) * 8
+                # Japanese metadata remains immutable provenance.
                 self.assertEqual(
                     RAW[spec.metadata_offset:spec.metadata_offset + metadata_size],
                     result[spec.metadata_offset:spec.metadata_offset + metadata_size],
                 )
-                self.assertEqual(
-                    RAW[spec.metadata_descriptor_offset:spec.metadata_descriptor_offset + 4],
-                    result[spec.metadata_descriptor_offset:spec.metadata_descriptor_offset + 4],
-                )
                 target_table_va = struct.unpack_from("<I", result, spec.descriptor_offset)[0]
                 self.assertGreaterEqual(target_table_va, info.segment_vaddr)
                 self.assertLess(target_table_va, info.segment_vaddr + info.payload_size)
+
+                metadata_va = struct.unpack_from("<I", result, spec.metadata_descriptor_offset)[0]
+                if not spec.metadata_records:
+                    self.assertEqual(struct.unpack_from("<I", RAW, spec.metadata_descriptor_offset)[0], metadata_va)
+                    continue
+                self.assertGreaterEqual(metadata_va, info.segment_vaddr)
+                self.assertLess(metadata_va, info.segment_vaddr + info.payload_size)
+                metadata_file = _segment_file_offset(info, metadata_va)
+                records = tuple(
+                    struct.unpack_from("<hhhh", result, metadata_file + index * 8)
+                    for index in range(len(spec.metadata_records) + 1)
+                )
+                self.assertEqual((-1, -1, -1, -1), records[-1])
+                self.assertEqual(expected_edges[spec.key][0], records[0])
+                self.assertEqual(expected_edges[spec.key][1], records[-2])
+
+    def test_r14_runtime_layout_defects_use_english_font_and_spacing_owners(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        result, _info = patch_hant_tutorial(RAW)
+        # Config labels and selected values use the same existing 12px style 1 as
+        # the runtime-good English H.A.N.T tutorial instead of Japanese style 0.
+        for offset in (0x18BC84, 0x18BF14):
+            self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, offset)[0])
+            self.assertEqual(0x24050001, struct.unpack_from("<I", result, offset)[0])
+        # Dictionary term rows and top index tabs likewise switch to style 1.
+        for offset in (0x18E2CC, 0x18E408):
+            self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, offset)[0])
+            self.assertEqual(0x24050001, struct.unpack_from("<I", result, offset)[0])
+        # Selected Dictionary definition pages instantiate their line objects through
+        # a separate renderer and must also use style 1 for the translated rows.
+        for offset in (0x190968, 0x190A40):
+            self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, offset)[0])
+            self.assertEqual(0x24050001, struct.unpack_from("<I", result, offset)[0])
+        # Enemy category labels are 80px apart after the renderer's +21px bias
+        # and use style 1, preventing Small/Large/Human from colliding.
+        self.assertEqual((0x2402010F, 0x24020137, 0x2402015F), tuple(struct.unpack_from("<I", RAW, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
+        self.assertEqual((0x240200D1, 0x24020121, 0x24020171), tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
+        self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x195D5C)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x195D5C)[0])
+
+        by_key = {spec.key: spec for spec in hant_ui.HANT_CONTENT_LABELS}
+        self.assertEqual("   No mail received.", by_key["mail_empty"].english)
+        self.assertEqual("No data.", by_key["dictionary_empty"].english)
+        self.assertEqual("No data.", by_key["enemy_empty"].english)
+        self.assertEqual("Mail (New)", hant_ui.HANT_MAIL_COUNT_LABEL.english)
+
+    def test_observed_dictionary_definition_pages_are_promoted_fail_closed(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        definitions = {spec.key: spec for spec in getattr(hant_ui, "HANT_DICTIONARY_DEFINITIONS", ())}
+        self.assertEqual({"king_akhenaten", "heracleion"}, set(definitions))
+        expected = {
+            "king_akhenaten": (0x5AB380, 0x5A43B0, 15),
+            "heracleion": (0x5B9780, 0x5B87A0, 9),
+        }
+        result, info = patch_hant_tutorial(RAW)
+        for key, (descriptor, source_table, rows) in expected.items():
+            with self.subTest(key=key):
+                spec = definitions[key]
+                self.assertEqual((descriptor, source_table, rows), (spec.descriptor_offset, spec.source_table_offset, len(spec.english_rows)))
+                self.assertTrue(all(measured_hant_cells(row) <= HANT_LAYOUT_PROFILE.max_cells for row in spec.english_rows))
+                source_size = (rows + 1) * 4
+                self.assertEqual(RAW[source_table:source_table + source_size], result[source_table:source_table + source_size])
+                table_va = struct.unpack_from("<I", result, descriptor)[0]
+                self.assertGreaterEqual(table_va, info.segment_vaddr)
+                self.assertLess(table_va, info.segment_vaddr + info.payload_size)
+                table_file = _segment_file_offset(info, table_va)
+                self.assertEqual(0x00795FBC, struct.unpack_from("<I", result, table_file + rows * 4)[0])
+
+        tampered = bytearray(RAW)
+        tampered[definitions["king_akhenaten"].descriptor_offset] ^= 1
+        with self.assertRaisesRegex(ValueError, "Dictionary definition.*descriptor"):
+            patch_hant_tutorial(bytes(tampered))
 
     def test_runtime_reported_hant_content_owner_manifest(self) -> None:
         import tools.hant_ui as hant_ui
 
         values = getattr(hant_ui, "HANT_CONTENT_LABELS", ())
         by_key = {spec.key: spec for spec in values}
-        self.assertEqual({"config_stereo", "config_mono", "config_japanese", "config_english", "mail_empty", "enemy_small", "enemy_large", "enemy_human"}, set(by_key))
+        self.assertEqual({"config_stereo", "config_mono", "config_japanese", "config_english", "mail_empty", "dictionary_empty", "enemy_empty", "enemy_small", "enemy_large", "enemy_human"}, set(by_key))
         expected = {
             "config_stereo": (0x586F48, (0x6958C8,), "ステレオ", "Stereo"),
             "config_mono": (0x586F58, (0x6958CC,), "モノラル", "Mono"),
             "config_japanese": (0x6958D0, (0x6958E0,), "日本語", "Japanese"),
             "config_english": (0x6958D8, (0x6958E4,), "英語", "English"),
-            "mail_empty": (0x589960, (0x695BD8,), "受信メールがありません。", "No mail received."),
+            "mail_empty": (0x589960, (0x695BD8,), "受信メールがありません。", "   No mail received."),
+            "dictionary_empty": (0x5878F0, (0x695968,), "データがありません。", "No data."),
+            "enemy_empty": (0x587260, (0x695900,), "データがありません。", "No data."),
             "enemy_small": (0x695BE8, (0x5899F8,), "小型", "Small"),
             "enemy_large": (0x695BF0, (0x5899FC,), "大型", "Large"),
             "enemy_human": (0x695BF8, (0x589A00,), "人物", "Human"),

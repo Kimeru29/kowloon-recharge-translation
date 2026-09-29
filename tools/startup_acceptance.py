@@ -11,9 +11,12 @@ from tools.hant_ui import (
     HANT_CHROME_LABELS,
     HANT_CONFIG_LABELS,
     HANT_CONTENT_LABELS,
+    HANT_DICTIONARY_DEFINITIONS,
     HANT_DICTIONARY_TABS,
     HANT_DICTIONARY_TERMS,
     HANT_HELP_BODIES,
+    HANT_MAIL_COUNT_LABEL,
+    HANT_RUNTIME_LAYOUT_PATCHES,
     HANT_RINGTONES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
@@ -692,24 +695,138 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             hant_help_bodies_ok = False
             break
 
-        expected_metadata_va = _ELF_MAIN_VADDR + spec.metadata_offset - _ELF_MAIN_FILE_OFFSET
-        metadata_size = (len(spec.metadata_records) + 1) * 8
-        expected_metadata = (*spec.metadata_records, (-1, -1, -1, -1))
-        actual_metadata = (
-            tuple(
+    def expected_english_help_metadata(spec) -> tuple[tuple[int, int, int, int], ...]:
+        records: list[tuple[int, int, int, int]] = []
+        for kind, variant, field_x, field_y in spec.metadata_records:
+            source_x = 73 + field_x
+            source_y = 119 + field_y
+            source_column = round((source_x - 85) / 16)
+            source_row = round((source_y - 131) / 21)
+            delta_x = source_x - (85 + source_column * 16)
+            delta_y = source_y - (131 + source_row * 21)
+            target_x = 85 + source_column * HANT_LAYOUT_PROFILE.glyph_advance + delta_x
+            target_y = 131 + source_row * HANT_LAYOUT_PROFILE.line_spacing + delta_y
+            records.append((kind, variant, int(round(target_x - 73)), int(round(target_y - 119))))
+        records.append((-1, -1, -1, -1))
+        return tuple(records)
+
+    hant_help_body_metadata_ok = segment is not None
+    if segment is not None:
+        p_offset, p_vaddr, p_filesz, _p_memsz = segment
+        for spec in HANT_HELP_BODIES:
+            source_metadata = (*spec.metadata_records, (-1, -1, -1, -1))
+            metadata_size = len(source_metadata) * 8
+            if spec.metadata_offset + metadata_size > len(raw):
+                hant_help_body_metadata_ok = False
+                break
+            if tuple(
                 struct.unpack_from("<hhhh", raw, spec.metadata_offset + index * 8)
+                for index in range(len(source_metadata))
+            ) != source_metadata:
+                hant_help_body_metadata_ok = False
+                break
+            if spec.metadata_descriptor_offset + 4 > len(raw):
+                hant_help_body_metadata_ok = False
+                break
+            metadata_va = struct.unpack_from("<I", raw, spec.metadata_descriptor_offset)[0]
+            if not spec.metadata_records:
+                expected_source_va = _ELF_MAIN_VADDR + spec.metadata_offset - _ELF_MAIN_FILE_OFFSET
+                if metadata_va != expected_source_va:
+                    hant_help_body_metadata_ok = False
+                    break
+                continue
+            relative = metadata_va - p_vaddr
+            expected_metadata = expected_english_help_metadata(spec)
+            expected_size = len(expected_metadata) * 8
+            if metadata_va & 3 or relative < 0 or relative + expected_size > p_filesz:
+                hant_help_body_metadata_ok = False
+                break
+            target_file = p_offset + relative
+            actual_metadata = tuple(
+                struct.unpack_from("<hhhh", raw, target_file + index * 8)
                 for index in range(len(expected_metadata))
             )
-            if spec.metadata_offset + metadata_size <= len(raw)
-            else ()
-        )
-        if (
-            spec.metadata_descriptor_offset + 4 > len(raw)
-            or struct.unpack_from("<I", raw, spec.metadata_descriptor_offset)[0] != expected_metadata_va
-            or actual_metadata != expected_metadata
-        ):
-            hant_help_bodies_ok = False
-            break
+            if actual_metadata != expected_metadata:
+                hant_help_body_metadata_ok = False
+                break
+
+    hant_runtime_layout_ok = all(
+        offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
+        for offset, _expected, replacement in HANT_RUNTIME_LAYOUT_PATCHES
+    )
+
+    hant_mail_chrome_ok = segment is not None
+    if segment is not None:
+        source = HANT_MAIL_COUNT_LABEL.source_text.encode("cp932") + b"\x00"
+        if raw[HANT_MAIL_COUNT_LABEL.source_offset:HANT_MAIL_COUNT_LABEL.source_offset + len(source)] != source:
+            hant_mail_chrome_ok = False
+        elif HANT_MAIL_COUNT_LABEL.addiu_offset + 4 > len(raw):
+            hant_mail_chrome_ok = False
+        else:
+            lui_word = struct.unpack_from("<I", raw, HANT_MAIL_COUNT_LABEL.lui_offset)[0]
+            addiu_word = struct.unpack_from("<I", raw, HANT_MAIL_COUNT_LABEL.addiu_offset)[0]
+            if lui_word & 0xFFFF0000 != 0x3C050000 or addiu_word & 0xFFFF0000 != 0x24A50000:
+                hant_mail_chrome_ok = False
+            else:
+                hi = lui_word & 0xFFFF
+                lo = addiu_word & 0xFFFF
+                signed_lo = lo if lo < 0x8000 else lo - 0x10000
+                target_va = ((hi << 16) + signed_lo) & 0xFFFFFFFF
+                p_offset, p_vaddr, p_filesz, _p_memsz = segment
+                relative = target_va - p_vaddr
+                expected = encode_ps2_english(HANT_MAIL_COUNT_LABEL.english, collapse_spaces=False) + b"\x00"
+                if relative < 0 or relative + len(expected) > p_filesz:
+                    hant_mail_chrome_ok = False
+                elif raw[p_offset + relative:p_offset + relative + len(expected)] != expected:
+                    hant_mail_chrome_ok = False
+
+    hant_dictionary_definitions_ok = segment is not None
+    if segment is not None:
+        p_offset, p_vaddr, p_filesz, _p_memsz = segment
+        for spec in HANT_DICTIONARY_DEFINITIONS:
+            source_by_index = {index: offset for index, offset, _text in spec.source_rows}
+            expected_source_table = tuple(
+                _ELF_MAIN_VADDR + source_by_index[index] - _ELF_MAIN_FILE_OFFSET
+                if index in source_by_index else _HANT_BLANK_VA
+                for index in range(len(spec.english_rows))
+            ) + (_HANT_EOF_VA,)
+            if spec.source_table_offset + len(expected_source_table) * 4 > len(raw):
+                hant_dictionary_definitions_ok = False
+                break
+            if struct.unpack_from(f"<{len(expected_source_table)}I", raw, spec.source_table_offset) != expected_source_table:
+                hant_dictionary_definitions_ok = False
+                break
+            if any(
+                raw[source_offset:source_offset + len(source_text.encode("cp932")) + 1]
+                != source_text.encode("cp932") + b"\x00"
+                for _row, source_offset, source_text in spec.source_rows
+            ):
+                hant_dictionary_definitions_ok = False
+                break
+            if spec.descriptor_offset + 4 > len(raw):
+                hant_dictionary_definitions_ok = False
+                break
+            table_va = struct.unpack_from("<I", raw, spec.descriptor_offset)[0]
+            relative = table_va - p_vaddr
+            table_size = (len(spec.english_rows) + 1) * 4
+            if table_va & 3 or relative < 0 or relative + table_size > p_filesz:
+                hant_dictionary_definitions_ok = False
+                break
+            table_file = p_offset + relative
+            for row_index, english in enumerate(spec.english_rows):
+                row_va = struct.unpack_from("<I", raw, table_file + row_index * 4)[0]
+                if not english:
+                    if row_va != _HANT_BLANK_VA:
+                        hant_dictionary_definitions_ok = False
+                        break
+                elif measured_hant_cells(english) > HANT_LAYOUT_PROFILE.max_cells or not _read_wide_at_va(raw, row_va, english):
+                    hant_dictionary_definitions_ok = False
+                    break
+            if not hant_dictionary_definitions_ok:
+                break
+            if struct.unpack_from("<I", raw, table_file + len(spec.english_rows) * 4)[0] != _HANT_EOF_VA:
+                hant_dictionary_definitions_ok = False
+                break
 
     def verify_relocated_hant_content(specs, *, hashed: bool) -> bool:
         if segment is None:
@@ -834,7 +951,11 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "one or more selected H.A.N.T Help bodies do not resolve through the proven mode/category/topic body owner",
         )
     )
-    checks.append(_check("hant_content_values", hant_content_values_ok, "Mail/Config/Enemy H.A.N.T content values are stale or unresolved"))
+    checks.append(_check("hant_help_body_metadata", hant_help_body_metadata_ok, "one or more selected Help-body icon records do not follow the English 12px/16px geometry"))
+    checks.append(_check("hant_runtime_layout", hant_runtime_layout_ok, "Config/Dictionary/Enemy H.A.N.T renderer geometry is stale"))
+    checks.append(_check("hant_mail_chrome", hant_mail_chrome_ok, "Mail count/status chrome does not resolve to its translated direct-code owner"))
+    checks.append(_check("hant_dictionary_definitions", hant_dictionary_definitions_ok, "one or more observed Dictionary definition pages are stale or unresolved"))
+    checks.append(_check("hant_content_values", hant_content_values_ok, "Mail/Config/Dictionary/Enemy H.A.N.T content values are stale or unresolved"))
     checks.append(_check("hant_ringtones", hant_ringtones_ok, "one or more H.A.N.T ringtone titles are stale or unresolved"))
     checks.append(_check("hant_dictionary_tabs", hant_dictionary_tabs_ok, "one or more H.A.N.T Dictionary tabs are stale or unresolved"))
     checks.append(_check("hant_dictionary_terms", hant_dictionary_terms_ok, "one or more H.A.N.T Dictionary terms are stale or unresolved"))

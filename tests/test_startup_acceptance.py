@@ -14,9 +14,11 @@ from tools.hant_ui import (
     HANT_CHROME_LABELS,
     HANT_CONFIG_LABELS,
     HANT_CONTENT_LABELS,
+    HANT_DICTIONARY_DEFINITIONS,
     HANT_DICTIONARY_TABS,
     HANT_DICTIONARY_TERMS,
     HANT_HELP_BODIES,
+    HANT_MAIL_COUNT_LABEL,
     HANT_RINGTONES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_TUTORIAL_FONT_STYLE_OFFSET,
@@ -47,6 +49,10 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_chrome_labels", names)
         self.assertIn("hant_help_topics", names)
         self.assertIn("hant_help_bodies", names)
+        self.assertIn("hant_help_body_metadata", names)
+        self.assertIn("hant_runtime_layout", names)
+        self.assertIn("hant_mail_chrome", names)
+        self.assertIn("hant_dictionary_definitions", names)
         self.assertIn("hant_content_values", names)
         self.assertIn("hant_ringtones", names)
         self.assertIn("hant_dictionary_tabs", names)
@@ -80,6 +86,10 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("hant_tutorial_font_style", failed_names)
         self.assertIn("hant_chrome_labels", failed_names)
         self.assertIn("hant_config_labels", failed_names)
+        self.assertIn("hant_help_body_metadata", failed_names)
+        self.assertIn("hant_runtime_layout", failed_names)
+        self.assertIn("hant_mail_chrome", failed_names)
+        self.assertIn("hant_dictionary_definitions", failed_names)
         self.assertIn("hant_content_values", failed_names)
         self.assertIn("hant_ringtones", failed_names)
         self.assertIn("hant_dictionary_tabs", failed_names)
@@ -127,6 +137,14 @@ class StartupAcceptanceTests(unittest.TestCase):
             ("hant_help_topics", HANT_ALL_HELP_TOPICS[0].pointer_offset),
             ("hant_help_topics", HANT_ALL_HELP_TOPICS[-1].pointer_offset),
             ("hant_help_bodies", HANT_HELP_BODIES[0].descriptor_offset),
+            ("hant_help_body_metadata", HANT_HELP_BODIES[0].metadata_descriptor_offset),
+            ("hant_runtime_layout", 0x18BC84),
+            ("hant_runtime_layout", 0x18E408),
+            ("hant_runtime_layout", 0x190968),
+            ("hant_runtime_layout", 0x195CB4),
+            ("hant_runtime_layout", 0x195D5C),
+            ("hant_mail_chrome", HANT_MAIL_COUNT_LABEL.lui_offset),
+            ("hant_dictionary_definitions", HANT_DICTIONARY_DEFINITIONS[0].descriptor_offset),
             ("hant_content_values", HANT_CONTENT_LABELS[0].pointer_offsets[0]),
             ("hant_ringtones", HANT_RINGTONES[0].pointer_offsets[0]),
             ("hant_dictionary_tabs", HANT_DICTIONARY_TABS[0].pointer_offsets[0]),

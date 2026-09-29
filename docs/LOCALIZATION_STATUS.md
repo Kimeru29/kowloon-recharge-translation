@@ -38,11 +38,12 @@ Status meanings:
 | H.A.N.T. top-level six tiles (`GP020_03`) | **Working / runtime-proven** | r5 runtime confirms `MAIL`, `DICTIONARY`, `ENEMY`, `MEMO`, `HELP`, and `CONFIG` look good. Preserve the semantic baked-art repaint and do not route these captions back through executable text. |
 | H.A.N.T. executable chrome labels | **Working / runtime-proven** | r9 runtime accepts the H.A.N.T. menus/submenus as presented. Preserve the seven-entry translated chrome owner table. |
 | H.A.N.T. Help category/topic labels + navigation | **Working / runtime-proven** | v11-r11 manual runtime confirms the Help category/topic menu presentation is substantially English and navigation works. Preserve all **55 topic labels** and the three-tab owner including `Ruins`. This status applies to labels/navigation only, not selected topic body text. |
-| H.A.N.T. selected Help topic bodies | **Not runtime-tested** | r12 runtime confirms `H.A.N.T Functions` is English but `ADV Controls`, `Exploration Controls`, and `Moving in Ruins` still render Japanese. r13 promotes those three exact body owners while preserving their original icon/controller metadata and also keeps r12's `About the Shop` body. Runtime proof of the new bodies is pending. |
-| H.A.N.T. Config labels / values | **Not runtime-tested** | r12 confirms the nine Config labels are English but selected values remain mixed: `Stereo`, language, and ringtone values can still be Japanese. r13 relocates the proven `Stereo/Mono`, `Japanese/English`, and all 20 live ringtone-title aliases to semantic English; runtime proof is pending. |
-| H.A.N.T. Mail empty state | **Not runtime-tested** | r12 runtime shows `受信メールがありません。` in the empty inbox. r13 redirects its sole proven pointer alias to `No mail received.`; other actual mail messages/subjects remain a separate content class. |
-| H.A.N.T. Enemy category tabs | **Not runtime-tested** | r12 runtime shows the L1/R1 category names in Japanese. r13 translates the proven three-entry live table to `Small`, `Large`, and `Human`. |
-| H.A.N.T. Dictionary tabs + term lists | **Not runtime-tested** | r12 runtime shows the kana tabs and nearly all selectable terms in Japanese. r13 translates the 10 live tab aliases to `A/K/S/T/N/H/M/Y/R/W` and all **208 real selectable term pointers** to semantic English/romanized names while leaving placeholder slots pristine. Definition pages opened after selecting a term are tracked separately and are not claimed translated. |
+| H.A.N.T. selected Help topic bodies | **r13 runtime-proven text; r14 layout pending** | r13 proves the promoted bodies render English, but the controller/icon metadata still follows Japanese geometry and can overlap the translated rows. r14 relocates each proven metadata leaf into the measured 12px/16px English geometry while preserving icon identity and sentinels. |
+| H.A.N.T. Config labels / values | **r13 runtime-proven text; r14 presentation pending** | r13 proves the labels/values/ringtones are English but still use Japanese style 0 at live constructors. r14 switches the proven Config constructors to existing 12px style 1. |
+| H.A.N.T. Mail empty state | **r13 runtime-proven text; r14 positioning pending** | r13 proves the empty state is English but visually off-center. r14 accounts for its fixed fifth-row X owner, uses `   No mail received.`, and retargets the direct count/status materialization to `Mail (New)`. Non-empty mail remains separate. |
+| H.A.N.T. Enemy category tabs | **r13 runtime-proven text; r14 spacing pending** | r13 proves `Small / Large / Human` are live but the 40px Japanese cadence overlaps in English. r14 widens the three proven X owners and switches the category renderer to 12px style 1. |
+| H.A.N.T. Dictionary tabs + term lists | **r13 runtime-proven text; r14 presentation pending** | r13 proves the Latin tabs and 208 translated/romanized terms are live, but their list/tab constructors still use Japanese style 0. r14 switches the proven constructors to 12px style 1. Selected definition pages are tracked separately. |
+| H.A.N.T. Dictionary selected definitions | **r13 runtime-proven Japanese; r14 translation pending** | r13 proves selected terms open a separate detail-leaf class. r14 promotes only the observed `King Akhenaten` and `Heracleion` descriptors/tables and switches their line renderer to 12px style 1; the other 206 leaves remain unresolved. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
@@ -50,7 +51,7 @@ Status meanings:
 | Surface | Status | Evidence / next action |
 | --- | --- | --- |
 | `メディア` | **Still Japanese / unresolved** | No exact official dictionary mapping has been proven for this PS2-only label. |
-| Remaining H.A.N.T. content | **Still Japanese / unresolved** | r13 covers the runtime-observed Config values/ringtones, empty-Mail state, Enemy category tabs, Dictionary tabs and 208 selectable Dictionary terms. Unobserved/independent content remains fail-closed, including non-empty Mail subjects/bodies and the 208 Dictionary definition pages reached after choosing a term. |
+| Remaining H.A.N.T. content | **Still Japanese / unresolved** | r14 covers the runtime-observed Config values/ringtones, empty-Mail state/chrome, Enemy category tabs, Dictionary tabs/208 selectable terms, and the two observed definition leaves. Unobserved/independent content remains fail-closed, including non-empty Mail subjects/bodies and the other 206 Dictionary definition leaves. |
 | Re:charge-only memory-card clear-data messages | **Still Japanese / unresolved** | Eight pointer-table entries have no proven official remaster counterpart and remain untouched. |
 
 ## Corpus-level translation coverage
@@ -348,7 +349,7 @@ r12 adds a bounded inventory of all 55 selected Help-body leaves behind mode 4 a
 The r12 runtime pass preserves everything before H.A.N.T. exactly as accepted in r11 and confirms the main H.A.N.T. screen/navigation remain good. It also exposes the next independent content owners: `ADV Controls`, `Exploration Controls`, and `Moving in Ruins` bodies remain Japanese; Mail's empty state is Japanese; Config values are mixed; Enemy L1/R1 category names are Japanese; and Dictionary tabs/term lists are predominantly Japanese. Those observations define r13. `About the Shop` itself was not explicitly reported in this pass, so its runtime status remains unpromoted.
 
 
-### v11-r13 — current deterministic H.A.N.T. content candidate; runtime proof pending
+### v11-r13 — runtime-tested H.A.N.T. content expansion; superseded by r14
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r13.iso`
 - ISO SHA-256: `53bf85f051ff3f3c8714e41be134dbd5fa9fcd0fd4ba2e3bd58091bf2acc1648`
@@ -361,8 +362,28 @@ The r12 runtime pass preserves everything before H.A.N.T. exactly as accepted in
 - dependency-free suite: **212 tests OK** (10 expected skips)
 - Pillow-enabled suite: **212 tests OK** (1 owned-corpus skip)
 - deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r13-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
-- PCSX2 status: **not launched for r13**.
+- PCSX2 status: **manually runtime-tested by Pablo; text ownership proven, presentation defects recorded above**.
 
 r13 is scoped to the runtime-observed Japanese H.A.N.T. layers. It translates the selected bodies `(4,0,0)` ADV Controls, `(4,1,0)` Exploration Controls and `(4,1,1)` Moving in Ruins while keeping their pristine row counts and exact metadata/icon records. It additionally translates the empty-Mail message, four Config enum values, all 20 proven ringtone aliases, the three Enemy category tabs, all 10 Dictionary index tabs and all 208 real Dictionary term-list pointers. All Japanese source strings/tables remain byte-identical provenance; only proven aliases/descriptors redirect into the shared translation PT_LOAD. Wording is `semantic` because the owned extraction still lacks the localized `English.bytes` TextAsset.
 
-Manual r13 gate: everything before H.A.N.T. must remain exactly as accepted; H.A.N.T. main/chrome/navigation and `H.A.N.T Functions` must remain unchanged; ADV Controls, Exploration Controls and Moving in Ruins bodies should now be readable English with controller icons still aligned; empty Mail should say `No mail received.`; Config selected values/ringtones should be English and unclipped; Enemy L1/R1 tabs should read `Small / Large / Human`; and Dictionary should show Latin A/K/S/T/N/H/M/Y/R/W tabs plus English/romanized selectable terms. Definition pages after selecting a Dictionary term are not part of this r13 acceptance claim.
+r13 runtime result: the new English owners are live, but Help icon geometry, Config/Dictionary font style, Enemy tab spacing and Mail centering still need correction. Selecting `King Akhenaten` and `Heracleion` also exposes a separate Japanese Dictionary definition-page class. Those findings define r14.
+
+
+### v11-r14 — current deterministic H.A.N.T. runtime-layout candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r14.iso`
+- ISO SHA-256: `2d543df1367dea4b9b9b31d77cf246d959f2e5c0b23a8726e6b001be611ce795`
+- translated ELF SHA-256 before ROFS rewrite: `29be2791d014be9730d5d8107d8d3c4990132bf3fd6d25c227fc6a97b768c08a`
+- final post-ROFS ELF SHA-256: `36ac6bfa4e0b995bc94163e728eaa5787110d17f250777c52ccf602830676041`
+- translated/final ELF size: 8,416,234 bytes
+- overlays: 1,145 total; 892 in place / 253 relocated
+- executable ROFS records: 1,145 patched/re-resolved
+- final-image startup acceptance: **150/150** (`local/startup-acceptance-v11-r14.json`)
+- dependency-free suite: **214 tests OK** (10 expected skips)
+- Pillow-enabled suite: **214 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r14-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
+- PCSX2 status: **not launched automatically for r14; manual visual acceptance pending**.
+
+r14 preserves all pre-H.A.N.T. accepted surfaces and the r13 H.A.N.T. translations. It additionally relocates Help icon/controller metadata to the measured English grid, uses existing 12px style 1 for the proven Config/Dictionary/Enemy constructors (including selected Dictionary detail rows), widens Enemy category spacing, fixes Mail empty-state/chrome ownership, adds `No data.` for the observed empty Dictionary/Enemy states, and promotes only the observed `King Akhenaten` and `Heracleion` Dictionary definition leaves.
+
+Manual r14 gate: verify no regression before H.A.N.T.; translated Help bodies have aligned/non-overlapping controller icons; Config values/ringtones and Dictionary lists/tabs are readable at the smaller English font; Enemy shows `Small / Large / Human` without collision; empty Mail is visually centered/readable and shows English chrome; and selecting `King Akhenaten` and `Heracleion` opens English 12px definition pages. `H.A.N.T Functions` must remain unchanged.

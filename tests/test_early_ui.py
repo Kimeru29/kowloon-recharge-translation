@@ -29,9 +29,12 @@ from tools.hant_ui import (
     HANT_CHROME_LABELS,
     HANT_CONFIG_LABELS,
     HANT_CONTENT_LABELS,
+    HANT_DICTIONARY_DEFINITIONS,
     HANT_DICTIONARY_TABS,
     HANT_DICTIONARY_TERMS,
     HANT_HELP_BODIES,
+    HANT_MAIL_COUNT_LABEL,
+    HANT_RUNTIME_LAYOUT_PATCHES,
     HANT_RINGTONES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET,
@@ -117,6 +120,14 @@ class EarlyUiPatchTests(unittest.TestCase):
         allowed.update(range(HANT_TUTORIAL_DESCRIPTOR_OFFSET, HANT_TUTORIAL_DESCRIPTOR_OFFSET + 4))
         for spec in HANT_HELP_BODIES:
             allowed.update(range(spec.descriptor_offset, spec.descriptor_offset + 4))
+            if spec.metadata_records:
+                allowed.update(range(spec.metadata_descriptor_offset, spec.metadata_descriptor_offset + 4))
+        for spec in HANT_DICTIONARY_DEFINITIONS:
+            allowed.update(range(spec.descriptor_offset, spec.descriptor_offset + 4))
+        for off, _expected, _replacement in HANT_RUNTIME_LAYOUT_PATCHES:
+            allowed.update(range(off, off + 4))
+        allowed.update(range(HANT_MAIL_COUNT_LABEL.lui_offset, HANT_MAIL_COUNT_LABEL.lui_offset + 4))
+        allowed.update(range(HANT_MAIL_COUNT_LABEL.addiu_offset, HANT_MAIL_COUNT_LABEL.addiu_offset + 4))
         allowed.update(
             range(HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET, HANT_CONTROLLER_METADATA_DESCRIPTOR_OFFSET + 4)
         )
@@ -225,7 +236,7 @@ class EarlyUiPatchTests(unittest.TestCase):
         segment_va = segment[2]
         segment_size = segment[4]
         by_key = {spec.key: spec for spec in MENU_LABELS}
-        self.assertEqual(13382, segment_size)
+        self.assertEqual(15002, segment_size)
 
         for key, expected in (("return_above_ground", b"Return above ground\x00"), ("report_card", b"Report card\x00")):
             spec = by_key[key]
@@ -238,7 +249,7 @@ class EarlyUiPatchTests(unittest.TestCase):
             target_va = targets.pop()
             self.assertGreaterEqual(target_va, segment_va)
             self.assertLess(target_va, segment_va + segment_size)
-            expected_offset = {"return_above_ground": 0x3426, "report_card": 0x343A}[key]
+            expected_offset = {"return_above_ground": 0x3A7A, "report_card": 0x3A8E}[key]
             self.assertEqual(segment_va + expected_offset, target_va)
             target_file = segment_file + target_va - segment_va
             self.assertEqual(expected, result[target_file:target_file + len(expected)])

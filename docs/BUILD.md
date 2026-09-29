@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v11-r13 result: 212 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11-r14 result: 214 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -806,3 +806,41 @@ Measured r13 result:
 r13 translates the three runtime-observed Japanese Help bodies while keeping all source metadata/icon records intact, plus Mail empty state, Config values/ringtones, Enemy category tabs, Dictionary index tabs and 208 selectable Dictionary terms. The wording is semantic because `English.bytes` remains unavailable. Dictionary definition pages are intentionally outside this build's acceptance claim.
 
 Do not launch PCSX2 automatically. The exact r13 visual gate is documented in `docs/LOCALIZATION_STATUS.md` and `docs/HANDOFF.md`.
+
+
+## Build startup v11-r14 candidate
+
+r14 is the runtime-layout and selected-Dictionary-definition follow-up to r13. Build only from the pristine PS2 ISO.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r14.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r14.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r14.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r14.json
+```
+
+Measured r14 result:
+- ISO SHA-256: `2d543df1367dea4b9b9b31d77cf246d959f2e5c0b23a8726e6b001be611ce795`;
+- pre-ROFS ELF: `29be2791d014be9730d5d8107d8d3c4990132bf3fd6d25c227fc6a97b768c08a`;
+- post-ROFS ELF: `36ac6bfa4e0b995bc94163e728eaa5787110d17f250777c52ccf602830676041`;
+- final ELF size: 8,416,234 bytes;
+- 1,145 overlays; 892 in place / 253 relocated;
+- **150/150** final-image checks;
+- **214** dependency-free tests (10 expected skips);
+- **214** Pillow-enabled tests (1 owned-corpus skip);
+- repeat ISO `/private/tmp/kowloon-recharge-startup-en-v11-r14-repeat.iso` is byte-for-byte identical and has the same SHA-256.
+
+r14 preserves all accepted pre-H.A.N.T. behavior and r13 text ownership while correcting the runtime-observed H.A.N.T. presentation: translated Help icon metadata follows English geometry, Config/Dictionary/Enemy render with proven English style/spacing, Mail chrome/empty-state positioning is corrected, and the two observed Dictionary definition leaves are translated fail-closed.
+
+Do not launch PCSX2 automatically. The exact r14 visual gate is documented in `docs/LOCALIZATION_STATUS.md` and `docs/HANDOFF.md`.

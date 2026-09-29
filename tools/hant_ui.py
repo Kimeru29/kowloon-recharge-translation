@@ -127,6 +127,27 @@ class HantHashedText:
 
 
 @dataclass(frozen=True)
+class HantCodeText:
+    key: str
+    source_offset: int
+    source_text: str
+    english: str
+    lui_offset: int
+    addiu_offset: int
+    provenance: str = "semantic"
+
+
+@dataclass(frozen=True)
+class HantDictionaryDefinition:
+    key: str
+    descriptor_offset: int
+    source_table_offset: int
+    source_rows: tuple[tuple[int, int, str], ...]
+    english_rows: tuple[str, ...]
+    provenance: str = "semantic"
+
+
+@dataclass(frozen=True)
 class HantConfigLabel:
     key: str
     source_offset: int
@@ -198,7 +219,9 @@ HANT_CONTENT_LABELS: tuple[HantContentLabel, ...] = (
     HantContentLabel("config_mono", 0x586F58, (0x6958CC,), "モノラル", "Mono"),
     HantContentLabel("config_japanese", 0x6958D0, (0x6958E0,), "日本語", "Japanese"),
     HantContentLabel("config_english", 0x6958D8, (0x6958E4,), "英語", "English"),
-    HantContentLabel("mail_empty", 0x589960, (0x695BD8,), "受信メールがありません。", "No mail received."),
+    HantContentLabel("mail_empty", 0x589960, (0x695BD8,), "受信メールがありません。", "   No mail received."),
+    HantContentLabel("dictionary_empty", 0x5878F0, (0x695968,), "データがありません。", "No data."),
+    HantContentLabel("enemy_empty", 0x587260, (0x695900,), "データがありません。", "No data."),
     HantContentLabel("enemy_small", 0x695BE8, (0x5899F8,), "小型", "Small"),
     HantContentLabel("enemy_large", 0x695BF0, (0x5899FC,), "大型", "Large"),
     HantContentLabel("enemy_human", 0x695BF8, (0x589A00,), "人物", "Human"),
@@ -212,6 +235,113 @@ def _hashed_specs(data: tuple[tuple[str, int, int, str, str], ...]) -> tuple[Han
 HANT_RINGTONES: tuple[HantHashedText, ...] = _hashed_specs(HANT_RINGTONE_DATA)
 HANT_DICTIONARY_TABS: tuple[HantHashedText, ...] = _hashed_specs(HANT_DICTIONARY_TAB_DATA)
 HANT_DICTIONARY_TERMS: tuple[HantHashedText, ...] = _hashed_specs(HANT_DICTIONARY_TERM_DATA)
+
+# The empty-mail screen constructs the count/status suffix through a direct
+# LUI/ADDIU address materialization rather than a pointer table. Keep the
+# Japanese source immutable and retarget only those two proven instructions.
+HANT_MAIL_COUNT_LABEL = HantCodeText(
+    "mail_count",
+    0x5899A0,
+    "通（未読　　通）",
+    "Mail (New)",
+    0x1936C0,
+    0x1936C4,
+)
+
+# Runtime r13 proves selected Dictionary entries open a second, independent text
+# leaf. Promote only the two detail pages actually observed in the current save.
+HANT_DICTIONARY_DEFINITIONS: tuple[HantDictionaryDefinition, ...] = (
+    HantDictionaryDefinition(
+        "king_akhenaten",
+        0x5AB380,
+        0x5A43B0,
+        (
+            (0, 0x5A41A0, "●アクエンアテン王"),
+            (2, 0x5A41C0, "　エジプト新王国時代、第十八王朝の『ファ"),
+            (3, 0x5A41F0, "ラオ』で、エジプト史上もっとも謎に満ちた"),
+            (4, 0x5A4220, "王とされている。"),
+            (6, 0x5A4240, "　改名前はアメンヘテプ４世といい、「アメ"),
+            (7, 0x5A4270, "ン神は喜びたまう」の意であったが、大規模"),
+            (8, 0x5A42A0, "な宗教改革により『アテン神』への唯一崇拝"),
+            (9, 0x5A42D0, "を唱え始めてからアクエンアテン「アテン神"),
+            (10, 0x5A4300, "の役に立つもの」と名を改めたという。"),
+            (12, 0x5A4330, "　それまでの最高神であった『アメン神』を"),
+            (13, 0x5A4360, "始めとする幾多の神々を排斥した事から国内"),
+            (14, 0x5A4390, "は大いに乱れたといわれている。"),
+        ),
+        (
+            "King Akhenaten",
+            "",
+            "An 18th Dynasty pharaoh of",
+            "Egypt's New Kingdom, he is",
+            "an enigmatic Egyptian king.",
+            "",
+            "Born Amenhotep IV, his name",
+            'meant "Amun is satisfied."',
+            "After religious reforms, he",
+            "made Aten the sole god and",
+            "renamed himself Akhenaten.",
+            "",
+            "He rejected Amun and many",
+            "other gods, causing turmoil",
+            "throughout ancient Egypt.",
+        ),
+    ),
+    HantDictionaryDefinition(
+        "heracleion",
+        0x5B9780,
+        0x5B87A0,
+        (
+            (0, 0x5B86A0, "●ヘラクレイオン"),
+            (2, 0x5B86C0, "　ギリシャの歴史家ヘロドトスが記した伝説"),
+            (3, 0x6974E0, "都市。"),
+            (5, 0x5B86F0, "　プトレマイオス朝最後の女王クレオパトラ"),
+            (6, 0x5B8720, "七世の宮殿があったといわれ、エジプト北部"),
+            (7, 0x5B8750, "のアレクサンドリア沖に８世紀ごろに沈んだ"),
+            (8, 0x5B8780, "とされる幻の古代都市である。"),
+        ),
+        (
+            "Heracleion",
+            "",
+            "A legendary city described",
+            "by Greek historian Herodotus",
+            "",
+            "Cleopatra VII's palace stood",
+            "off Alexandria in northern",
+            "Egypt. The ancient city sank",
+            "around the 8th century.",
+        ),
+    ),
+)
+
+_HANT_CONFIG_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x18BC84, 0x0000282D, 0x24050001),
+    (0x18BF14, 0x0000282D, 0x24050001),
+)
+_HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x18E2CC, 0x0000282D, 0x24050001),
+    (0x18E408, 0x0000282D, 0x24050001),
+)
+_HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x190968, 0x0000282D, 0x24050001),
+    (0x190A40, 0x0000282D, 0x24050001),
+)
+_HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x195CB4, 0x2402010F, 0x240200D1),
+    (0x195CD0, 0x24020137, 0x24020121),
+    (0x195CEC, 0x2402015F, 0x24020171),
+    (0x195D5C, 0x0000282D, 0x24050001),
+)
+_HANT_MAIL_COUNT_CODE_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (HANT_MAIL_COUNT_LABEL.lui_offset, 0x3C050069),
+    (HANT_MAIL_COUNT_LABEL.addiu_offset, 0x24A59920),
+)
+HANT_RUNTIME_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    *_HANT_CONFIG_ENGLISH_STYLE_PATCHES,
+    *_HANT_DICTIONARY_ENGLISH_STYLE_PATCHES,
+    *_HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES,
+    *_HANT_ENEMY_LAYOUT_PATCHES,
+)
 
 _HANT_RINGTONE_RENDERER_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x18B674, 0x3C020068), (0x18B678, 0x24427160),
@@ -767,6 +897,41 @@ def _expected_help_body_table(spec: HantHelpBody) -> tuple[int, ...]:
     return tuple(values)
 
 
+def _expected_dictionary_definition_table(spec: HantDictionaryDefinition) -> tuple[int, ...]:
+    source_by_index = {index: offset for index, offset, _text in spec.source_rows}
+    values = [
+        _elf_va(source_by_index[index]) if index in source_by_index else _HANT_BLANK_VA
+        for index in range(len(spec.english_rows))
+    ]
+    values.append(_HANT_EOF_VA)
+    return tuple(values)
+
+
+def _relocated_help_body_metadata(spec: HantHelpBody) -> tuple[tuple[int, int, int, int], ...]:
+    if not spec.metadata_records:
+        return ((-1, -1, -1, -1),)
+
+    origin_x = 85.0
+    records: list[tuple[int, int, int, int]] = []
+    for kind, variant, field_x, field_y in spec.metadata_records:
+        source_icon_x = _HANT_METADATA_SCREEN_X_BASE + field_x
+        source_icon_y = _HANT_METADATA_SCREEN_Y_BASE + field_y
+        source_column = round((source_icon_x - origin_x) / _HANT_PRISTINE_GLYPH_ADVANCE)
+        source_row = round((source_icon_y - _HANT_TEXT_ORIGIN_Y) / _HANT_PRISTINE_LINE_SPACING)
+        delta_x = source_icon_x - (origin_x + source_column * _HANT_PRISTINE_GLYPH_ADVANCE)
+        delta_y = source_icon_y - (_HANT_TEXT_ORIGIN_Y + source_row * _HANT_PRISTINE_LINE_SPACING)
+        target_icon_x = origin_x + source_column * HANT_LAYOUT_PROFILE.glyph_advance + delta_x
+        target_icon_y = _HANT_TEXT_ORIGIN_Y + source_row * HANT_LAYOUT_PROFILE.line_spacing + delta_y
+        records.append((
+            kind,
+            variant,
+            int(round(target_icon_x - _HANT_METADATA_SCREEN_X_BASE)),
+            int(round(target_icon_y - _HANT_METADATA_SCREEN_Y_BASE)),
+        ))
+    records.append((-1, -1, -1, -1))
+    return tuple(records)
+
+
 def _read_metadata_records(raw: bytes, offset: int) -> tuple[tuple[int, int, int, int], ...]:
     size = len(HANT_PRISTINE_CONTROLLER_METADATA_RECORDS) * 8
     if offset + size > len(raw):
@@ -962,6 +1127,38 @@ def _validate_source(raw: bytes) -> None:
         if offset + 4 > len(raw) or struct.unpack_from("<I", raw, offset)[0] != expected:
             raise ValueError(f"H.A.N.T content renderer preimage mismatch at {offset:#x}")
 
+    for offset, expected, _replacement in HANT_RUNTIME_LAYOUT_PATCHES:
+        if offset + 4 > len(raw) or struct.unpack_from("<I", raw, offset)[0] != expected:
+            raise ValueError(f"H.A.N.T English layout preimage mismatch at {offset:#x}")
+
+    mail_source = HANT_MAIL_COUNT_LABEL.source_text.encode("cp932") + b"\x00"
+    if raw[HANT_MAIL_COUNT_LABEL.source_offset:HANT_MAIL_COUNT_LABEL.source_offset + len(mail_source)] != mail_source:
+        raise ValueError("H.A.N.T mail count source preimage mismatch")
+    for offset, expected in _HANT_MAIL_COUNT_CODE_PREIMAGES:
+        if offset + 4 > len(raw) or struct.unpack_from("<I", raw, offset)[0] != expected:
+            raise ValueError("H.A.N.T mail count code preimage mismatch")
+
+    for spec in HANT_DICTIONARY_DEFINITIONS:
+        if spec.descriptor_offset + 4 > len(raw):
+            raise ValueError(f"Dictionary definition descriptor is outside executable: {spec.key}")
+        expected_table_va = _elf_va(spec.source_table_offset)
+        actual_table_va = struct.unpack_from("<I", raw, spec.descriptor_offset)[0]
+        if actual_table_va != expected_table_va:
+            raise ValueError(f"Dictionary definition descriptor preimage mismatch: {spec.key}")
+        words = len(spec.english_rows) + 1
+        if spec.source_table_offset + words * 4 > len(raw):
+            raise ValueError(f"Dictionary definition table is outside executable: {spec.key}")
+        actual_table = struct.unpack_from(f"<{words}I", raw, spec.source_table_offset)
+        if actual_table != _expected_dictionary_definition_table(spec):
+            raise ValueError(f"Dictionary definition table preimage mismatch: {spec.key}")
+        for row_index, source_offset, source_text in spec.source_rows:
+            encoded = source_text.encode("cp932") + b"\x00"
+            if raw[source_offset:source_offset + len(encoded)] != encoded:
+                raise ValueError(f"Dictionary definition source preimage mismatch: {spec.key}/{row_index}")
+        for row_index, english in enumerate(spec.english_rows):
+            if measured_hant_cells(english) > HANT_LAYOUT_PROFILE.max_cells:
+                raise ValueError(f"Dictionary definition row exceeds visible width: {spec.key}/{row_index}")
+
     for spec in HANT_CONTENT_LABELS:
         encoded = spec.source_text.encode("cp932")
         if raw[spec.source_offset:spec.source_offset + len(encoded) + 1] != encoded + b"\x00":
@@ -1132,6 +1329,7 @@ def _base_relocated_entries(raw: bytes) -> tuple[RelocatedText, ...]:
         )
         for spec in (*HANT_RINGTONES, *HANT_DICTIONARY_TABS, *HANT_DICTIONARY_TERMS)
     )
+    entries.append(RelocatedText("hant_mail_count", _encoded_wide(HANT_MAIL_COUNT_LABEL.english), ()))
 
     for spec in HANT_HELP_BODIES:
         for row_index, english in enumerate(spec.english_rows):
@@ -1159,6 +1357,33 @@ def _base_relocated_entries(raw: bytes) -> tuple[RelocatedText, ...]:
                 pointer_offsets=(spec.descriptor_offset,),
             )
         )
+        if spec.metadata_records:
+            next_offset = (_packed_payload_size(entries) + 1) & ~1
+            if next_offset & 3:
+                entries.append(RelocatedText(f"hant_help_body_{spec.key}_metadata_alignment", b"\x00\x00", ()))
+            metadata = _relocated_help_body_metadata(spec)
+            entries.append(RelocatedText(
+                f"hant_help_body_{spec.key}_metadata",
+                b"".join(struct.pack("<hhhh", *record) for record in metadata),
+                (spec.metadata_descriptor_offset,),
+            ))
+
+    for spec in HANT_DICTIONARY_DEFINITIONS:
+        for row_index, english in enumerate(spec.english_rows):
+            if english:
+                entries.append(RelocatedText(
+                    f"hant_dictionary_definition_{spec.key}_row_{row_index}",
+                    _encoded_wide(english),
+                    (),
+                ))
+        next_offset = (_packed_payload_size(entries) + 1) & ~1
+        if next_offset & 3:
+            entries.append(RelocatedText(f"hant_dictionary_definition_{spec.key}_alignment", b"\x00\x00", ()))
+        entries.append(RelocatedText(
+            f"hant_dictionary_definition_{spec.key}_table",
+            b"\x00" * ((len(spec.english_rows) + 1) * 4),
+            (spec.descriptor_offset,),
+        ))
 
     entries.extend(relocated_memory_card_entries(raw))
     return tuple(entries)
@@ -1218,6 +1443,15 @@ def patch_hant_tutorial(
         HANT_TUTORIAL_FONT_STYLE_OFFSET,
         _HANT_TUTORIAL_FONT_STYLE_ENGLISH_WORD,
     )
+    for offset, _expected, replacement in HANT_RUNTIME_LAYOUT_PATCHES:
+        struct.pack_into("<I", result, offset, replacement)
+
+    mail_va = installed.target_vas["hant_mail_count"]
+    mail_hi = ((mail_va + 0x8000) >> 16) & 0xFFFF
+    mail_lo = mail_va & 0xFFFF
+    struct.pack_into("<I", result, HANT_MAIL_COUNT_LABEL.lui_offset, 0x3C050000 | mail_hi)
+    struct.pack_into("<I", result, HANT_MAIL_COUNT_LABEL.addiu_offset, 0x24A50000 | mail_lo)
+
     table_file = installed.info.file_offset + (table_va - installed.info.segment_vaddr)
     for index in range(len(HANT_WRAPPED_LINES)):
         struct.pack_into("<I", result, table_file + index * 4, installed.target_vas[f"hant_row_{index}"])
@@ -1241,5 +1475,19 @@ def patch_hant_tutorial(
             body_table_file + len(spec.english_rows) * 4,
             _HANT_EOF_VA,
         )
+
+    for spec in HANT_DICTIONARY_DEFINITIONS:
+        definition_table_va = installed.target_vas[f"hant_dictionary_definition_{spec.key}_table"]
+        if definition_table_va & 3:
+            raise ValueError(f"Dictionary definition translation table lost word alignment: {spec.key}")
+        definition_table_file = installed.info.file_offset + (definition_table_va - installed.info.segment_vaddr)
+        for row_index, english in enumerate(spec.english_rows):
+            target_va = (
+                installed.target_vas[f"hant_dictionary_definition_{spec.key}_row_{row_index}"]
+                if english
+                else _HANT_BLANK_VA
+            )
+            struct.pack_into("<I", result, definition_table_file + row_index * 4, target_va)
+        struct.pack_into("<I", result, definition_table_file + len(spec.english_rows) * 4, _HANT_EOF_VA)
 
     return bytes(result), installed.info
