@@ -322,10 +322,14 @@ _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x18E2CC, 0x0000282D, 0x24050001),
     (0x18E408, 0x0000282D, 0x24050001),
 )
-_HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
-    (0x190968, 0x0000282D, 0x24050001),
-    (0x190A40, 0x0000282D, 0x24050001),
-)
+# r14 runtime disproved the earlier Dictionary-detail style attribution here.
+# 0x190968 is already the separately owned mode-4 H.A.N.T body-row font style;
+# 0x190A40 is a different singleton constructor in the same mode-4 function and
+# must remain pristine. Dictionary-definition style ownership is therefore left
+# unresolved until independently traced.
+_HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = ()
+HANT_TUTORIAL_SINGLETON_STYLE_OFFSET = 0x190A40
+HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD = 0x0000282D
 _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x195CB4, 0x2402010F, 0x240200D1),
     (0x195CD0, 0x24020137, 0x24020121),
@@ -536,9 +540,9 @@ HANT_HELP_BODIES: tuple[HantHelpBody, ...] = (
             '      Explore / battle mode',
             '      Radar on / off',
             '',
-            'Night vision uses battery.',
-            'It drains while active.',
-            'At zero, it cannot be used.',
+            '  Night vision uses battery.',
+            '  It drains while active.',
+            '  At zero, it shuts off.',
             '',
         ),
         metadata_records=(
@@ -959,6 +963,15 @@ def _validate_source(raw: bytes) -> None:
         raise ValueError(
             "H.A.N.T renderer style preimage mismatch: "
             f"expected {_HANT_TUTORIAL_FONT_STYLE_PRISTINE_WORD:#010x}, got {actual_style:#010x}"
+        )
+
+    if HANT_TUTORIAL_SINGLETON_STYLE_OFFSET + 4 > len(raw):
+        raise ValueError("H.A.N.T singleton style preimage is outside executable")
+    singleton_style = struct.unpack_from("<I", raw, HANT_TUTORIAL_SINGLETON_STYLE_OFFSET)[0]
+    if singleton_style != HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD:
+        raise ValueError(
+            "H.A.N.T singleton style preimage mismatch: "
+            f"expected {HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD:#010x}, got {singleton_style:#010x}"
         )
 
     for spec in HANT_CHROME_LABELS:

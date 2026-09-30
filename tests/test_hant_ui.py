@@ -35,9 +35,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(14969, info.payload_size)
+        self.assertEqual(14973, info.payload_size)
         self.assertEqual(
-            "70a90d748f67df1a61d8a6b8b118cddc799bce2ce9a5e7fbdb8e23fefb290516",
+            "6841fe33cf7904a34a1a37de7241d9e4c364661b0baaf3f3ed8f54099f913698",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -432,11 +432,14 @@ class HantTutorialTests(unittest.TestCase):
         for offset in (0x18E2CC, 0x18E408):
             self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, offset)[0])
             self.assertEqual(0x24050001, struct.unpack_from("<I", result, offset)[0])
-        # Selected Dictionary definition pages instantiate their line objects through
-        # a separate renderer and must also use style 1 for the translated rows.
-        for offset in (0x190968, 0x190A40):
-            self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, offset)[0])
-            self.assertEqual(0x24050001, struct.unpack_from("<I", result, offset)[0])
+        # 0x190968 is the proven mode-4 H.A.N.T body-row font owner and remains
+        # style 1. r14 runtime disproves 0x190A40 as a Dictionary-detail style
+        # owner: changing that singleton constructor blanks H.A.N.T Functions and
+        # leaves the H.A.N.T state trapped, so it must remain pristine style 0.
+        self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x190968)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x190968)[0])
+        self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x190A40)[0])
+        self.assertEqual(0x0000282D, struct.unpack_from("<I", result, 0x190A40)[0])
         # Enemy category labels are 80px apart after the renderer's +21px bias
         # and use style 1, preventing Small/Large/Human from colliding.
         self.assertEqual((0x2402010F, 0x24020137, 0x2402015F), tuple(struct.unpack_from("<I", RAW, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
@@ -449,6 +452,19 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual("No data.", by_key["dictionary_empty"].english)
         self.assertEqual("No data.", by_key["enemy_empty"].english)
         self.assertEqual("Mail (New)", hant_ui.HANT_MAIL_COUNT_LABEL.english)
+
+    def test_exploration_warning_text_preserves_two_cell_icon_gutter(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        spec = next(spec for spec in hant_ui.HANT_HELP_BODIES if spec.key == "exploration_controls")
+        warning_rows = spec.english_rows[13:16]
+        self.assertEqual((
+            "  Night vision uses battery.",
+            "  It drains while active.",
+            "  At zero, it shuts off.",
+        ), warning_rows)
+        self.assertTrue(all(row.startswith("  ") for row in warning_rows))
+        self.assertTrue(all(measured_hant_cells(row) <= HANT_LAYOUT_PROFILE.max_cells for row in warning_rows))
 
     def test_observed_dictionary_definition_pages_are_promoted_fail_closed(self) -> None:
         import tools.hant_ui as hant_ui

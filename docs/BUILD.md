@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v11-r14 result: 214 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11-r15 result: 215 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -844,3 +844,39 @@ Measured r14 result:
 r14 preserves all accepted pre-H.A.N.T. behavior and r13 text ownership while correcting the runtime-observed H.A.N.T. presentation: translated Help icon metadata follows English geometry, Config/Dictionary/Enemy render with proven English style/spacing, Mail chrome/empty-state positioning is corrected, and the two observed Dictionary definition leaves are translated fail-closed.
 
 Do not launch PCSX2 automatically. The exact r14 visual gate is documented in `docs/LOCALIZATION_STATUS.md` and `docs/HANDOFF.md`.
+
+
+## Build startup v11-r15 H.A.N.T Functions recovery candidate
+
+r15 is built from the same pristine PS2 ISO and overlay set as r14. It restores the runtime-disproven H.A.N.T singleton constructor at `0x190A40` to pristine and reserves a two-cell gutter around the Exploration warning icon.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r15.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r15.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r15.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r15.json
+```
+
+Measured r15 result:
+- ISO SHA-256: `e4cf331c90470e99c2c0db1728673a7ddcdab358182f8d1ba7927b6dbbf387f6`;
+- pre-ROFS ELF: `dcdd2f0c4a22bb74f280ec285fc43a061dd475c07ce10a00e31498849a274f86`;
+- post-ROFS ELF: `306cfa21e720328c269c505995c5041b0d4b77496329ecbf22bdf14b5eef1a68`;
+- final ELF size: 8,416,238 bytes;
+- 1,145 overlays; 892 in place / 253 relocated;
+- **150/150** final-image checks;
+- **215** dependency-free tests (10 expected skips);
+- **215** Pillow-enabled tests (1 owned-corpus skip);
+- repeat ISO `/private/tmp/kowloon-recharge-startup-en-v11-r15-repeat.iso` is byte-for-byte identical and has the same SHA-256.
+
+Do not launch PCSX2 automatically. r15's first runtime gate is H.A.N.T Functions body/exit-state recovery plus the Exploration warning-icon gutter; Moving in Ruins and all pre-H.A.N.T. accepted presentation remain frozen.

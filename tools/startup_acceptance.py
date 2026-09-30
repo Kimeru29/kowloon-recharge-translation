@@ -26,6 +26,8 @@ from tools.hant_ui import (
     HANT_PRISTINE_CONTROLLER_METADATA_RECORDS,
     HANT_TUTORIAL_DESCRIPTOR_OFFSET,
     HANT_TUTORIAL_FONT_STYLE_OFFSET,
+    HANT_TUTORIAL_SINGLETON_STYLE_OFFSET,
+    HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD,
     HANT_TUTORIAL_ROW_SPACING_OFFSET,
     HANT_WRAPPED_LINES,
 )
@@ -530,6 +532,9 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
     hant_style_ok = (
         HANT_TUTORIAL_FONT_STYLE_OFFSET + 4 <= len(raw)
         and struct.unpack_from("<I", raw, HANT_TUTORIAL_FONT_STYLE_OFFSET)[0] == 0x24050001
+        and HANT_TUTORIAL_SINGLETON_STYLE_OFFSET + 4 <= len(raw)
+        and struct.unpack_from("<I", raw, HANT_TUTORIAL_SINGLETON_STYLE_OFFSET)[0]
+        == HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD
     )
     hant_spacing_ok = (
         HANT_TUTORIAL_ROW_SPACING_OFFSET + 4 <= len(raw)
@@ -906,7 +911,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         _check(
             "hant_tutorial_font_style",
             hant_style_ok,
-            "H.A.N.T tutorial rows are not using the page-local 12px style",
+            "H.A.N.T tutorial row style or singleton-constructor preservation is stale",
         )
     )
     checks.append(

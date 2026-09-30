@@ -22,6 +22,7 @@ from tools.hant_ui import (
     HANT_RINGTONES,
     HANT_HELP_CATEGORY_LABELS,
     HANT_TUTORIAL_FONT_STYLE_OFFSET,
+    HANT_TUTORIAL_SINGLETON_STYLE_OFFSET,
     HANT_TUTORIAL_ROW_SPACING_OFFSET,
 )
 from tools.menu_ui import MENU_LABELS
@@ -130,6 +131,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         translated = build_early_ui_elf(RAW)
         cases = (
             ("hant_tutorial_font_style", HANT_TUTORIAL_FONT_STYLE_OFFSET),
+            ("hant_tutorial_font_style", HANT_TUTORIAL_SINGLETON_STYLE_OFFSET),
             ("hant_tutorial_row_spacing", HANT_TUTORIAL_ROW_SPACING_OFFSET),
             ("hant_chrome_labels", HANT_CHROME_LABELS[0].pointer_offset),
             ("hant_config_labels", HANT_CONFIG_LABELS[0].pointer_offset),
@@ -140,7 +142,6 @@ class StartupAcceptanceTests(unittest.TestCase):
             ("hant_help_body_metadata", HANT_HELP_BODIES[0].metadata_descriptor_offset),
             ("hant_runtime_layout", 0x18BC84),
             ("hant_runtime_layout", 0x18E408),
-            ("hant_runtime_layout", 0x190968),
             ("hant_runtime_layout", 0x195CB4),
             ("hant_runtime_layout", 0x195D5C),
             ("hant_mail_chrome", HANT_MAIL_COUNT_LABEL.lui_offset),

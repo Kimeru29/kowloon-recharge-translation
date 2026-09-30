@@ -43,7 +43,7 @@ Status meanings:
 | H.A.N.T. Mail empty state | **r13 runtime-proven text; r14 positioning pending** | r13 proves the empty state is English but visually off-center. r14 accounts for its fixed fifth-row X owner, uses `   No mail received.`, and retargets the direct count/status materialization to `Mail (New)`. Non-empty mail remains separate. |
 | H.A.N.T. Enemy category tabs | **r13 runtime-proven text; r14 spacing pending** | r13 proves `Small / Large / Human` are live but the 40px Japanese cadence overlaps in English. r14 widens the three proven X owners and switches the category renderer to 12px style 1. |
 | H.A.N.T. Dictionary tabs + term lists | **r13 runtime-proven text; r14 presentation pending** | r13 proves the Latin tabs and 208 translated/romanized terms are live, but their list/tab constructors still use Japanese style 0. r14 switches the proven constructors to 12px style 1. Selected definition pages are tracked separately. |
-| H.A.N.T. Dictionary selected definitions | **r13 runtime-proven Japanese; r14 translation pending** | r13 proves selected terms open a separate detail-leaf class. r14 promotes only the observed `King Akhenaten` and `Heracleion` descriptors/tables and switches their line renderer to 12px style 1; the other 206 leaves remain unresolved. |
+| H.A.N.T. Dictionary selected definitions | **Text-table translation pending runtime; font owner unresolved** | r13 proves selected terms open a separate detail-leaf class. r14 promotes only the observed `King Akhenaten` and `Heracleion` descriptors/tables. r14 incorrectly attributed `0x190A40` to their font renderer; r14 runtime disproves that mutation because it breaks `H.A.N.T Functions`. r15 restores `0x190A40` pristine. The other 206 leaves and the actual definition-page font-style owner remain unresolved. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
@@ -369,7 +369,7 @@ r13 is scoped to the runtime-observed Japanese H.A.N.T. layers. It translates th
 r13 runtime result: the new English owners are live, but Help icon geometry, Config/Dictionary font style, Enemy tab spacing and Mail centering still need correction. Selecting `King Akhenaten` and `Heracleion` also exposes a separate Japanese Dictionary definition-page class. Those findings define r14.
 
 
-### v11-r14 — current deterministic H.A.N.T. runtime-layout candidate
+### v11-r14 — runtime-tested H.A.N.T. layout checkpoint; contains critical H.A.N.T Functions regression
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r14.iso`
 - ISO SHA-256: `2d543df1367dea4b9b9b31d77cf246d959f2e5c0b23a8726e6b001be611ce795`
@@ -382,8 +382,27 @@ r13 runtime result: the new English owners are live, but Help icon geometry, Con
 - dependency-free suite: **214 tests OK** (10 expected skips)
 - Pillow-enabled suite: **214 tests OK** (1 owned-corpus skip)
 - deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r14-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
-- PCSX2 status: **not launched automatically for r14; manual visual acceptance pending**.
+- PCSX2 status: **manually runtime-tested by Pablo; review stopped after the critical H.A.N.T Functions blank/trapped-state regression**.
 
-r14 preserves all pre-H.A.N.T. accepted surfaces and the r13 H.A.N.T. translations. It additionally relocates Help icon/controller metadata to the measured English grid, uses existing 12px style 1 for the proven Config/Dictionary/Enemy constructors (including selected Dictionary detail rows), widens Enemy category spacing, fixes Mail empty-state/chrome ownership, adds `No data.` for the observed empty Dictionary/Enemy states, and promotes only the observed `King Akhenaten` and `Heracleion` Dictionary definition leaves.
+r14 preserves all pre-H.A.N.T. accepted surfaces and the r13 H.A.N.T. translations. Runtime confirms the main H.A.N.T. menu remains good, `Exploration Controls` is much improved except for the warning-icon overlap, and `Moving in Ruins` is acceptable. However, r14 also changed `0x190A40` under a false Dictionary-detail style attribution; `H.A.N.T Functions` becomes blank and can leave H.A.N.T. blank/trapped afterward. The definition text-table relocations remain separately owned, but their font-style owner is not proven.
 
-Manual r14 gate: verify no regression before H.A.N.T.; translated Help bodies have aligned/non-overlapping controller icons; Config values/ringtones and Dictionary lists/tabs are readable at the smaller English font; Enemy shows `Small / Large / Human` without collision; empty Mail is visually centered/readable and shows English chrome; and selecting `King Akhenaten` and `Heracleion` opens English 12px definition pages. `H.A.N.T Functions` must remain unchanged.
+r14 runtime result: pre-H.A.N.T. and the main H.A.N.T. menu remain accepted. Exploration ordinary icons/text are improved, but the `(!)` warning overlaps its bottom text. Moving in Ruins appears acceptable. `H.A.N.T Functions` is a release blocker: the body is blank, and leaving it can leave the H.A.N.T. screen blank/trapped while audio/input feedback continues. The review stopped there.
+
+### v11-r15 — current emergency H.A.N.T Functions recovery candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r15.iso`
+- ISO SHA-256: `e4cf331c90470e99c2c0db1728673a7ddcdab358182f8d1ba7927b6dbbf387f6`
+- translated ELF SHA-256 before ROFS rewrite: `dcdd2f0c4a22bb74f280ec285fc43a061dd475c07ce10a00e31498849a274f86`
+- final post-ROFS ELF SHA-256: `306cfa21e720328c269c505995c5041b0d4b77496329ecbf22bdf14b5eef1a68`
+- translated/final ELF size: 8,416,238 bytes
+- overlays: 1,145 total; 892 in place / 253 relocated
+- executable ROFS records: 1,145 patched/re-resolved
+- final-image startup acceptance: **150/150** (`local/startup-acceptance-v11-r15.json`)
+- dependency-free suite: **215 tests OK** (10 expected skips)
+- Pillow-enabled suite: **215 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r15-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
+- PCSX2 status: **runtime proof pending**.
+
+r15 restores `0x190A40` to its pristine style-0 singleton-constructor word and fail-closes on that preservation invariant. `0x190968` remains the proven style-1 body-row owner. This explicitly retracts r14's unsupported claim that both words are Dictionary-definition font owners. r15 also keeps the corrected Exploration icon metadata and adds a two-cell text gutter to the three night-vision warning rows so the `(!)` icon has reserved space. Moving in Ruins and all pre-H.A.N.T. accepted owners are untouched.
+
+Manual r15 gate: `H.A.N.T Functions` must show its English body again and exit cleanly back to H.A.N.T.; entering/exiting it must never blank or trap the H.A.N.T. state. In Exploration Controls the `(!)` icon must no longer overlap the bottom three warning lines. Moving in Ruins and every pre-H.A.N.T./main-H.A.N.T. accepted surface must remain visually unchanged.

@@ -236,7 +236,7 @@ class EarlyUiPatchTests(unittest.TestCase):
         segment_va = segment[2]
         segment_size = segment[4]
         by_key = {spec.key: spec for spec in MENU_LABELS}
-        self.assertEqual(15002, segment_size)
+        self.assertEqual(15006, segment_size)
 
         for key, expected in (("return_above_ground", b"Return above ground\x00"), ("report_card", b"Report card\x00")):
             spec = by_key[key]
@@ -249,7 +249,7 @@ class EarlyUiPatchTests(unittest.TestCase):
             target_va = targets.pop()
             self.assertGreaterEqual(target_va, segment_va)
             self.assertLess(target_va, segment_va + segment_size)
-            expected_offset = {"return_above_ground": 0x3A7A, "report_card": 0x3A8E}[key]
+            expected_offset = {"return_above_ground": 0x3A7E, "report_card": 0x3A92}[key]
             self.assertEqual(segment_va + expected_offset, target_va)
             target_file = segment_file + target_va - segment_va
             self.assertEqual(expected, result[target_file:target_file + len(expected)])
