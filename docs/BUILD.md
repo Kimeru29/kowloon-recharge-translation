@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v11-r15 result: 215 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11-r16 result: 217 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -880,3 +880,39 @@ Measured r15 result:
 - repeat ISO `/private/tmp/kowloon-recharge-startup-en-v11-r15-repeat.iso` is byte-for-byte identical and has the same SHA-256.
 
 Do not launch PCSX2 automatically. r15's first runtime gate is H.A.N.T Functions body/exit-state recovery plus the Exploration warning-icon gutter; Moving in Ruins and all pre-H.A.N.T. accepted presentation remain frozen.
+
+
+## Build startup v11-r16 H.A.N.T. completion/presentation candidate
+
+r16 is built from the same pristine PS2 ISO and overlay set as r15. It preserves the r15-good H.A.N.T Functions/ADV/Moving/Config paths, refines the remaining Mail/Dictionary/Enemy/Exploration layout owners, and adds generated official English tables for all 208 selectable Dictionary definitions from the recovered owned-remaster `English.bytes`.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r16.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r16.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r16.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r16.json
+```
+
+Measured r16 result:
+- ISO SHA-256: `7669e50ddd81778e48e15c1f85f8ac4ff56a7d9e4e6c330c58ab9ae3b7bd8b9b`;
+- pre-ROFS ELF: `f8c90885dfd9050570fd5b70db6fbf5b890915e6469128996ab89cfa7ac86106`;
+- post-ROFS ELF: `bb4bcb3640616cb33de351b3735cfacb25376e7e4e56601113956e8dc85df752`;
+- final ELF size: 8,563,534 bytes;
+- 1,145 overlays; 892 in place / 253 relocated;
+- **150/150** final-image checks;
+- **217** dependency-free tests (10 expected skips);
+- **217** Pillow-enabled tests (1 owned-corpus skip);
+- repeat ISO `/private/tmp/kowloon-recharge-startup-en-v11-r16-repeat.iso` is byte-for-byte identical and has the same SHA-256.
+
+Do not launch PCSX2 automatically. r16's manual gate is the remaining r15 review: Exploration warning-icon spacing, Mail alignment/centering, Dictionary tabs/empty state plus representative opened definitions, and Enemy category/L1-R1 separation. Reconfirm Moving in Ruins, H.A.N.T Functions, ADV Controls and Config remain unchanged.

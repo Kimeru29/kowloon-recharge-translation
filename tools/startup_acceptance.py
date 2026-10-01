@@ -6,6 +6,7 @@ from hashlib import sha256
 
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES, ADV_SPEAKER_LAYOUT_PATCHES
 from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells
+from tools.hant_dictionary_definitions import DICTIONARY_DEFINITION_MAX_CELLS, definition_source_fingerprint
 from tools.hant_ui import (
     HANT_ALL_HELP_TOPICS,
     HANT_CHROME_LABELS,
@@ -702,7 +703,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
 
     def expected_english_help_metadata(spec) -> tuple[tuple[int, int, int, int], ...]:
         records: list[tuple[int, int, int, int]] = []
-        for kind, variant, field_x, field_y in spec.metadata_records:
+        for record_index, (kind, variant, field_x, field_y) in enumerate(spec.metadata_records):
             source_x = 73 + field_x
             source_y = 119 + field_y
             source_column = round((source_x - 85) / 16)
@@ -711,6 +712,8 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             delta_y = source_y - (131 + source_row * 21)
             target_x = 85 + source_column * HANT_LAYOUT_PROFILE.glyph_advance + delta_x
             target_y = 131 + source_row * HANT_LAYOUT_PROFILE.line_spacing + delta_y
+            if spec.key == "exploration_controls" and record_index == len(spec.metadata_records) - 1:
+                target_x -= 6
             records.append((kind, variant, int(round(target_x - 73)), int(round(target_y - 119))))
         records.append((-1, -1, -1, -1))
         return tuple(records)
@@ -789,23 +792,14 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
     if segment is not None:
         p_offset, p_vaddr, p_filesz, _p_memsz = segment
         for spec in HANT_DICTIONARY_DEFINITIONS:
-            source_by_index = {index: offset for index, offset, _text in spec.source_rows}
-            expected_source_table = tuple(
-                _ELF_MAIN_VADDR + source_by_index[index] - _ELF_MAIN_FILE_OFFSET
-                if index in source_by_index else _HANT_BLANK_VA
-                for index in range(len(spec.english_rows))
-            ) + (_HANT_EOF_VA,)
-            if spec.source_table_offset + len(expected_source_table) * 4 > len(raw):
-                hant_dictionary_definitions_ok = False
-                break
-            if struct.unpack_from(f"<{len(expected_source_table)}I", raw, spec.source_table_offset) != expected_source_table:
-                hant_dictionary_definitions_ok = False
-                break
-            if any(
-                raw[source_offset:source_offset + len(source_text.encode("cp932")) + 1]
-                != source_text.encode("cp932") + b"\x00"
-                for _row, source_offset, source_text in spec.source_rows
-            ):
+            try:
+                source_ok = (
+                    definition_source_fingerprint(raw, spec.source_table_offset, spec.source_row_count)
+                    == spec.source_sha256
+                )
+            except ValueError:
+                source_ok = False
+            if not source_ok:
                 hant_dictionary_definitions_ok = False
                 break
             if spec.descriptor_offset + 4 > len(raw):
@@ -824,7 +818,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
                     if row_va != _HANT_BLANK_VA:
                         hant_dictionary_definitions_ok = False
                         break
-                elif measured_hant_cells(english) > HANT_LAYOUT_PROFILE.max_cells or not _read_wide_at_va(raw, row_va, english):
+                elif measured_hant_cells(english) > DICTIONARY_DEFINITION_MAX_CELLS or not _read_wide_at_va(raw, row_va, english):
                     hant_dictionary_definitions_ok = False
                     break
             if not hant_dictionary_definitions_ok:

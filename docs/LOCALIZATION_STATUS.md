@@ -38,12 +38,12 @@ Status meanings:
 | H.A.N.T. top-level six tiles (`GP020_03`) | **Working / runtime-proven** | r5 runtime confirms `MAIL`, `DICTIONARY`, `ENEMY`, `MEMO`, `HELP`, and `CONFIG` look good. Preserve the semantic baked-art repaint and do not route these captions back through executable text. |
 | H.A.N.T. executable chrome labels | **Working / runtime-proven** | r9 runtime accepts the H.A.N.T. menus/submenus as presented. Preserve the seven-entry translated chrome owner table. |
 | H.A.N.T. Help category/topic labels + navigation | **Working / runtime-proven** | v11-r11 manual runtime confirms the Help category/topic menu presentation is substantially English and navigation works. Preserve all **55 topic labels** and the three-tab owner including `Ruins`. This status applies to labels/navigation only, not selected topic body text. |
-| H.A.N.T. selected Help topic bodies | **r13 runtime-proven text; r14 layout pending** | r13 proves the promoted bodies render English, but the controller/icon metadata still follows Japanese geometry and can overlap the translated rows. r14 relocates each proven metadata leaf into the measured 12px/16px English geometry while preserving icon identity and sentinels. |
-| H.A.N.T. Config labels / values | **r13 runtime-proven text; r14 presentation pending** | r13 proves the labels/values/ringtones are English but still use Japanese style 0 at live constructors. r14 switches the proven Config constructors to existing 12px style 1. |
-| H.A.N.T. Mail empty state | **r13 runtime-proven text; r14 positioning pending** | r13 proves the empty state is English but visually off-center. r14 accounts for its fixed fifth-row X owner, uses `   No mail received.`, and retargets the direct count/status materialization to `Mail (New)`. Non-empty mail remains separate. |
-| H.A.N.T. Enemy category tabs | **r13 runtime-proven text; r14 spacing pending** | r13 proves `Small / Large / Human` are live but the 40px Japanese cadence overlaps in English. r14 widens the three proven X owners and switches the category renderer to 12px style 1. |
-| H.A.N.T. Dictionary tabs + term lists | **r13 runtime-proven text; r14 presentation pending** | r13 proves the Latin tabs and 208 translated/romanized terms are live, but their list/tab constructors still use Japanese style 0. r14 switches the proven constructors to 12px style 1. Selected definition pages are tracked separately. |
-| H.A.N.T. Dictionary selected definitions | **Text-table translation pending runtime; font owner unresolved** | r13 proves selected terms open a separate detail-leaf class. r14 promotes only the observed `King Akhenaten` and `Heracleion` descriptors/tables. r14 incorrectly attributed `0x190A40` to their font renderer; r14 runtime disproves that mutation because it breaks `H.A.N.T Functions`. r15 restores `0x190A40` pristine. The other 206 leaves and the actual definition-page font-style owner remain unresolved. |
+| H.A.N.T. selected Help topic bodies | **Working with minor r16 polish pending** | r15 runtime accepts H.A.N.T Functions, ADV Controls and Moving in Ruins; Exploration Controls is also correct except that its final `(!)` icon remains slightly too close to the warning text. r16 nudges only that final icon six pixels left. |
+| H.A.N.T. Config labels / values | **Working / runtime-proven** | r15 runtime reports Config looks fully translated and visually correct. r16 does not modify this path. |
+| H.A.N.T. Mail empty state | **Translated but buggy; r16 candidate** | r15 runtime proves the text is English but the layout is misaligned and `No mail received.` is not centered. r16 preserves the two numeric count slots with `msgs  new` and adjusts the empty-state padding for centering. Non-empty Mail content remains separate. |
+| H.A.N.T. Enemy category tabs | **Translated but buggy; r16 candidate** | r15 runtime proves `Small / Large / Human` are English but still overlap the L1/R1 chrome. r16 keeps their proven X/style owners and moves only the category row from y=93 to y=110. |
+| H.A.N.T. Dictionary tabs + term lists | **Translated but buggy; r16 candidate** | r15 runtime proves the Latin tabs/terms are live, but the top index labels overlap L1/R1 and the empty state is off-center. r16 uses a 260px tab origin with 14px advance and centers `No data.`. Selected definition pages are tracked separately. |
+| H.A.N.T. Dictionary selected definitions | **Official English complete; runtime pending** | r15 still shows Japanese/misaligned opened entries such as Cairo. r16 inventories all 208 mode-1 definition leaves and maps all 2,073 nonblank Japanese source rows uniquely to the recovered official CUSA27034 `English.bytes`, producing 4,177 deterministic 21-cell rows. Every source page is fingerprinted; `0x190A40` remains pristine. Runtime must confirm paging/alignment across representative long and short definitions. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
@@ -51,7 +51,7 @@ Status meanings:
 | Surface | Status | Evidence / next action |
 | --- | --- | --- |
 | `メディア` | **Still Japanese / unresolved** | No exact official dictionary mapping has been proven for this PS2-only label. |
-| Remaining H.A.N.T. content | **Still Japanese / unresolved** | r14 covers the runtime-observed Config values/ringtones, empty-Mail state/chrome, Enemy category tabs, Dictionary tabs/208 selectable terms, and the two observed definition leaves. Unobserved/independent content remains fail-closed, including non-empty Mail subjects/bodies and the other 206 Dictionary definition leaves. |
+| Remaining H.A.N.T. content | **Still Japanese / unresolved** | r16 covers all 208 selectable Dictionary definition pages in addition to the previously translated Config/ringtones, empty-Mail state/chrome, Enemy categories, Dictionary tabs/terms and promoted Help bodies. Independent unobserved content remains fail-closed, especially non-empty Mail subjects/bodies and unpromoted Help bodies. |
 | Re:charge-only memory-card clear-data messages | **Still Japanese / unresolved** | Eight pointer-table entries have no proven official remaster counterpart and remain untouched. |
 
 ## Corpus-level translation coverage
@@ -388,7 +388,7 @@ r14 preserves all pre-H.A.N.T. accepted surfaces and the r13 H.A.N.T. translatio
 
 r14 runtime result: pre-H.A.N.T. and the main H.A.N.T. menu remain accepted. Exploration ordinary icons/text are improved, but the `(!)` warning overlaps its bottom text. Moving in Ruins appears acceptable. `H.A.N.T Functions` is a release blocker: the body is blank, and leaving it can leave the H.A.N.T. screen blank/trapped while audio/input feedback continues. The review stopped there.
 
-### v11-r15 — current emergency H.A.N.T Functions recovery candidate
+### v11-r15 — runtime-tested H.A.N.T Functions recovery checkpoint
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r15.iso`
 - ISO SHA-256: `e4cf331c90470e99c2c0db1728673a7ddcdab358182f8d1ba7927b6dbbf387f6`
@@ -401,8 +401,28 @@ r14 runtime result: pre-H.A.N.T. and the main H.A.N.T. menu remain accepted. Exp
 - dependency-free suite: **215 tests OK** (10 expected skips)
 - Pillow-enabled suite: **215 tests OK** (1 owned-corpus skip)
 - deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r15-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
-- PCSX2 status: **runtime proof pending**.
+- PCSX2 status: **runtime-tested by Pablo**; H.A.N.T Functions/ADV/Moving/Config are good, with remaining Mail/Dictionary/Enemy/Exploration issues carried to r16.
 
 r15 restores `0x190A40` to its pristine style-0 singleton-constructor word and fail-closes on that preservation invariant. `0x190968` remains the proven style-1 body-row owner. This explicitly retracts r14's unsupported claim that both words are Dictionary-definition font owners. r15 also keeps the corrected Exploration icon metadata and adds a two-cell text gutter to the three night-vision warning rows so the `(!)` icon has reserved space. Moving in Ruins and all pre-H.A.N.T. accepted owners are untouched.
 
 Manual r15 gate: `H.A.N.T Functions` must show its English body again and exit cleanly back to H.A.N.T.; entering/exiting it must never blank or trap the H.A.N.T. state. In Exploration Controls the `(!)` icon must no longer overlap the bottom three warning lines. Moving in Ruins and every pre-H.A.N.T./main-H.A.N.T. accepted surface must remain visually unchanged.
+
+
+### v11-r16 — current H.A.N.T. completion/presentation candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r16.iso`
+- ISO SHA-256: `7669e50ddd81778e48e15c1f85f8ac4ff56a7d9e4e6c330c58ab9ae3b7bd8b9b`
+- translated ELF SHA-256 before ROFS rewrite: `f8c90885dfd9050570fd5b70db6fbf5b890915e6469128996ab89cfa7ac86106`
+- final post-ROFS ELF SHA-256: `bb4bcb3640616cb33de351b3735cfacb25376e7e4e56601113956e8dc85df752`
+- translated/final ELF size: 8,563,534 bytes
+- overlays: 1,145 total; 892 in place / 253 relocated
+- executable ROFS records: 1,145 patched/re-resolved
+- final-image startup acceptance: **150/150** (`local/startup-acceptance-v11-r16.json`)
+- dependency-free suite: **217 tests OK** (10 expected skips)
+- Pillow-enabled suite: **217 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r16-repeat.iso` has the same SHA-256 and is byte-for-byte identical.
+- PCSX2 status: **runtime proof pending**.
+
+r16 keeps the r15-good surfaces frozen. It nudges only Exploration's final warning icon by 6px; repairs Mail count-slot semantics and empty-state centering; compresses/repositions Dictionary top tabs and centers its empty state; moves Enemy categories below L1/R1; and promotes all 208 Dictionary definition pages from the recovered official remaster `English.bytes`. The generated definition corpus proves 2,073 unique exact source-row matches, 208 fail-closed source fingerprints, 4,177 deterministic output rows, and a conservative 21-cell page width without touching the runtime-critical `0x190A40` singleton.
+
+Manual r16 gate: continue from the r15 review. Check Exploration's final `(!)` gap, Mail alignment/centering, Dictionary tabs/empty state plus several opened definitions including Cairo, and Enemy category/L1/R1 separation. Reconfirm Moving in Ruins, H.A.N.T Functions, ADV Controls and Config are unchanged.

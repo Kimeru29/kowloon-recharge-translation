@@ -9,6 +9,8 @@ from tools.elf_translation_segment import TranslationSegmentInfo
 from tools.executable_text import RelocatedText, install_executable_text
 from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells, wrap_hant_text
 from tools.hant_content_data import HANT_DICTIONARY_TAB_DATA, HANT_DICTIONARY_TERM_DATA, HANT_RINGTONE_DATA
+from tools.hant_dictionary_definitions import DICTIONARY_DEFINITION_MAX_CELLS, definition_source_fingerprint
+from tools.hant_dictionary_definitions_data import HANT_DICTIONARY_DEFINITION_DATA
 from tools.localization import encode_ps2_english
 from tools.memory_card_ui import relocated_memory_card_entries
 from tools.startup_ui import (
@@ -142,9 +144,10 @@ class HantDictionaryDefinition:
     key: str
     descriptor_offset: int
     source_table_offset: int
-    source_rows: tuple[tuple[int, int, str], ...]
+    source_row_count: int
+    source_sha256: str
     english_rows: tuple[str, ...]
-    provenance: str = "semantic"
+    provenance: str = "official_exact_reflow"
 
 
 @dataclass(frozen=True)
@@ -219,8 +222,8 @@ HANT_CONTENT_LABELS: tuple[HantContentLabel, ...] = (
     HantContentLabel("config_mono", 0x586F58, (0x6958CC,), "モノラル", "Mono"),
     HantContentLabel("config_japanese", 0x6958D0, (0x6958E0,), "日本語", "Japanese"),
     HantContentLabel("config_english", 0x6958D8, (0x6958E4,), "英語", "English"),
-    HantContentLabel("mail_empty", 0x589960, (0x695BD8,), "受信メールがありません。", "   No mail received."),
-    HantContentLabel("dictionary_empty", 0x5878F0, (0x695968,), "データがありません。", "No data."),
+    HantContentLabel("mail_empty", 0x589960, (0x695BD8,), "受信メールがありません。", "  No mail received."),
+    HantContentLabel("dictionary_empty", 0x5878F0, (0x695968,), "データがありません。", "          No data."),
     HantContentLabel("enemy_empty", 0x587260, (0x695900,), "データがありません。", "No data."),
     HantContentLabel("enemy_small", 0x695BE8, (0x5899F8,), "小型", "Small"),
     HantContentLabel("enemy_large", 0x695BF0, (0x5899FC,), "大型", "Large"),
@@ -243,76 +246,21 @@ HANT_MAIL_COUNT_LABEL = HantCodeText(
     "mail_count",
     0x5899A0,
     "通（未読　　通）",
-    "Mail (New)",
+    "msgs  new",
     0x1936C0,
     0x1936C4,
 )
 
-# Runtime r13 proves selected Dictionary entries open a second, independent text
-# leaf. Promote only the two detail pages actually observed in the current save.
-HANT_DICTIONARY_DEFINITIONS: tuple[HantDictionaryDefinition, ...] = (
-    HantDictionaryDefinition(
-        "king_akhenaten",
-        0x5AB380,
-        0x5A43B0,
-        (
-            (0, 0x5A41A0, "●アクエンアテン王"),
-            (2, 0x5A41C0, "　エジプト新王国時代、第十八王朝の『ファ"),
-            (3, 0x5A41F0, "ラオ』で、エジプト史上もっとも謎に満ちた"),
-            (4, 0x5A4220, "王とされている。"),
-            (6, 0x5A4240, "　改名前はアメンヘテプ４世といい、「アメ"),
-            (7, 0x5A4270, "ン神は喜びたまう」の意であったが、大規模"),
-            (8, 0x5A42A0, "な宗教改革により『アテン神』への唯一崇拝"),
-            (9, 0x5A42D0, "を唱え始めてからアクエンアテン「アテン神"),
-            (10, 0x5A4300, "の役に立つもの」と名を改めたという。"),
-            (12, 0x5A4330, "　それまでの最高神であった『アメン神』を"),
-            (13, 0x5A4360, "始めとする幾多の神々を排斥した事から国内"),
-            (14, 0x5A4390, "は大いに乱れたといわれている。"),
-        ),
-        (
-            "King Akhenaten",
-            "",
-            "An 18th Dynasty pharaoh of",
-            "Egypt's New Kingdom, he is",
-            "an enigmatic Egyptian king.",
-            "",
-            "Born Amenhotep IV, his name",
-            'meant "Amun is satisfied."',
-            "After religious reforms, he",
-            "made Aten the sole god and",
-            "renamed himself Akhenaten.",
-            "",
-            "He rejected Amun and many",
-            "other gods, causing turmoil",
-            "throughout ancient Egypt.",
-        ),
-    ),
-    HantDictionaryDefinition(
-        "heracleion",
-        0x5B9780,
-        0x5B87A0,
-        (
-            (0, 0x5B86A0, "●ヘラクレイオン"),
-            (2, 0x5B86C0, "　ギリシャの歴史家ヘロドトスが記した伝説"),
-            (3, 0x6974E0, "都市。"),
-            (5, 0x5B86F0, "　プトレマイオス朝最後の女王クレオパトラ"),
-            (6, 0x5B8720, "七世の宮殿があったといわれ、エジプト北部"),
-            (7, 0x5B8750, "のアレクサンドリア沖に８世紀ごろに沈んだ"),
-            (8, 0x5B8780, "とされる幻の古代都市である。"),
-        ),
-        (
-            "Heracleion",
-            "",
-            "A legendary city described",
-            "by Greek historian Herodotus",
-            "",
-            "Cleopatra VII's palace stood",
-            "off Alexandria in northern",
-            "Egypt. The ancient city sank",
-            "around the 8th century.",
-        ),
-    ),
+# Dictionary selections use mode=1/category/term-index through the same proven
+# three-level text resolver. The owned CUSA27034 English.bytes corpus now gives a
+# unique exact match for every one of the 2,073 nonblank source rows across all
+# 208 selectable pages. The generated data preserves each pristine source table
+# by fingerprint and reflows only the official English values to a conservative 21-cell
+# Dictionary-detail body width; no Japanese source strings/tables are modified.
+HANT_DICTIONARY_DEFINITIONS: tuple[HantDictionaryDefinition, ...] = tuple(
+    HantDictionaryDefinition(*record) for record in HANT_DICTIONARY_DEFINITION_DATA
 )
+
 
 _HANT_CONFIG_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x18BC84, 0x0000282D, 0x24050001),
@@ -321,6 +269,11 @@ _HANT_CONFIG_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
 _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x18E2CC, 0x0000282D, 0x24050001),
     (0x18E408, 0x0000282D, 0x24050001),
+    # Ten Latin index tabs share the header row with L1/R1. Compress their
+    # 18px Japanese-era advance to 14px and move the origin right so all ten
+    # 12px glyphs fit between the fixed controller chrome.
+    (0x18E398, 0x3C024190, 0x3C024160),
+    (0x18E3AC, 0x3C024361, 0x3C024382),
 )
 # r14 runtime disproved the earlier Dictionary-detail style attribution here.
 # 0x190968 is already the separately owned mode-4 H.A.N.T body-row font style;
@@ -334,6 +287,9 @@ _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x195CB4, 0x2402010F, 0x240200D1),
     (0x195CD0, 0x24020137, 0x24020121),
     (0x195CEC, 0x2402015F, 0x24020171),
+    # Japanese two-character categories fit on the L1/R1 row; English does not.
+    # Keep the proven X owners and move only the category-text row to y=110.
+    (0x195D18, 0x3C0242BA, 0x3C0242DC),
     (0x195D5C, 0x0000282D, 0x24050001),
 )
 _HANT_MAIL_COUNT_CODE_PREIMAGES: tuple[tuple[int, int], ...] = (
@@ -901,23 +857,13 @@ def _expected_help_body_table(spec: HantHelpBody) -> tuple[int, ...]:
     return tuple(values)
 
 
-def _expected_dictionary_definition_table(spec: HantDictionaryDefinition) -> tuple[int, ...]:
-    source_by_index = {index: offset for index, offset, _text in spec.source_rows}
-    values = [
-        _elf_va(source_by_index[index]) if index in source_by_index else _HANT_BLANK_VA
-        for index in range(len(spec.english_rows))
-    ]
-    values.append(_HANT_EOF_VA)
-    return tuple(values)
-
-
 def _relocated_help_body_metadata(spec: HantHelpBody) -> tuple[tuple[int, int, int, int], ...]:
     if not spec.metadata_records:
         return ((-1, -1, -1, -1),)
 
     origin_x = 85.0
     records: list[tuple[int, int, int, int]] = []
-    for kind, variant, field_x, field_y in spec.metadata_records:
+    for record_index, (kind, variant, field_x, field_y) in enumerate(spec.metadata_records):
         source_icon_x = _HANT_METADATA_SCREEN_X_BASE + field_x
         source_icon_y = _HANT_METADATA_SCREEN_Y_BASE + field_y
         source_column = round((source_icon_x - origin_x) / _HANT_PRISTINE_GLYPH_ADVANCE)
@@ -926,6 +872,11 @@ def _relocated_help_body_metadata(spec: HantHelpBody) -> tuple[tuple[int, int, i
         delta_y = source_icon_y - (_HANT_TEXT_ORIGIN_Y + source_row * _HANT_PRISTINE_LINE_SPACING)
         target_icon_x = origin_x + source_column * HANT_LAYOUT_PROFILE.glyph_advance + delta_x
         target_icon_y = _HANT_TEXT_ORIGIN_Y + source_row * HANT_LAYOUT_PROFILE.line_spacing + delta_y
+        # r15 runtime shows only the final Exploration warning icon still crowds
+        # its English copy. Preserve every other transformed record and nudge this
+        # single proven icon six pixels left.
+        if spec.key == "exploration_controls" and record_index == len(spec.metadata_records) - 1:
+            target_icon_x -= 6
         records.append((
             kind,
             variant,
@@ -1158,18 +1109,10 @@ def _validate_source(raw: bytes) -> None:
         actual_table_va = struct.unpack_from("<I", raw, spec.descriptor_offset)[0]
         if actual_table_va != expected_table_va:
             raise ValueError(f"Dictionary definition descriptor preimage mismatch: {spec.key}")
-        words = len(spec.english_rows) + 1
-        if spec.source_table_offset + words * 4 > len(raw):
-            raise ValueError(f"Dictionary definition table is outside executable: {spec.key}")
-        actual_table = struct.unpack_from(f"<{words}I", raw, spec.source_table_offset)
-        if actual_table != _expected_dictionary_definition_table(spec):
-            raise ValueError(f"Dictionary definition table preimage mismatch: {spec.key}")
-        for row_index, source_offset, source_text in spec.source_rows:
-            encoded = source_text.encode("cp932") + b"\x00"
-            if raw[source_offset:source_offset + len(encoded)] != encoded:
-                raise ValueError(f"Dictionary definition source preimage mismatch: {spec.key}/{row_index}")
+        if definition_source_fingerprint(raw, spec.source_table_offset, spec.source_row_count) != spec.source_sha256:
+            raise ValueError(f"Dictionary definition source preimage mismatch: {spec.key}")
         for row_index, english in enumerate(spec.english_rows):
-            if measured_hant_cells(english) > HANT_LAYOUT_PROFILE.max_cells:
+            if measured_hant_cells(english) > DICTIONARY_DEFINITION_MAX_CELLS:
                 raise ValueError(f"Dictionary definition row exceeds visible width: {spec.key}/{row_index}")
 
     for spec in HANT_CONTENT_LABELS:
