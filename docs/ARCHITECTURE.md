@@ -86,3 +86,8 @@ ISO9660 is not the only runtime source of truth. `SLPM_665.11` contains a ROFS f
 ## Save compatibility
 
 The executable uses `BISLPM-66511Save`. Ordinary memory-card saves are the cross-build compatibility target. Savestates are considered build-specific. The serial `SLPM-66511` and save namespace are build invariants.
+
+
+### v11-r20 selector ownership
+
+Dictionary and Enemy root selection rectangles are independent animated objects, not properties of their text canvases. Dictionary derives selector X from a stored base plus current-category cadence (`223 + 18*i` pristine), while Enemy recreates its selector from selected category `0x130` (`288 + 40*i` pristine). r20 changes only those formulas to follow the already-accepted English text geometry (`300 + 12*i` and `222 + 66*i`) and restores Enemy's independently owned R1 anchor to x=407. This keeps Mail, Dictionary detail offset `0x588C84 = 12`, `0x190A40`, translated text payloads, and all other r19-accepted owners outside the r20 mutation set.

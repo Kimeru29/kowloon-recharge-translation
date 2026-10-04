@@ -40,9 +40,9 @@ Status meanings:
 | H.A.N.T. Help category/topic labels + navigation | **Working / runtime-proven** | v11-r11 manual runtime confirms the Help category/topic menu presentation is substantially English and navigation works. Preserve all **55 topic labels** and the three-tab owner including `Ruins`. This status applies to labels/navigation only, not selected topic body text. |
 | H.A.N.T. selected Help topic bodies | **Working with minor r16 polish pending** | r15 runtime accepts H.A.N.T Functions, ADV Controls and Moving in Ruins; Exploration Controls is also correct except that its final `(!)` icon remains slightly too close to the warning text. r16 nudges only that final icon six pixels left. |
 | H.A.N.T. Config labels / values | **Working / runtime-proven** | r15 runtime reports Config looks fully translated and visually correct. r16 does not modify this path. |
-| H.A.N.T. Mail empty state | **Translated; r19 centering candidate** | r18 runtime confirms removing string padding was insufficient. The empty state is row 4 of the shared Mail-row constructor; r19 changes that proven X owner from 143 to 120, the centered origin for 272px of style-0 English in a 512px viewport. |
-| H.A.N.T. Enemy category tabs | **Translated; r19 root-nav candidate** | r18 runtime shows the y=110 split-row composition still looks wrong. r19 restores y=93 and lays out the complete header cluster at L1=194, Small/Large/Human=226/292/358, R1=428. |
-| H.A.N.T. Dictionary tabs + term lists | **Translated; r19 root-nav candidate** | r18 runtime proves moving only the tabs cannot fix a title that already overlaps pristine L1. r19 owns the whole root row: L1=274, tabs x=302 with 12px cadence, R1=428. `No data.` is preserved from r18. |
+| H.A.N.T. Mail empty state | **Working / runtime-proven** | r19 runtime accepts the empty-state presentation. Freeze the shared Mail-row x=120 owner and `No mail received.` payload. |
+| H.A.N.T. Enemy category tabs | **Translated; r20 selector/R1 candidate** | r19 runtime says the row is close to correct, but the red selector does not track the active category and R1 is clipped. r20 freezes Small/Large/Human at 226/292/358, changes only selector geometry to 222+66*i, and restores R1 to x=407. |
+| H.A.N.T. Dictionary tabs + term lists | **Translated; r20 selector candidate** | r19 runtime accepts the improved root text layout but shows the independently animated red box still follows Japanese geometry. r20 leaves L1/tabs/R1 text placement unchanged and changes only the selector to x=300+12*i, preserving its original 2px inset from the active letter. |
 | H.A.N.T. Dictionary selected definitions | **Working / runtime-proven** | r18 runtime accepts Cairo, H.A.N.T and Heracleion detail pages. Freeze the 3,827-row official definition reflow, mode-1 offset `0x588C84 = 12`, and pristine `0x190A40`. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
@@ -460,7 +460,7 @@ r17 is bounded to the final r16 Dictionary/Enemy review. Dictionary index tabs a
 r18 preserves r17's official Dictionary definition body reflow and Enemy placement. It removes Mail's leading empty-state padding, reduces Dictionary empty-state padding to five cells, starts the ten Dictionary index tabs at x=268 with the accepted 14px cadence, and changes only the Dictionary mode-1 title/icon offset from 6 to 12. All previously accepted surfaces and `0x190A40` remain frozen.
 
 
-### v11-r19 — current Mail/Dictionary/Enemy root-layout candidate
+### v11-r19 — runtime-tested root-layout checkpoint
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r19.iso`
 - ISO SHA-256: `4dbce7f49d537e6cc6aa156ff6d4723596de31b3a8657caa83a4b0a40db81928`
@@ -471,6 +471,22 @@ r18 preserves r17's official Dictionary definition body reflow and Enemy placeme
 - dependency-free suite: **218 tests OK** (10 expected skips)
 - Pillow-enabled suite: **218 tests OK** (1 owned-corpus skip)
 - deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r19-repeat.iso` is byte-for-byte identical.
-- PCSX2 status: **runtime proof pending**.
+- PCSX2 status: **runtime-tested by Pablo; Mail and all other reviewed surfaces are accepted, while Dictionary/Enemy red selectors remain misaligned and Enemy R1 is clipped**.
 
 r19 freezes the now-accepted Dictionary detail path. It changes only three reviewed presentation classes: shared Mail-row X 143→120 so the 272px English empty state centers in the 512px viewport; Dictionary root navigation becomes L1=274, tabs=302..422 at 12px cadence, R1=428; Enemy root navigation returns to y=93 with L1=194, Small/Large/Human=226/292/358 and R1=428.
+
+
+### v11-r20 — current Dictionary/Enemy selector-alignment candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r20.iso`
+- ISO SHA-256: `374a8813fcf10d148c35b9e0e47be6d1d943ebf447752ed461f4a0fb17884ebd`
+- translated ELF SHA-256 before ROFS rewrite: `30333e4d488714d2639b67c07da4ea76a4afd4b70e92ecc02f446421dd6850f9`
+- final post-ROFS ELF SHA-256: `e4aa7717fe11111a7a82c07595a3d6e5088c2fc3b93dd4af2cb23610666bca83`
+- translated/final ELF size: 8,562,114 bytes
+- final-image startup acceptance: **150/150** (`local/startup-acceptance-v11-r20.json`)
+- dependency-free suite: **220 tests OK** (10 expected skips)
+- Pillow-enabled suite: **220 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r20-repeat.iso` is byte-for-byte identical.
+- PCSX2 status: **runtime proof pending**.
+
+r20 changes no translated content and no accepted detail/list geometry. It changes only Dictionary's moving selector from `223+18*i` to `300+12*i`, Enemy's moving selector from `288+40*i` to `222+66*i`, and restores Enemy R1 from the clipped r19 x=428 to pristine x=407.
