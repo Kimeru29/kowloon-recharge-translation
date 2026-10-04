@@ -96,3 +96,8 @@ Dictionary and Enemy root selection rectangles are independent animated objects,
 ### v11-r21 selector resource geometry
 
 r20 proves selector position and selector size are independent owners. Both Dictionary and Enemy red frames are group-20 sprite resources constructed through VA `0x107D60`; their resource-table records resolve to one metadata leaf each. Dictionary index `0x21` owns metadata file `0x364BB0` and Enemy index `0x41` owns `0x3657B0`. r21 treats the second metadata word as the bounded rendered-width owner (24→14px and 40→64px respectively) and deliberately leaves each resource's UV rectangle byte-identical. Enemy additionally keeps the runtime-accepted style-1 font and adjusts only category/selector X packing; no global font or atlas mutation is introduced.
+
+
+### v11-r22 selector-family inheritance
+
+Dictionary group-20 selector index `0x21` and Enemy index `0x41` are family-level resources, not per-item assets. The runtime computes selector position from the selected category index, so width/base changes apply uniformly to every item in that family. Dictionary's mode-1 detail renderer is likewise shared across all enumerated terms; the generated corpus already covers 208 definition leaves, including currently locked ones when they become reachable. This inheritance does not extend across unrelated H.A.N.T families: Help/topic bodies and other menu classes may own separate descriptors, text tables or selectors and remain fail-closed until promoted.
