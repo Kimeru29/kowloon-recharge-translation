@@ -222,8 +222,8 @@ HANT_CONTENT_LABELS: tuple[HantContentLabel, ...] = (
     HantContentLabel("config_mono", 0x586F58, (0x6958CC,), "モノラル", "Mono"),
     HantContentLabel("config_japanese", 0x6958D0, (0x6958E0,), "日本語", "Japanese"),
     HantContentLabel("config_english", 0x6958D8, (0x6958E4,), "英語", "English"),
-    HantContentLabel("mail_empty", 0x589960, (0x695BD8,), "受信メールがありません。", "  No mail received."),
-    HantContentLabel("dictionary_empty", 0x5878F0, (0x695968,), "データがありません。", "          No data."),
+    HantContentLabel("mail_empty", 0x589960, (0x695BD8,), "受信メールがありません。", "No mail received."),
+    HantContentLabel("dictionary_empty", 0x5878F0, (0x695968,), "データがありません。", "     No data."),
     HantContentLabel("enemy_empty", 0x587260, (0x695900,), "データがありません。", "No data."),
     HantContentLabel("enemy_small", 0x695BE8, (0x5899F8,), "小型", "Small"),
     HantContentLabel("enemy_large", 0x695BF0, (0x5899FC,), "大型", "Large"),
@@ -269,19 +269,20 @@ _HANT_CONFIG_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
 _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x18E2CC, 0x0000282D, 0x24050001),
     (0x18E408, 0x0000282D, 0x24050001),
-    # Ten Latin index tabs share the header row with fixed L1/R1 anchors at
-    # x=195/x=407. A 14px cadence plus 12px glyph width occupies 138px, so an
-    # x=232 origin gives equal 37px side gutters.
+    # The live H.A.N.T. chrome renders 【Dictionary】 at x=75 with style 0.
+    # Twelve 16px glyphs end at x=267. Keep the accepted 14px tab cadence,
+    # start the ten style-1 tabs at x=268, and end the final 12px glyph at
+    # x=406 immediately before the fixed R1 anchor at x=407.
     (0x18E398, 0x3C024190, 0x3C024160),
-    (0x18E3AC, 0x3C024361, 0x3C024368),
+    (0x18E3AC, 0x3C024361, 0x3C024386),
 )
 _HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # The generic detail renderer consults this per-mode integer only at its
-    # selected-title and selected-icon X paths. Mode 1 (Dictionary) used six
-    # 16px cells for the shorter Japanese chrome; English 【Dictionary】 needs
-    # two additional cells. Changing only this mode moves both owners +32px
-    # without touching the shared constructor or the r15-critical singleton.
-    (0x588C84, 0x00000006, 0x00000008),
+    # selected-title and selected-icon X paths. Japanese 【用語辞典】 is six
+    # 16px glyphs while English 【Dictionary】 is twelve, so mode 1 needs six
+    # additional cells. Offset 12 clears both icon and title past the English
+    # chrome without touching the shared constructor or r15-critical singleton.
+    (0x588C84, 0x00000006, 0x0000000C),
 )
 # r14 runtime disproved the earlier Dictionary-detail style attribution here.
 # 0x190968 is already the separately owned mode-4 H.A.N.T body-row font style;

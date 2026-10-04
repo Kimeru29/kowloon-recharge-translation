@@ -951,3 +951,39 @@ Measured r17 result:
 - repeat ISO is byte-for-byte identical.
 
 Do not launch PCSX2 automatically. Runtime checklist: Dictionary root tabs centered between L1/R1; Cairo/H.A.N.T/Heracleion/Rosetta Society title+icon clear of `【Dictionary】`; no body-internal blank-row sentence splits; Enemy `Small / Large / Human` centered/regularly spaced. Everything else should remain unchanged.
+
+
+## Build startup v11-r18 Dictionary/Mail geometry follow-up
+
+r18 responds only to Pablo's r17 screenshots. It preserves r17's official 208-page definition reflow and Enemy geometry. Mail's empty message drops the previous guessed two-space prefix; Dictionary `No data.` uses five leading style-1 cells instead of ten; the Dictionary index origin moves to x=268 while retaining the 14px cadence; and the Dictionary-only detail offset at file `0x588C84` changes 6→12 so selected title/icon content clears the full English `【Dictionary】` chrome.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r18.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r18.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r18.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r18.json
+```
+
+Measured r18 result:
+- ISO SHA-256: `136a528030ab5ce611efd67fd06cf637f9015e1ba3473f760f9a6e72d7754c9a`;
+- pre-ROFS ELF: `64c220490e64da7e6d50d8d76ebd0f9e60cc94c42cbc6414605ba258bd71fad1`;
+- post-ROFS ELF: `a61b72b35d95112f68e79f1d1f1f1c36a77a1ab454ff714514694e540799f74a`;
+- final ELF size: 8,562,114 bytes;
+- 1,145 overlays; 892 in place / 253 relocated;
+- **150/150** final-image checks;
+- **218** dependency-free tests (10 expected skips);
+- **218** Pillow-enabled tests (1 owned-corpus skip);
+- `/private/tmp/kowloon-recharge-startup-en-v11-r18-repeat.iso` is byte-for-byte identical.
+
+Do not launch PCSX2 automatically. r18's visual gate is Mail empty-state centering; Dictionary empty-state centering across several index pages; Dictionary A/K/S/T/N/H/M/Y/R/W clearing `【Dictionary】` and R1; and selected titles/icons such as H.A.N.T/Cairo/Heracleion/Rosetta Society clearing `【Dictionary】`. The r17 definition body reflow, Enemy row, and every previously accepted surface are preservation checks.

@@ -35,9 +35,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(160861, info.payload_size)
+        self.assertEqual(160849, info.payload_size)
         self.assertEqual(
-            "9141ab0a1c269dc5d90923b9532ea9d3d91c605998e1434d58ae8fd117b630d2",
+            "9e786e48ad3a822f491b3d1b6c43ffde321ecfc096fcadd3e4356fa6241b1e60",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -440,20 +440,22 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x190968)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x190A40)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", result, 0x190A40)[0])
-        # Dictionary tabs fit between the fixed L1/R1 chrome at x=195/x=407.
-        # Ten 12px glyphs on a 14px cadence occupy 138px, so x=232 centers the
-        # complete group with equal 37px side gutters.
+        # The live H.A.N.T. chrome renders 【Dictionary】 at x=75 in style 0.
+        # English is 12 glyphs * 16px = 192px, so its right edge is x=267.
+        # Ten style-1 index tabs on a 14px cadence occupy 138px; x=268 puts
+        # them immediately after the chrome and ends the last glyph at x=406,
+        # one pixel before the fixed R1 anchor at x=407.
         self.assertEqual(0x3C024190, struct.unpack_from("<I", RAW, 0x18E398)[0])
         self.assertEqual(0x3C024160, struct.unpack_from("<I", result, 0x18E398)[0])
         self.assertEqual(0x3C024361, struct.unpack_from("<I", RAW, 0x18E3AC)[0])
-        self.assertEqual(0x3C024368, struct.unpack_from("<I", result, 0x18E3AC)[0])
+        self.assertEqual(0x3C024386, struct.unpack_from("<I", result, 0x18E3AC)[0])
         # Dictionary detail title/icon X derives only from the mode-offset table.
-        # Japanese mode 1 uses 6 cells (icon x=179/title x=197), which collides
-        # with the longer English 【Dictionary】 chrome. Two more cells move both
-        # independently owned detail elements 32px right without touching the
+        # Japanese 【用語辞典】 is six 16px glyphs; English 【Dictionary】 is twelve.
+        # Mode 1 therefore needs six extra 16px cells, not r17's two. Offset 12
+        # puts the icon/title beyond the translated chrome without touching the
         # generic constructor or the r15-critical 0x190A40 singleton.
         self.assertEqual(6, struct.unpack_from("<I", RAW, 0x588C84)[0])
-        self.assertEqual(8, struct.unpack_from("<I", result, 0x588C84)[0])
+        self.assertEqual(12, struct.unpack_from("<I", result, 0x588C84)[0])
         # Enemy's renderer adds 21px after these three integer X bases. Use
         # bases 189/269/349 so the actual English starts are 210/290/370: a
         # centered 210..430 block with 20px gaps between 60px labels.
@@ -465,8 +467,8 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x195D5C)[0])
 
         by_key = {spec.key: spec for spec in hant_ui.HANT_CONTENT_LABELS}
-        self.assertEqual("  No mail received.", by_key["mail_empty"].english)
-        self.assertEqual("          No data.", by_key["dictionary_empty"].english)
+        self.assertEqual("No mail received.", by_key["mail_empty"].english)
+        self.assertEqual("     No data.", by_key["dictionary_empty"].english)
         self.assertEqual("No data.", by_key["enemy_empty"].english)
         # Keep the two source count cells so the separately rendered unread
         # number has a reserved gap instead of colliding with the English text.
@@ -539,8 +541,8 @@ class HantTutorialTests(unittest.TestCase):
             "config_mono": (0x586F58, (0x6958CC,), "モノラル", "Mono"),
             "config_japanese": (0x6958D0, (0x6958E0,), "日本語", "Japanese"),
             "config_english": (0x6958D8, (0x6958E4,), "英語", "English"),
-            "mail_empty": (0x589960, (0x695BD8,), "受信メールがありません。", "  No mail received."),
-            "dictionary_empty": (0x5878F0, (0x695968,), "データがありません。", "          No data."),
+            "mail_empty": (0x589960, (0x695BD8,), "受信メールがありません。", "No mail received."),
+            "dictionary_empty": (0x5878F0, (0x695968,), "データがありません。", "     No data."),
             "enemy_empty": (0x587260, (0x695900,), "データがありません。", "No data."),
             "enemy_small": (0x695BE8, (0x5899F8,), "小型", "Small"),
             "enemy_large": (0x695BF0, (0x5899FC,), "大型", "Large"),

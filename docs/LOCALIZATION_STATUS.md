@@ -40,10 +40,10 @@ Status meanings:
 | H.A.N.T. Help category/topic labels + navigation | **Working / runtime-proven** | v11-r11 manual runtime confirms the Help category/topic menu presentation is substantially English and navigation works. Preserve all **55 topic labels** and the three-tab owner including `Ruins`. This status applies to labels/navigation only, not selected topic body text. |
 | H.A.N.T. selected Help topic bodies | **Working with minor r16 polish pending** | r15 runtime accepts H.A.N.T Functions, ADV Controls and Moving in Ruins; Exploration Controls is also correct except that its final `(!)` icon remains slightly too close to the warning text. r16 nudges only that final icon six pixels left. |
 | H.A.N.T. Config labels / values | **Working / runtime-proven** | r15 runtime reports Config looks fully translated and visually correct. r16 does not modify this path. |
-| H.A.N.T. Mail empty state | **Translated but buggy; r16 candidate** | r15 runtime proves the text is English but the layout is misaligned and `No mail received.` is not centered. r16 preserves the two numeric count slots with `msgs  new` and adjusts the empty-state padding for centering. Non-empty Mail content remains separate. |
-| H.A.N.T. Enemy category tabs | **Translated; r17 layout candidate** | r16 runtime confirms the lower row is much better but `Small / Large / Human` remain horizontally mispositioned. r17 keeps y=110/style 1 and corrects the renderer-pre-addition X bases so visible starts are 210/290/370. |
-| H.A.N.T. Dictionary tabs + term lists | **Translated; r17 layout candidate** | r16 runtime confirms translation/empty-state improvements but the top index strip still looks off. r17 keeps 14px advance and moves the ten-tab origin to 232px, centered between fixed L1/R1 anchors. |
-| H.A.N.T. Dictionary selected definitions | **Official English complete; r17 layout/reflow candidate** | r16 runtime proves Cairo/H.A.N.T/Heracleion/Rosetta Society are translated but exposes title/icon collision and Japanese-derived blank separators inside English prose. r17 moves only the mode-1 title/icon offset +32px and regenerates all 208 pages as 3,827 deterministic <=21-cell rows with one title/body separator and no body-internal blank rows. `0x190A40` remains pristine. |
+| H.A.N.T. Mail empty state | **Translated; r18 centering candidate** | r17 runtime confirms Mail is translated but `No mail received.` remains too far right. r18 removes the prior guessed two-space prefix while leaving the shared Mail-row constructor unchanged. Non-empty Mail content remains frozen. |
+| H.A.N.T. Enemy category tabs | **Translated; r17 geometry preserved** | r17 changes the renderer-pre-addition X bases so visible starts are 210/290/370 at the accepted y=110/style 1. The r17 review supplied no new Enemy defect; r18 leaves this path byte-for-byte unchanged. |
+| H.A.N.T. Dictionary tabs + term lists | **Translated; r18 layout candidate** | r17 runtime proves x=232 still places A/K/S/T/N/H/M/Y/R/W behind the longer English `【Dictionary】`. r18 keeps the accepted 14px cadence but starts at x=268, after the chrome ending at x=267 and before R1≈407. Dictionary `No data.` padding is reduced from ten to five cells. |
+| H.A.N.T. Dictionary selected definitions | **Official English complete; r18 chrome-clearance candidate** | r17 runtime confirms the 3,827-row official body reflow is live, but its mode-1 offset 8 still leaves titles such as H.A.N.T behind `【Dictionary】`. r18 changes only file `0x588C84` from 6→12, matching the six-cell Japanese→English chrome-width delta. `0x190A40` and all definition body tables remain unchanged from r17. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
@@ -428,7 +428,7 @@ r16 keeps the r15-good surfaces frozen. It nudges only Exploration's final warni
 Manual r16 gate: continue from the r15 review. Check Exploration's final `(!)` gap, Mail alignment/centering, Dictionary tabs/empty state plus several opened definitions including Cairo, and Enemy category/L1/R1 separation. Reconfirm Moving in Ruins, H.A.N.T Functions, ADV Controls and Config are unchanged.
 
 
-### v11-r17 — current Dictionary/Enemy presentation candidate
+### v11-r17 — runtime-tested Dictionary/Enemy presentation checkpoint
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r17.iso`
 - ISO SHA-256: `728f9eae1d7dd2f69009732ff8c880585db1c6cde41d120358e04362428276dc`
@@ -439,6 +439,22 @@ Manual r16 gate: continue from the r15 review. Check Exploration's final `(!)` g
 - dependency-free suite: **218 tests OK** (10 expected skips)
 - Pillow-enabled suite: **218 tests OK** (1 owned-corpus skip)
 - deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r17-repeat.iso` is byte-for-byte identical.
-- PCSX2 status: **runtime proof pending**.
+- PCSX2 status: **runtime-tested by Pablo; Dictionary body reflow is live, but Mail/Dictionary empty-state centering and Dictionary top/detail chrome remain incorrect**.
 
 r17 is bounded to the final r16 Dictionary/Enemy review. Dictionary index tabs are centered at x=232 with their accepted 14px cadence; the Dictionary-only mode offset at file `0x588C84` moves selected title/icon chrome +32px away from `【Dictionary】`; official 208-page definition generation removes Japanese paragraph separators from English body prose while retaining one title/body break; Enemy keeps y=110/style 1 but corrects its actual visible starts to 210/290/370. All other r16-good surfaces are frozen.
+
+
+### v11-r18 — current Mail/Dictionary geometry candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r18.iso`
+- ISO SHA-256: `136a528030ab5ce611efd67fd06cf637f9015e1ba3473f760f9a6e72d7754c9a`
+- translated ELF SHA-256 before ROFS rewrite: `64c220490e64da7e6d50d8d76ebd0f9e60cc94c42cbc6414605ba258bd71fad1`
+- final post-ROFS ELF SHA-256: `a61b72b35d95112f68e79f1d1f1f1c36a77a1ab454ff714514694e540799f74a`
+- translated/final ELF size: 8,562,114 bytes
+- final-image startup acceptance: **150/150** (`local/startup-acceptance-v11-r18.json`)
+- dependency-free suite: **218 tests OK** (10 expected skips)
+- Pillow-enabled suite: **218 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r18-repeat.iso` is byte-for-byte identical.
+- PCSX2 status: **runtime proof pending**.
+
+r18 preserves r17's official Dictionary definition body reflow and Enemy placement. It removes Mail's leading empty-state padding, reduces Dictionary empty-state padding to five cells, starts the ten Dictionary index tabs at x=268 with the accepted 14px cadence, and changes only the Dictionary mode-1 title/icon offset from 6 to 12. All previously accepted surfaces and `0x190A40` remain frozen.
