@@ -269,12 +269,15 @@ _HANT_CONFIG_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
 _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x18E2CC, 0x0000282D, 0x24050001),
     (0x18E408, 0x0000282D, 0x24050001),
-    # The live H.A.N.T. chrome renders 【Dictionary】 at x=75 with style 0.
-    # Twelve 16px glyphs end at x=267. Keep the accepted 14px tab cadence,
-    # start the ten style-1 tabs at x=268, and end the final 12px glyph at
-    # x=406 immediately before the fixed R1 anchor at x=407.
-    (0x18E398, 0x3C024190, 0x3C024160),
-    (0x18E3AC, 0x3C024361, 0x3C024386),
+    # r18 runtime proves that the longer English chrome and pristine L1 cannot
+    # coexist: 【Dictionary】 spans x=75..267 while L1 begins at x=195. Own the
+    # complete root-nav row and pack it inside the same header instead of moving
+    # only the letters. L1=274, ten 12px tabs span x=302..422 at 12px cadence,
+    # and R1=428. The accepted selected-detail mode offset remains independent.
+    (0x18E1A4, 0x3C024343, 0x3C024389),
+    (0x18E1EC, 0x24020197, 0x240201AC),
+    (0x18E398, 0x3C024190, 0x3C024140),
+    (0x18E3AC, 0x3C024361, 0x3C024397),
 )
 _HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # The generic detail renderer consults this per-mode integer only at its
@@ -293,16 +296,24 @@ _HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], .
 HANT_TUTORIAL_SINGLETON_STYLE_OFFSET = 0x190A40
 HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD = 0x0000282D
 _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
-    # The renderer adds a fixed 21px after each immediate below. Use bases
-    # 189/269/349 so the visible English starts are 210/290/370. Three 60px
-    # style-1 labels then span 210..430, centered on the 640px logical screen.
-    (0x195CB4, 0x2402010F, 0x240200BD),
-    (0x195CD0, 0x24020137, 0x2402010D),
-    (0x195CEC, 0x2402015F, 0x2402015D),
-    # Japanese two-character categories fit on the L1/R1 row; English does not.
-    # Keep the proven row separation at y=110.
-    (0x195D18, 0x3C0242BA, 0x3C0242DC),
+    # r18 runtime shows that pushing the categories below the divider is the
+    # wrong composition. Keep every control on the original y=93 header row and
+    # own the complete horizontal cluster: title ends near x=187, L1=194,
+    # visible category starts are 226/292/358, and R1=428. The renderer adds a
+    # fixed 21px to category bases 205/271/337.
+    (0x195BCC, 0x3C024382, 0x3C024342),
+    (0x195C14, 0x24020197, 0x240201AC),
+    (0x195CB4, 0x2402010F, 0x240200CD),
+    (0x195CD0, 0x24020137, 0x2402010F),
+    (0x195CEC, 0x2402015F, 0x24020151),
     (0x195D5C, 0x0000282D, 0x24050001),
+)
+_HANT_MAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    # The empty state is assigned to row 4 after the ten Mail row objects are
+    # constructed. There is no separate empty-state X owner: all rows share this
+    # x=143 constructor. English style-0 `No mail received.` is 17*16=272px, so
+    # x=120 centers it in the 512px H.A.N.T. viewport.
+    (0x193564, 0x3C02430F, 0x3C0242F0),
 )
 _HANT_MAIL_COUNT_CODE_PREIMAGES: tuple[tuple[int, int], ...] = (
     (HANT_MAIL_COUNT_LABEL.lui_offset, 0x3C050069),
@@ -314,6 +325,7 @@ HANT_RUNTIME_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     *_HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES,
     *_HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES,
     *_HANT_ENEMY_LAYOUT_PATCHES,
+    *_HANT_MAIL_LAYOUT_PATCHES,
 )
 
 _HANT_RINGTONE_RENDERER_PREIMAGES: tuple[tuple[int, int], ...] = (

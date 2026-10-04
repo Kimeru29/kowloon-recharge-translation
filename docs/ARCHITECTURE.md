@@ -56,6 +56,9 @@ r5 added a second orientation patch at file `0x151608` / VA `0x251588`, but r5 r
 
 ## Current candidate verification contract
 
+v11-r19 freezes the r18 runtime-accepted Dictionary selected-page layout and changes only root presentation owners: shared Mail-row X 143→120; Dictionary L1/tab cadence+origin/R1; and Enemy L1/category bases/R1 with category Y restored to pristine 93. The candidate hashes are pre-ROFS `c8795405f9746db2ba260c4fe644ee45218d200232112496f4ad6f1f58ba50b3`, post-ROFS `d34d53d62b6236d1c1b87577704bbd2eb8d84945564216750df74347e82a7cef`, ISO `4dbce7f49d537e6cc6aa156ff6d4723596de31b3a8657caa83a4b0a40db81928`; final-image acceptance is **150/150**, both suites execute **218 tests**, and the independent repeat ISO is byte-for-byte identical.
+
+
 v11-r18 is the bounded follow-up to Pablo's r17 screenshots. It preserves the r17 definition reflow, Enemy geometry, and all previously accepted surfaces; only Mail empty-state padding, Dictionary empty-state padding, Dictionary top-tab origin, and Dictionary mode-1 title/icon offset change. The finished executable is 8,562,114 bytes; pre-ROFS SHA-256 `64c220490e64da7e6d50d8d76ebd0f9e60cc94c42cbc6414605ba258bd71fad1` and post-ROFS SHA-256 `a61b72b35d95112f68e79f1d1f1f1c36a77a1ab454ff714514694e540799f74a`. The finished ISO hashes to `136a528030ab5ce611efd67fd06cf637f9015e1ba3473f760f9a6e72d7754c9a`. Final-image acceptance is **150/150**, both complete suites execute **218 tests** (10 dependency-free skips / 1 Pillow-enabled owned-corpus skip), and the independent r18 rebuild is byte-for-byte identical. These are static/deterministic guarantees only; r18 still requires Pablo's visual acceptance.
 
 ## PS2 indexed graphics

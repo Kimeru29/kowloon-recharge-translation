@@ -37,7 +37,7 @@ class HantTutorialTests(unittest.TestCase):
 
         self.assertEqual(160849, info.payload_size)
         self.assertEqual(
-            "9e786e48ad3a822f491b3d1b6c43ffde321ecfc096fcadd3e4356fa6241b1e60",
+            "61dc5243610474a9546d1a0c03509bf540ae5163f0bb30e6020c03a5c4d8ed03",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -440,15 +440,19 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x190968)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x190A40)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", result, 0x190A40)[0])
-        # The live H.A.N.T. chrome renders 【Dictionary】 at x=75 in style 0.
-        # English is 12 glyphs * 16px = 192px, so its right edge is x=267.
-        # Ten style-1 index tabs on a 14px cadence occupy 138px; x=268 puts
-        # them immediately after the chrome and ends the last glyph at x=406,
-        # one pixel before the fixed R1 anchor at x=407.
+        # r18 runtime proves that moving only the Dictionary tabs cannot produce a
+        # coherent header: the 192px English chrome already overlaps pristine L1.
+        # r19 owns the complete root-nav row instead. Keep the 12px tab glyphs,
+        # pack them at 12px cadence, and place the cluster after the title: title
+        # ends at x=267, L1 starts at 274, tabs span 302..422, and R1 starts at 428.
+        self.assertEqual(0x3C024343, struct.unpack_from("<I", RAW, 0x18E1A4)[0])
+        self.assertEqual(0x3C024389, struct.unpack_from("<I", result, 0x18E1A4)[0])
+        self.assertEqual(0x24020197, struct.unpack_from("<I", RAW, 0x18E1EC)[0])
+        self.assertEqual(0x240201AC, struct.unpack_from("<I", result, 0x18E1EC)[0])
         self.assertEqual(0x3C024190, struct.unpack_from("<I", RAW, 0x18E398)[0])
-        self.assertEqual(0x3C024160, struct.unpack_from("<I", result, 0x18E398)[0])
+        self.assertEqual(0x3C024140, struct.unpack_from("<I", result, 0x18E398)[0])
         self.assertEqual(0x3C024361, struct.unpack_from("<I", RAW, 0x18E3AC)[0])
-        self.assertEqual(0x3C024386, struct.unpack_from("<I", result, 0x18E3AC)[0])
+        self.assertEqual(0x3C024397, struct.unpack_from("<I", result, 0x18E3AC)[0])
         # Dictionary detail title/icon X derives only from the mode-offset table.
         # Japanese 【用語辞典】 is six 16px glyphs; English 【Dictionary】 is twelve.
         # Mode 1 therefore needs six extra 16px cells, not r17's two. Offset 12
@@ -456,15 +460,26 @@ class HantTutorialTests(unittest.TestCase):
         # generic constructor or the r15-critical 0x190A40 singleton.
         self.assertEqual(6, struct.unpack_from("<I", RAW, 0x588C84)[0])
         self.assertEqual(12, struct.unpack_from("<I", result, 0x588C84)[0])
-        # Enemy's renderer adds 21px after these three integer X bases. Use
-        # bases 189/269/349 so the actual English starts are 210/290/370: a
-        # centered 210..430 block with 20px gaps between 60px labels.
+        # Enemy uses the same header pattern. r17/r18 moved categories to y=110,
+        # which runtime shows below the divider. r19 restores y=93 and owns L1/R1
+        # plus all three category bases as one compact row. The renderer adds 21px
+        # to bases 205/271/337, giving visible starts 226/292/358.
+        self.assertEqual(0x3C024382, struct.unpack_from("<I", RAW, 0x195BCC)[0])
+        self.assertEqual(0x3C024342, struct.unpack_from("<I", result, 0x195BCC)[0])
+        self.assertEqual(0x24020197, struct.unpack_from("<I", RAW, 0x195C14)[0])
+        self.assertEqual(0x240201AC, struct.unpack_from("<I", result, 0x195C14)[0])
         self.assertEqual((0x2402010F, 0x24020137, 0x2402015F), tuple(struct.unpack_from("<I", RAW, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
-        self.assertEqual((0x240200BD, 0x2402010D, 0x2402015D), tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
+        self.assertEqual((0x240200CD, 0x2402010F, 0x24020151), tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
         self.assertEqual(0x3C0242BA, struct.unpack_from("<I", RAW, 0x195D18)[0])
-        self.assertEqual(0x3C0242DC, struct.unpack_from("<I", result, 0x195D18)[0])
+        self.assertEqual(0x3C0242BA, struct.unpack_from("<I", result, 0x195D18)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x195D5C)[0])
         self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x195D5C)[0])
+
+        # Empty Mail is assigned to row 4 after construction, so its live X owner
+        # is the shared Mail-row constructor. English style-0 text is 17*16=272px;
+        # x=120 centers it in the 512px H.A.N.T. viewport.
+        self.assertEqual(0x3C02430F, struct.unpack_from("<I", RAW, 0x193564)[0])
+        self.assertEqual(0x3C0242F0, struct.unpack_from("<I", result, 0x193564)[0])
 
         by_key = {spec.key: spec for spec in hant_ui.HANT_CONTENT_LABELS}
         self.assertEqual("No mail received.", by_key["mail_empty"].english)
