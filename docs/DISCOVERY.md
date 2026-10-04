@@ -512,3 +512,16 @@ The generic selected-detail renderer uses the mode table at VA `0x00688C00` / fi
 The Mail empty alias (`0x695BD8` → source `0x589960`) and Dictionary empty alias (`0x695968` → source `0x5878F0`) are set on shared row objects whose X constructors also serve ordinary non-empty content. r18 therefore does not move those shared constructors. It removes Mail's guessed two-cell prefix entirely and reduces Dictionary's guessed ten-cell prefix to five style-1 cells, limiting the adjustment to the observed empty states. Exact visual centering remains a runtime gate rather than a static claim.
 
 Measured r18 candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r18.iso`, SHA-256 `136a528030ab5ce611efd67fd06cf637f9015e1ba3473f760f9a6e72d7754c9a`; pre-ROFS ELF `64c220490e64da7e6d50d8d76ebd0f9e60cc94c42cbc6414605ba258bd71fad1`; post-ROFS ELF `a61b72b35d95112f68e79f1d1f1f1c36a77a1ab454ff714514694e540799f74a`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **218** tests in both suites (10 dependency-free skips / 1 Pillow-owned-corpus skip). The repeat ISO is byte-for-byte identical. Runtime acceptance is pending.
+
+
+## Startup v11-r19 root-navigation and Mail centering trace
+
+Pablo's r18 runtime pass accepts Cairo, H.A.N.T and Heracleion selected Dictionary pages, proving the r18 mode-1 offset `0x588C84 = 12` and r17 definition-body reflow; both are frozen. The remaining observed defects are `No mail received.` centering plus Dictionary and Enemy root top-row composition.
+
+Disassembly resolves Mail first. The ten Mail rows are constructed at a shared x=143 owner (file `0x193564`) before the empty-state branch assigns `No mail received.` specifically to row 4. There is no independent empty-row X immediate. Style-0 English is 17 glyphs × 16px = 272px, so x=(512-272)/2=120 is the exact viewport-centered origin. r19 patches that constructor 143→120 rather than reintroducing string padding.
+
+Dictionary root has independent L1/R1 objects (files `0x18E1A4` and `0x18E1EC`) plus the ten-tab cadence/origin owners (`0x18E398`/`0x18E3AC`). r18 moved only the tabs, but the 192px English `【Dictionary】` already extends through x=267 while pristine L1 begins at x=195. r19 therefore composes the complete row: L1=274, tabs begin x=302 at 12px cadence and span through x=422, R1=428. Selected Dictionary page ownership is untouched.
+
+Enemy root has the same structural error. r17 moved category labels to y=110 while L1/R1 remained on the y≈91 header, which r18 runtime still reports as visually wrong. Disassembly proves L1 x=260 at file `0x195BCC`, R1 x=407 at `0x195C14`, category bases at `0x195CB4/0x195CD0/0x195CEC`, and category y at `0x195D18`. r19 restores the pristine y=93 row and composes L1=194, category visible starts 226/292/358 (bases 205/271/337 plus the renderer's fixed +21), and R1=428.
+
+Measured r19 candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r19.iso`, SHA-256 `4dbce7f49d537e6cc6aa156ff6d4723596de31b3a8657caa83a4b0a40db81928`; pre-ROFS ELF `c8795405f9746db2ba260c4fe644ee45218d200232112496f4ad6f1f58ba50b3`; post-ROFS ELF `d34d53d62b6236d1c1b87577704bbd2eb8d84945564216750df74347e82a7cef`; **150/150** final-image checks; **218** tests in both suites (10 dependency-free skips / 1 Pillow-owned-corpus skip); repeat build byte-for-byte identical. Runtime acceptance is pending.

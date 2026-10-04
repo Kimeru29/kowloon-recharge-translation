@@ -40,10 +40,10 @@ Status meanings:
 | H.A.N.T. Help category/topic labels + navigation | **Working / runtime-proven** | v11-r11 manual runtime confirms the Help category/topic menu presentation is substantially English and navigation works. Preserve all **55 topic labels** and the three-tab owner including `Ruins`. This status applies to labels/navigation only, not selected topic body text. |
 | H.A.N.T. selected Help topic bodies | **Working with minor r16 polish pending** | r15 runtime accepts H.A.N.T Functions, ADV Controls and Moving in Ruins; Exploration Controls is also correct except that its final `(!)` icon remains slightly too close to the warning text. r16 nudges only that final icon six pixels left. |
 | H.A.N.T. Config labels / values | **Working / runtime-proven** | r15 runtime reports Config looks fully translated and visually correct. r16 does not modify this path. |
-| H.A.N.T. Mail empty state | **Translated; r18 centering candidate** | r17 runtime confirms Mail is translated but `No mail received.` remains too far right. r18 removes the prior guessed two-space prefix while leaving the shared Mail-row constructor unchanged. Non-empty Mail content remains frozen. |
-| H.A.N.T. Enemy category tabs | **Translated; r17 geometry preserved** | r17 changes the renderer-pre-addition X bases so visible starts are 210/290/370 at the accepted y=110/style 1. The r17 review supplied no new Enemy defect; r18 leaves this path byte-for-byte unchanged. |
-| H.A.N.T. Dictionary tabs + term lists | **Translated; r18 layout candidate** | r17 runtime proves x=232 still places A/K/S/T/N/H/M/Y/R/W behind the longer English `【Dictionary】`. r18 keeps the accepted 14px cadence but starts at x=268, after the chrome ending at x=267 and before R1≈407. Dictionary `No data.` padding is reduced from ten to five cells. |
-| H.A.N.T. Dictionary selected definitions | **Official English complete; r18 chrome-clearance candidate** | r17 runtime confirms the 3,827-row official body reflow is live, but its mode-1 offset 8 still leaves titles such as H.A.N.T behind `【Dictionary】`. r18 changes only file `0x588C84` from 6→12, matching the six-cell Japanese→English chrome-width delta. `0x190A40` and all definition body tables remain unchanged from r17. |
+| H.A.N.T. Mail empty state | **Translated; r19 centering candidate** | r18 runtime confirms removing string padding was insufficient. The empty state is row 4 of the shared Mail-row constructor; r19 changes that proven X owner from 143 to 120, the centered origin for 272px of style-0 English in a 512px viewport. |
+| H.A.N.T. Enemy category tabs | **Translated; r19 root-nav candidate** | r18 runtime shows the y=110 split-row composition still looks wrong. r19 restores y=93 and lays out the complete header cluster at L1=194, Small/Large/Human=226/292/358, R1=428. |
+| H.A.N.T. Dictionary tabs + term lists | **Translated; r19 root-nav candidate** | r18 runtime proves moving only the tabs cannot fix a title that already overlaps pristine L1. r19 owns the whole root row: L1=274, tabs x=302 with 12px cadence, R1=428. `No data.` is preserved from r18. |
+| H.A.N.T. Dictionary selected definitions | **Working / runtime-proven** | r18 runtime accepts Cairo, H.A.N.T and Heracleion detail pages. Freeze the 3,827-row official definition reflow, mode-1 offset `0x588C84 = 12`, and pristine `0x190A40`. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
@@ -444,7 +444,7 @@ Manual r16 gate: continue from the r15 review. Check Exploration's final `(!)` g
 r17 is bounded to the final r16 Dictionary/Enemy review. Dictionary index tabs are centered at x=232 with their accepted 14px cadence; the Dictionary-only mode offset at file `0x588C84` moves selected title/icon chrome +32px away from `【Dictionary】`; official 208-page definition generation removes Japanese paragraph separators from English body prose while retaining one title/body break; Enemy keeps y=110/style 1 but corrects its actual visible starts to 210/290/370. All other r16-good surfaces are frozen.
 
 
-### v11-r18 — current Mail/Dictionary geometry candidate
+### v11-r18 — runtime-tested Dictionary-detail checkpoint
 
 - path: `/private/tmp/kowloon-recharge-startup-en-v11-r18.iso`
 - ISO SHA-256: `136a528030ab5ce611efd67fd06cf637f9015e1ba3473f760f9a6e72d7754c9a`
@@ -455,6 +455,22 @@ r17 is bounded to the final r16 Dictionary/Enemy review. Dictionary index tabs a
 - dependency-free suite: **218 tests OK** (10 expected skips)
 - Pillow-enabled suite: **218 tests OK** (1 owned-corpus skip)
 - deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r18-repeat.iso` is byte-for-byte identical.
-- PCSX2 status: **runtime proof pending**.
+- PCSX2 status: **runtime-tested by Pablo; Cairo/H.A.N.T/Heracleion detail pages are accepted, but Mail centering and Dictionary/Enemy root navigation remain incorrect**.
 
 r18 preserves r17's official Dictionary definition body reflow and Enemy placement. It removes Mail's leading empty-state padding, reduces Dictionary empty-state padding to five cells, starts the ten Dictionary index tabs at x=268 with the accepted 14px cadence, and changes only the Dictionary mode-1 title/icon offset from 6 to 12. All previously accepted surfaces and `0x190A40` remain frozen.
+
+
+### v11-r19 — current Mail/Dictionary/Enemy root-layout candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r19.iso`
+- ISO SHA-256: `4dbce7f49d537e6cc6aa156ff6d4723596de31b3a8657caa83a4b0a40db81928`
+- translated ELF SHA-256 before ROFS rewrite: `c8795405f9746db2ba260c4fe644ee45218d200232112496f4ad6f1f58ba50b3`
+- final post-ROFS ELF SHA-256: `d34d53d62b6236d1c1b87577704bbd2eb8d84945564216750df74347e82a7cef`
+- translated/final ELF size: 8,562,114 bytes
+- final-image startup acceptance: **150/150** (`local/startup-acceptance-v11-r19.json`)
+- dependency-free suite: **218 tests OK** (10 expected skips)
+- Pillow-enabled suite: **218 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r19-repeat.iso` is byte-for-byte identical.
+- PCSX2 status: **runtime proof pending**.
+
+r19 freezes the now-accepted Dictionary detail path. It changes only three reviewed presentation classes: shared Mail-row X 143→120 so the 272px English empty state centers in the 512px viewport; Dictionary root navigation becomes L1=274, tabs=302..422 at 12px cadence, R1=428; Enemy root navigation returns to y=93 with L1=194, Small/Large/Human=226/292/358 and R1=428.

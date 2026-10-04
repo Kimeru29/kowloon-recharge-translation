@@ -987,3 +987,10 @@ Measured r18 result:
 - `/private/tmp/kowloon-recharge-startup-en-v11-r18-repeat.iso` is byte-for-byte identical.
 
 Do not launch PCSX2 automatically. r18's visual gate is Mail empty-state centering; Dictionary empty-state centering across several index pages; Dictionary A/K/S/T/N/H/M/Y/R/W clearing `【Dictionary】` and R1; and selected titles/icons such as H.A.N.T/Cairo/Heracleion/Rosetta Society clearing `【Dictionary】`. The r17 definition body reflow, Enemy row, and every previously accepted surface are preservation checks.
+
+
+## Build startup v11-r19 Mail/Dictionary/Enemy root-layout candidate
+
+r19 uses the same pristine source and overlays. It freezes all r18 Dictionary detail work and changes only Mail shared-row X plus Dictionary/Enemy root-nav geometry.
+
+Measured result: ISO `4dbce7f49d537e6cc6aa156ff6d4723596de31b3a8657caa83a4b0a40db81928`; pre-ROFS ELF `c8795405f9746db2ba260c4fe644ee45218d200232112496f4ad6f1f58ba50b3`; post-ROFS ELF `d34d53d62b6236d1c1b87577704bbd2eb8d84945564216750df74347e82a7cef`; **150/150** final-image checks; **218** dependency-free tests (10 skips); **218** Pillow-enabled tests (1 skip); repeat ISO byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r19.iso`. Do not launch PCSX2 automatically.
