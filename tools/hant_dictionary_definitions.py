@@ -244,26 +244,26 @@ def _wrap_official_paragraph(paragraph: str) -> tuple[str, ...]:
 
 
 def _reflow_official_rows(values: tuple[str | None, ...]) -> tuple[str, ...]:
-    paragraphs: list[list[str]] = []
-    current: list[str] = []
-    for value in values:
-        if value is None or not _normalize_official_text(value):
-            if current:
-                paragraphs.append(current)
-                current = []
-            continue
-        current.append(value)
-    if current:
-        paragraphs.append(current)
-
-    output: list[str] = []
-    for index, fragments in enumerate(paragraphs):
-        if index:
-            output.append("")
-        output.extend(_wrap_official_paragraph(_join_official_fragments(fragments)))
-    if not output:
+    # The PS2 Japanese tables use blank rows as layout separators, but the
+    # remaster's English fragments do not preserve the same sentence boundaries.
+    # Carrying every Japanese separator across can split an English sentence in
+    # half (for example "world heritage" / "city"). Keep only the structural
+    # title/body separator: the first nonblank row is the term title and every
+    # remaining nonblank official fragment is one continuous English body.
+    normalized = [
+        _normalize_official_text(value)
+        for value in values
+        if value is not None and _normalize_official_text(value)
+    ]
+    if not normalized:
         raise ValueError("Dictionary definition reflow produced no English rows")
-    return tuple(output)
+
+    title_rows = _wrap_official_paragraph(normalized[0])
+    if len(normalized) == 1:
+        return title_rows
+
+    body = _join_official_fragments(normalized[1:])
+    return (*title_rows, "", *_wrap_official_paragraph(body))
 
 
 def build_official_dictionary_definitions(

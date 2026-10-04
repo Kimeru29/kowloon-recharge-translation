@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v11-r16 result: 217 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11-r17 result: 218 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -916,3 +916,38 @@ Measured r16 result:
 - repeat ISO `/private/tmp/kowloon-recharge-startup-en-v11-r16-repeat.iso` is byte-for-byte identical and has the same SHA-256.
 
 Do not launch PCSX2 automatically. r16's manual gate is the remaining r15 review: Exploration warning-icon spacing, Mail alignment/centering, Dictionary tabs/empty state plus representative opened definitions, and Enemy category/L1-R1 separation. Reconfirm Moving in Ruins, H.A.N.T Functions, ADV Controls and Config remain unchanged.
+
+
+## Build startup v11-r17 Dictionary/Enemy presentation candidate
+
+r17 uses the same pristine PS2 ISO and overlay set as r16. It changes only Dictionary tab/detail geometry, deterministic definition reflow, and Enemy category X geometry.
+
+```bash
+python3 -m tools.build_early_ui_elf
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r17.iso \
+  --overlay exact-mtx local/exact-mtx \
+  --overlay exact-ksf local/exact-ksf \
+  --overlay structural-mtx local/structural-mtx \
+  --overlay accepted local/accepted-overrides \
+  --overlay startup-graphics local/startup-graphics \
+  --elf artifacts/SLPM_665.11.en-early \
+  --report local/startup-build-v11-r17.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r17.iso \
+  --startup-graphics-root local/startup-graphics \
+  --report local/startup-acceptance-v11-r17.json
+```
+
+Measured r17 result:
+- ISO SHA-256: `728f9eae1d7dd2f69009732ff8c880585db1c6cde41d120358e04362428276dc`;
+- pre-ROFS ELF: `68ab06d3b2b51dbcdc8853944c04eadd0c165009afed488dfe158a167e0ca6f2`;
+- post-ROFS ELF: `ee24bb03984c7be760f398f01128faa65c02925552283c0ac9a6bc48dfd125a0`;
+- final ELF size: 8,562,126 bytes;
+- **150/150** final-image checks;
+- **218** dependency-free tests (10 expected skips);
+- **218** Pillow-enabled tests (1 owned-corpus skip);
+- repeat ISO is byte-for-byte identical.
+
+Do not launch PCSX2 automatically. Runtime checklist: Dictionary root tabs centered between L1/R1; Cairo/H.A.N.T/Heracleion/Rosetta Society title+icon clear of `【Dictionary】`; no body-internal blank-row sentence splits; Enemy `Small / Large / Human` centered/regularly spaced. Everything else should remain unchanged.
