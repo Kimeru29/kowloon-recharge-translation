@@ -525,3 +525,12 @@ Dictionary root has independent L1/R1 objects (files `0x18E1A4` and `0x18E1EC`) 
 Enemy root has the same structural error. r17 moved category labels to y=110 while L1/R1 remained on the y≈91 header, which r18 runtime still reports as visually wrong. Disassembly proves L1 x=260 at file `0x195BCC`, R1 x=407 at `0x195C14`, category bases at `0x195CB4/0x195CD0/0x195CEC`, and category y at `0x195D18`. r19 restores the pristine y=93 row and composes L1=194, category visible starts 226/292/358 (bases 205/271/337 plus the renderer's fixed +21), and R1=428.
 
 Measured r19 candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r19.iso`, SHA-256 `4dbce7f49d537e6cc6aa156ff6d4723596de31b3a8657caa83a4b0a40db81928`; pre-ROFS ELF `c8795405f9746db2ba260c4fe644ee45218d200232112496f4ad6f1f58ba50b3`; post-ROFS ELF `d34d53d62b6236d1c1b87577704bbd2eb8d84945564216750df74347e82a7cef`; **150/150** final-image checks; **218** tests in both suites (10 dependency-free skips / 1 Pillow-owned-corpus skip); repeat build byte-for-byte identical. Runtime acceptance is pending.
+
+
+## Startup v11-r20 Dictionary/Enemy selection-box trace
+
+Pablo's r19 runtime pass accepts all other reviewed work, including Mail centering and Dictionary detail pages. The remaining red-box mismatch is not text geometry. Dictionary's animated selector updates object `0x14` from current category `c8` with pristine `x = 223 + 18*i`, while the pristine tab text is `225 + 18*i`. r19 moved text to `302 + 12*i` but not this animation owner. r20 therefore preserves the original two-pixel inset with selector `300 + 12*i` (file `0x18DFD8` base and `0x18F7B4` cadence).
+
+Enemy has the same independent owner. Its selected category at struct `0x130` recreates the red object using pristine `x = 288 + 40*i`; Japanese category text begins at `292/332/372`, proving a four-pixel inset. r19 English text is frozen at `226/292/358`, so r20 changes only the selector to `222 + 66*i` (file `0x195F30` base and `0x195F28` cadence). r19's Enemy R1 x=428 is runtime-clipped, so r20 restores the independently owned R1 constructor to pristine x=407.
+
+Measured r20 candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r20.iso`, SHA-256 `374a8813fcf10d148c35b9e0e47be6d1d943ebf447752ed461f4a0fb17884ebd`; pre-ROFS ELF `30333e4d488714d2639b67c07da4ea76a4afd4b70e92ecc02f446421dd6850f9`; post-ROFS ELF `e4aa7717fe11111a7a82c07595a3d6e5088c2fc3b93dd4af2cb23610666bca83`; **150/150** final-image checks; **220** tests in both suites; repeat build byte-for-byte identical. Runtime acceptance remains Pablo's gate.

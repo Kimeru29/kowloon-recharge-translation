@@ -278,6 +278,11 @@ _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x18E1EC, 0x24020197, 0x240201AC),
     (0x18E398, 0x3C024190, 0x3C024140),
     (0x18E3AC, 0x3C024361, 0x3C024397),
+    # r19 runtime exposes the separately animated red selector. Pristine tracks
+    # the Japanese tabs at x = 223 + 18*i, two pixels before text at 225+18*i.
+    # Keep that inset against the r19 English text at 302 + 12*i.
+    (0x18DFD8, 0x3C03435F, 0x3C034396),  # selector base 223 -> 300
+    (0x18F7B4, 0x3C034190, 0x3C034140),  # selector cadence 18 -> 12
 )
 _HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # The generic detail renderer consults this per-mode integer only at its
@@ -299,14 +304,19 @@ _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # r18 runtime shows that pushing the categories below the divider is the
     # wrong composition. Keep every control on the original y=93 header row and
     # own the complete horizontal cluster: title ends near x=187, L1=194,
-    # visible category starts are 226/292/358, and R1=428. The renderer adds a
+    # visible category starts are 226/292/358. r19 runtime proves moving R1 to
+    # x=428 clips it, so R1 stays at its pristine x=407. The renderer adds a
     # fixed 21px to category bases 205/271/337.
     (0x195BCC, 0x3C024382, 0x3C024342),
-    (0x195C14, 0x24020197, 0x240201AC),
     (0x195CB4, 0x2402010F, 0x240200CD),
     (0x195CD0, 0x24020137, 0x2402010F),
     (0x195CEC, 0x2402015F, 0x24020151),
     (0x195D5C, 0x0000282D, 0x24050001),
+    # The Enemy red selector is independent from category text. Pristine uses
+    # x = 288 + 40*i, four pixels before Japanese text at 292/332/372. Track
+    # r19 English text 226/292/358 with the same inset: x = 222 + 66*i.
+    (0x195F28, 0x3C024220, 0x3C024284),  # selector cadence 40 -> 66
+    (0x195F30, 0x3C024390, 0x3C02435E),  # selector base 288 -> 222
 )
 _HANT_MAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # The empty state is assigned to row 4 after the ten Mail row objects are

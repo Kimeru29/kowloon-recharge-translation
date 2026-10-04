@@ -27,7 +27,7 @@ Full graphics suite:
 uv run --with pillow python -m unittest discover -s tests -v
 ```
 
-Current v11-r17 result: 218 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
+Current v11-r20 result: 220 tests; the dependency-free run passes with 10 expected skips, and the optional-Pillow run passes with 1 owned-corpus skip.
 
 ## Core corpus regeneration
 
@@ -994,3 +994,10 @@ Do not launch PCSX2 automatically. r18's visual gate is Mail empty-state centeri
 r19 uses the same pristine source and overlays. It freezes all r18 Dictionary detail work and changes only Mail shared-row X plus Dictionary/Enemy root-nav geometry.
 
 Measured result: ISO `4dbce7f49d537e6cc6aa156ff6d4723596de31b3a8657caa83a4b0a40db81928`; pre-ROFS ELF `c8795405f9746db2ba260c4fe644ee45218d200232112496f4ad6f1f58ba50b3`; post-ROFS ELF `d34d53d62b6236d1c1b87577704bbd2eb8d84945564216750df74347e82a7cef`; **150/150** final-image checks; **218** dependency-free tests (10 skips); **218** Pillow-enabled tests (1 skip); repeat ISO byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r19.iso`. Do not launch PCSX2 automatically.
+
+
+## Build startup v11-r20 Dictionary/Enemy selector-alignment candidate
+
+r20 uses the same pristine source and overlays. It freezes every r19-accepted surface and changes only the independently animated Dictionary/Enemy selector geometry plus the clipped Enemy R1 anchor.
+
+Measured result: ISO `374a8813fcf10d148c35b9e0e47be6d1d943ebf447752ed461f4a0fb17884ebd`; pre-ROFS ELF `30333e4d488714d2639b67c07da4ea76a4afd4b70e92ecc02f446421dd6850f9`; post-ROFS ELF `e4aa7717fe11111a7a82c07595a3d6e5088c2fc3b93dd4af2cb23610666bca83`; **150/150** final-image checks; **220** dependency-free tests (10 skips); **220** Pillow-enabled tests (1 skip); repeat ISO byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r20.iso`. Do not launch PCSX2 automatically.

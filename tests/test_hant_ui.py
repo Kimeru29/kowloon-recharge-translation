@@ -37,7 +37,7 @@ class HantTutorialTests(unittest.TestCase):
 
         self.assertEqual(160849, info.payload_size)
         self.assertEqual(
-            "61dc5243610474a9546d1a0c03509bf540ae5163f0bb30e6020c03a5c4d8ed03",
+            "39eb17fce13eb05fe4c469cfddb2f599c30b125048b5cc642f962839e21d1ab9",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -467,7 +467,9 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(0x3C024382, struct.unpack_from("<I", RAW, 0x195BCC)[0])
         self.assertEqual(0x3C024342, struct.unpack_from("<I", result, 0x195BCC)[0])
         self.assertEqual(0x24020197, struct.unpack_from("<I", RAW, 0x195C14)[0])
-        self.assertEqual(0x240201AC, struct.unpack_from("<I", result, 0x195C14)[0])
+        # r19 runtime shows x=428 clips R1. Restore the original proven x=407
+        # while leaving the now-good English category text positions unchanged.
+        self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
         self.assertEqual((0x2402010F, 0x24020137, 0x2402015F), tuple(struct.unpack_from("<I", RAW, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
         self.assertEqual((0x240200CD, 0x2402010F, 0x24020151), tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
         self.assertEqual(0x3C0242BA, struct.unpack_from("<I", RAW, 0x195D18)[0])
@@ -488,6 +490,35 @@ class HantTutorialTests(unittest.TestCase):
         # Keep the two source count cells so the separately rendered unread
         # number has a reserved gap instead of colliding with the English text.
         self.assertEqual("msgs  new", hant_ui.HANT_MAIL_COUNT_LABEL.english)
+
+    def test_r20_dictionary_selector_tracks_repacked_english_tabs(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+        # The moving selector is a separate owner from the ten text canvases.
+        # Pristine uses selector x = 223 + 18*category while text is
+        # x = 225 + 18*category. r19 moved only text to 302 + 12*category.
+        # Preserve the original 2px inset with selector x = 300 + 12*category.
+        self.assertEqual(0x3C03435F, struct.unpack_from("<I", RAW, 0x18DFD8)[0])
+        self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x18DFD8)[0])
+        self.assertEqual(0x3C034190, struct.unpack_from("<I", RAW, 0x18F7B4)[0])
+        self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x18F7B4)[0])
+        # Detail-page clearance and the H.A.N.T Functions singleton stay frozen.
+        self.assertEqual(12, struct.unpack_from("<I", result, 0x588C84)[0])
+        self.assertEqual(0x0000282D, struct.unpack_from("<I", result, 0x190A40)[0])
+
+    def test_r20_enemy_selector_tracks_english_categories(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+        # Pristine selection box follows x = 288 + 40*category, exactly 4px
+        # before Japanese category text at 292/332/372. r19 English text is
+        # 226/292/358, so its box must follow 222 + 66*category.
+        self.assertEqual(0x3C024220, struct.unpack_from("<I", RAW, 0x195F28)[0])
+        self.assertEqual(0x3C024284, struct.unpack_from("<I", result, 0x195F28)[0])
+        self.assertEqual(0x3C024390, struct.unpack_from("<I", RAW, 0x195F30)[0])
+        self.assertEqual(0x3C02435E, struct.unpack_from("<I", result, 0x195F30)[0])
+        # r19 category text geometry remains frozen.
+        self.assertEqual((0x240200CD, 0x2402010F, 0x24020151), tuple(
+            struct.unpack_from("<I", result, o)[0]
+            for o in (0x195CB4, 0x195CD0, 0x195CEC)
+        ))
 
     def test_exploration_warning_text_preserves_two_cell_icon_gutter(self) -> None:
         import tools.hant_ui as hant_ui
