@@ -142,6 +142,7 @@ class StartupAcceptanceTests(unittest.TestCase):
             ("hant_help_body_metadata", HANT_HELP_BODIES[0].metadata_descriptor_offset),
             ("hant_runtime_layout", 0x18BC84),
             ("hant_runtime_layout", 0x18E408),
+            ("hant_runtime_layout", 0x588C84),
             ("hant_runtime_layout", 0x195CB4),
             ("hant_runtime_layout", 0x195D5C),
             ("hant_mail_chrome", HANT_MAIL_COUNT_LABEL.lui_offset),

@@ -35,9 +35,9 @@ class HantTutorialTests(unittest.TestCase):
     def test_runtime_corrected_hant_payload_geometry_is_deterministic(self) -> None:
         result, info = patch_hant_tutorial(RAW)
 
-        self.assertEqual(162269, info.payload_size)
+        self.assertEqual(160861, info.payload_size)
         self.assertEqual(
-            "51066808bf9279998cf35fadac71e1b9f7281ccf98d14417d3448e6f34cc86f7",
+            "9141ab0a1c269dc5d90923b9532ea9d3d91c605998e1434d58ae8fd117b630d2",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -440,16 +440,25 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x190968)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x190A40)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", result, 0x190A40)[0])
-        # Dictionary tabs must fit between the fixed L1/R1 chrome: 260px origin
-        # with 14px advances keeps all ten 12px glyphs inside that span.
+        # Dictionary tabs fit between the fixed L1/R1 chrome at x=195/x=407.
+        # Ten 12px glyphs on a 14px cadence occupy 138px, so x=232 centers the
+        # complete group with equal 37px side gutters.
         self.assertEqual(0x3C024190, struct.unpack_from("<I", RAW, 0x18E398)[0])
         self.assertEqual(0x3C024160, struct.unpack_from("<I", result, 0x18E398)[0])
         self.assertEqual(0x3C024361, struct.unpack_from("<I", RAW, 0x18E3AC)[0])
-        self.assertEqual(0x3C024382, struct.unpack_from("<I", result, 0x18E3AC)[0])
-        # Enemy labels retain their proven horizontal owners/style, but the row
-        # moves from y=93 to y=110 so English no longer shares L1/R1's row.
+        self.assertEqual(0x3C024368, struct.unpack_from("<I", result, 0x18E3AC)[0])
+        # Dictionary detail title/icon X derives only from the mode-offset table.
+        # Japanese mode 1 uses 6 cells (icon x=179/title x=197), which collides
+        # with the longer English 【Dictionary】 chrome. Two more cells move both
+        # independently owned detail elements 32px right without touching the
+        # generic constructor or the r15-critical 0x190A40 singleton.
+        self.assertEqual(6, struct.unpack_from("<I", RAW, 0x588C84)[0])
+        self.assertEqual(8, struct.unpack_from("<I", result, 0x588C84)[0])
+        # Enemy's renderer adds 21px after these three integer X bases. Use
+        # bases 189/269/349 so the actual English starts are 210/290/370: a
+        # centered 210..430 block with 20px gaps between 60px labels.
         self.assertEqual((0x2402010F, 0x24020137, 0x2402015F), tuple(struct.unpack_from("<I", RAW, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
-        self.assertEqual((0x240200D1, 0x24020121, 0x24020171), tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
+        self.assertEqual((0x240200BD, 0x2402010D, 0x2402015D), tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
         self.assertEqual(0x3C0242BA, struct.unpack_from("<I", RAW, 0x195D18)[0])
         self.assertEqual(0x3C0242DC, struct.unpack_from("<I", result, 0x195D18)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x195D5C)[0])

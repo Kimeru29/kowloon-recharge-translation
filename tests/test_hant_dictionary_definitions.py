@@ -46,7 +46,16 @@ class HantDictionaryDefinitionTests(unittest.TestCase):
                 self.assertTrue(english_rows)
                 self.assertTrue(all(measured_hant_cells(row) <= DICTIONARY_DEFINITION_MAX_CELLS for row in english_rows))
                 total_english_rows += len(english_rows)
-        self.assertEqual(4177, total_english_rows)
+        self.assertEqual(3827, total_english_rows)
+
+    def test_definition_reflow_keeps_only_the_title_separator(self) -> None:
+        records = {record[0]: record for record in HANT_DICTIONARY_DEFINITION_DATA}
+        for key in ("dict_k_02", "dict_h_07", "dict_h_20", "dict_r_04"):
+            rows = records[key][5]
+            with self.subTest(key=key):
+                self.assertGreater(len(rows), 2)
+                self.assertEqual("", rows[1])
+                self.assertNotIn("", rows[2:])
 
     def test_generated_manifest_is_reproducible_from_owned_remaster_when_available(self) -> None:
         if not ENGLISH_BYTES.is_file():

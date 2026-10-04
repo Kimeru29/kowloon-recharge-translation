@@ -41,9 +41,9 @@ Status meanings:
 | H.A.N.T. selected Help topic bodies | **Working with minor r16 polish pending** | r15 runtime accepts H.A.N.T Functions, ADV Controls and Moving in Ruins; Exploration Controls is also correct except that its final `(!)` icon remains slightly too close to the warning text. r16 nudges only that final icon six pixels left. |
 | H.A.N.T. Config labels / values | **Working / runtime-proven** | r15 runtime reports Config looks fully translated and visually correct. r16 does not modify this path. |
 | H.A.N.T. Mail empty state | **Translated but buggy; r16 candidate** | r15 runtime proves the text is English but the layout is misaligned and `No mail received.` is not centered. r16 preserves the two numeric count slots with `msgs  new` and adjusts the empty-state padding for centering. Non-empty Mail content remains separate. |
-| H.A.N.T. Enemy category tabs | **Translated but buggy; r16 candidate** | r15 runtime proves `Small / Large / Human` are English but still overlap the L1/R1 chrome. r16 keeps their proven X/style owners and moves only the category row from y=93 to y=110. |
-| H.A.N.T. Dictionary tabs + term lists | **Translated but buggy; r16 candidate** | r15 runtime proves the Latin tabs/terms are live, but the top index labels overlap L1/R1 and the empty state is off-center. r16 uses a 260px tab origin with 14px advance and centers `No data.`. Selected definition pages are tracked separately. |
-| H.A.N.T. Dictionary selected definitions | **Official English complete; runtime pending** | r15 still shows Japanese/misaligned opened entries such as Cairo. r16 inventories all 208 mode-1 definition leaves and maps all 2,073 nonblank Japanese source rows uniquely to the recovered official CUSA27034 `English.bytes`, producing 4,177 deterministic 21-cell rows. Every source page is fingerprinted; `0x190A40` remains pristine. Runtime must confirm paging/alignment across representative long and short definitions. |
+| H.A.N.T. Enemy category tabs | **Translated; r17 layout candidate** | r16 runtime confirms the lower row is much better but `Small / Large / Human` remain horizontally mispositioned. r17 keeps y=110/style 1 and corrects the renderer-pre-addition X bases so visible starts are 210/290/370. |
+| H.A.N.T. Dictionary tabs + term lists | **Translated; r17 layout candidate** | r16 runtime confirms translation/empty-state improvements but the top index strip still looks off. r17 keeps 14px advance and moves the ten-tab origin to 232px, centered between fixed L1/R1 anchors. |
+| H.A.N.T. Dictionary selected definitions | **Official English complete; r17 layout/reflow candidate** | r16 runtime proves Cairo/H.A.N.T/Heracleion/Rosetta Society are translated but exposes title/icon collision and Japanese-derived blank separators inside English prose. r17 moves only the mode-1 title/icon offset +32px and regenerates all 208 pages as 3,827 deterministic <=21-cell rows with one title/body separator and no body-internal blank rows. `0x190A40` remains pristine. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
 ## Known executable/UI text not yet solved
@@ -426,3 +426,19 @@ Manual r15 gate: `H.A.N.T Functions` must show its English body again and exit c
 r16 keeps the r15-good surfaces frozen. It nudges only Exploration's final warning icon by 6px; repairs Mail count-slot semantics and empty-state centering; compresses/repositions Dictionary top tabs and centers its empty state; moves Enemy categories below L1/R1; and promotes all 208 Dictionary definition pages from the recovered official remaster `English.bytes`. The generated definition corpus proves 2,073 unique exact source-row matches, 208 fail-closed source fingerprints, 4,177 deterministic output rows, and a conservative 21-cell page width without touching the runtime-critical `0x190A40` singleton.
 
 Manual r16 gate: continue from the r15 review. Check Exploration's final `(!)` gap, Mail alignment/centering, Dictionary tabs/empty state plus several opened definitions including Cairo, and Enemy category/L1/R1 separation. Reconfirm Moving in Ruins, H.A.N.T Functions, ADV Controls and Config are unchanged.
+
+
+### v11-r17 — current Dictionary/Enemy presentation candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r17.iso`
+- ISO SHA-256: `728f9eae1d7dd2f69009732ff8c880585db1c6cde41d120358e04362428276dc`
+- translated ELF SHA-256 before ROFS rewrite: `68ab06d3b2b51dbcdc8853944c04eadd0c165009afed488dfe158a167e0ca6f2`
+- final post-ROFS ELF SHA-256: `ee24bb03984c7be760f398f01128faa65c02925552283c0ac9a6bc48dfd125a0`
+- translated/final ELF size: 8,562,126 bytes
+- final-image startup acceptance: **150/150** (`local/startup-acceptance-v11-r17.json`)
+- dependency-free suite: **218 tests OK** (10 expected skips)
+- Pillow-enabled suite: **218 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r17-repeat.iso` is byte-for-byte identical.
+- PCSX2 status: **runtime proof pending**.
+
+r17 is bounded to the final r16 Dictionary/Enemy review. Dictionary index tabs are centered at x=232 with their accepted 14px cadence; the Dictionary-only mode offset at file `0x588C84` moves selected title/icon chrome +32px away from `【Dictionary】`; official 208-page definition generation removes Japanese paragraph separators from English body prose while retaining one title/body break; Enemy keeps y=110/style 1 but corrects its actual visible starts to 210/290/370. All other r16-good surfaces are frozen.

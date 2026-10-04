@@ -269,11 +269,19 @@ _HANT_CONFIG_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
 _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x18E2CC, 0x0000282D, 0x24050001),
     (0x18E408, 0x0000282D, 0x24050001),
-    # Ten Latin index tabs share the header row with L1/R1. Compress their
-    # 18px Japanese-era advance to 14px and move the origin right so all ten
-    # 12px glyphs fit between the fixed controller chrome.
+    # Ten Latin index tabs share the header row with fixed L1/R1 anchors at
+    # x=195/x=407. A 14px cadence plus 12px glyph width occupies 138px, so an
+    # x=232 origin gives equal 37px side gutters.
     (0x18E398, 0x3C024190, 0x3C024160),
-    (0x18E3AC, 0x3C024361, 0x3C024382),
+    (0x18E3AC, 0x3C024361, 0x3C024368),
+)
+_HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    # The generic detail renderer consults this per-mode integer only at its
+    # selected-title and selected-icon X paths. Mode 1 (Dictionary) used six
+    # 16px cells for the shorter Japanese chrome; English 【Dictionary】 needs
+    # two additional cells. Changing only this mode moves both owners +32px
+    # without touching the shared constructor or the r15-critical singleton.
+    (0x588C84, 0x00000006, 0x00000008),
 )
 # r14 runtime disproved the earlier Dictionary-detail style attribution here.
 # 0x190968 is already the separately owned mode-4 H.A.N.T body-row font style;
@@ -284,11 +292,14 @@ _HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], .
 HANT_TUTORIAL_SINGLETON_STYLE_OFFSET = 0x190A40
 HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD = 0x0000282D
 _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
-    (0x195CB4, 0x2402010F, 0x240200D1),
-    (0x195CD0, 0x24020137, 0x24020121),
-    (0x195CEC, 0x2402015F, 0x24020171),
+    # The renderer adds a fixed 21px after each immediate below. Use bases
+    # 189/269/349 so the visible English starts are 210/290/370. Three 60px
+    # style-1 labels then span 210..430, centered on the 640px logical screen.
+    (0x195CB4, 0x2402010F, 0x240200BD),
+    (0x195CD0, 0x24020137, 0x2402010D),
+    (0x195CEC, 0x2402015F, 0x2402015D),
     # Japanese two-character categories fit on the L1/R1 row; English does not.
-    # Keep the proven X owners and move only the category-text row to y=110.
+    # Keep the proven row separation at y=110.
     (0x195D18, 0x3C0242BA, 0x3C0242DC),
     (0x195D5C, 0x0000282D, 0x24050001),
 )
@@ -299,6 +310,7 @@ _HANT_MAIL_COUNT_CODE_PREIMAGES: tuple[tuple[int, int], ...] = (
 HANT_RUNTIME_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     *_HANT_CONFIG_ENGLISH_STYLE_PATCHES,
     *_HANT_DICTIONARY_ENGLISH_STYLE_PATCHES,
+    *_HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES,
     *_HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES,
     *_HANT_ENEMY_LAYOUT_PATCHES,
 )
