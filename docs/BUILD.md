@@ -1001,3 +1001,10 @@ Measured result: ISO `4dbce7f49d537e6cc6aa156ff6d4723596de31b3a8657caa83a4b0a40d
 r20 uses the same pristine source and overlays. It freezes every r19-accepted surface and changes only the independently animated Dictionary/Enemy selector geometry plus the clipped Enemy R1 anchor.
 
 Measured result: ISO `374a8813fcf10d148c35b9e0e47be6d1d943ebf447752ed461f4a0fb17884ebd`; pre-ROFS ELF `30333e4d488714d2639b67c07da4ea76a4afd4b70e92ecc02f446421dd6850f9`; post-ROFS ELF `e4aa7717fe11111a7a82c07595a3d6e5088c2fc3b93dd4af2cb23610666bca83`; **150/150** final-image checks; **220** dependency-free tests (10 skips); **220** Pillow-enabled tests (1 skip); repeat ISO byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r20.iso`. Do not launch PCSX2 automatically.
+
+
+## Build startup v11-r21 Dictionary/Enemy selector-sizing candidate
+
+r21 uses the same pristine source and overlay set as r20. It freezes all r20-accepted surfaces, changes Dictionary selector intrinsic width 24→14px with identical UVs, and changes Enemy selector width 40→64px while compacting the accepted 12px category row left enough to clear R1.
+
+Measured result: ISO `08a9781ecfec5096f3d50769fabb686d7d8fa2cc82dcdca003e687dd05f9aaa7`; pre-ROFS ELF `457e2c149493f01a7ffcea7cc896af9b4296a8e587f17cb3e67edbb1ad1bb3cd`; post-ROFS ELF `b2a70936d57c6750f1f54ad19d1f398a11e6c0f2444bf3edb30cfd6e99c81616`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **222** dependency-free tests (10 skips); **222** Pillow-enabled tests (1 skip); repeat ISO `/private/tmp/kowloon-recharge-startup-en-v11-r21-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r21.iso`. Do not launch PCSX2 automatically.

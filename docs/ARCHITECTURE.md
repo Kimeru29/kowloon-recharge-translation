@@ -91,3 +91,8 @@ The executable uses `BISLPM-66511Save`. Ordinary memory-card saves are the cross
 ### v11-r20 selector ownership
 
 Dictionary and Enemy root selection rectangles are independent animated objects, not properties of their text canvases. Dictionary derives selector X from a stored base plus current-category cadence (`223 + 18*i` pristine), while Enemy recreates its selector from selected category `0x130` (`288 + 40*i` pristine). r20 changes only those formulas to follow the already-accepted English text geometry (`300 + 12*i` and `222 + 66*i`) and restores Enemy's independently owned R1 anchor to x=407. This keeps Mail, Dictionary detail offset `0x588C84 = 12`, `0x190A40`, translated text payloads, and all other r19-accepted owners outside the r20 mutation set.
+
+
+### v11-r21 selector resource geometry
+
+r20 proves selector position and selector size are independent owners. Both Dictionary and Enemy red frames are group-20 sprite resources constructed through VA `0x107D60`; their resource-table records resolve to one metadata leaf each. Dictionary index `0x21` owns metadata file `0x364BB0` and Enemy index `0x41` owns `0x3657B0`. r21 treats the second metadata word as the bounded rendered-width owner (24→14px and 40→64px respectively) and deliberately leaves each resource's UV rectangle byte-identical. Enemy additionally keeps the runtime-accepted style-1 font and adjusts only category/selector X packing; no global font or atlas mutation is introduced.
