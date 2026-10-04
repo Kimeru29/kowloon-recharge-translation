@@ -552,3 +552,12 @@ r21 runtime proves selector ownership/positioning correct but shows asymmetric p
 Unlock behavior: these selector fixes apply automatically to every item using the same family renderer/resource. Dictionary's ten root categories and mode-1 detail path are shared, and all 208 definition leaves are already generated. Enemy's Small/Large/Human root selector is shared. Separate H.A.N.T/help body tables remain independent and require their own promotion if still unresolved.
 
 Measured r22: ISO `1b3a9c916ec8436af94f702138efbdde3028158c4af256ba517293a2f3f2f009`, pre-ROFS ELF `60122115b3109f0acfc0c4f895a6fa79eb18fda7a3ff7d645310c050a7cab75d`, post-ROFS ELF `f1f6c68345e806296702fdd2f290b7cfbfb602dbe00992cd62819fe2954ec8ea`, final ELF size 8,562,114 bytes, **150/150** final-image checks, **223** tests in each suite, repeat ISO byte-identical.
+
+
+## Startup v11-r23 final H.A.N.T. header-clearance trace
+
+Pablo's r22 runtime screenshots leave only two header-edge defects. Dictionary repeats the already-proven Enemy clipping class: its independently owned R1 constructor is still x=428, so r23 moves only file `0x18E1EC` to x=424 while freezing tabs, selector base/cadence/width, detail offset `0x588C84 = 12`, and pristine `0x190A40`. Enemy's first selector is already correct at x=218 with width 64, but L1 remains x=194; the shared navigation footprint reaches into the selector. r23 moves only file `0x195BCC` to x=190, leaving category text 220/282/344, selector `218+62*i`, and R1 x=407 unchanged.
+
+Regression coverage is strengthened at the same boundary: `tests/test_startup_acceptance.py` now tampers every offset in `HANT_RUNTIME_LAYOUT_PATCHES` and requires the `hant_runtime_layout` final-image gate to fail, so all completed Config/Dictionary/Enemy layout owners remain fail-closed as the project continues.
+
+Measured r23: ISO `4465f4322fc252d1fa0cf734fc4c63697c38adbda155a90eadcaca37698a55c5`, pre-ROFS ELF `564c4268faf7f7224bc5a4dc1d67c758a2af003f2c5487a4056af8d537a2041f`, post-ROFS ELF `4b59521acbfc96b68a6a934a7eb2442b8e426288714065f96f1980aeff3516f8`, final ELF size 8,562,114 bytes, **150/150** final-image checks, **224** tests in each suite, repeat ISO byte-identical.

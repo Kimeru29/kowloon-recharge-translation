@@ -1015,3 +1015,10 @@ Measured result: ISO `08a9781ecfec5096f3d50769fabb686d7d8fa2cc82dcdca003e687dd05
 r22 uses the same pristine source/overlay pipeline. Only Dictionary selector width (14→16px) and Enemy selector base (216→218) differ from r21.
 
 Measured result: ISO `1b3a9c916ec8436af94f702138efbdde3028158c4af256ba517293a2f3f2f009`; pre-ROFS ELF `60122115b3109f0acfc0c4f895a6fa79eb18fda7a3ff7d645310c050a7cab75d`; post-ROFS ELF `f1f6c68345e806296702fdd2f290b7cfbfb602dbe00992cd62819fe2954ec8ea`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **223** dependency-free tests (10 skips); **223** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r22-repeat.iso` is byte-for-byte identical.
+
+
+## Build startup v11-r23 final H.A.N.T. header-clearance candidate
+
+r23 is a bounded follow-up to Pablo's r22 runtime screenshots. It preserves all r22 selector/text geometry and changes only two navigation-control owners: Dictionary R1 moves x=428→424, and Enemy L1 moves x=194→190. The H.A.N.T. final-image regression test now fail-closes every owner in `HANT_RUNTIME_LAYOUT_PATCHES`, not a representative subset.
+
+Measured result: ISO `4465f4322fc252d1fa0cf734fc4c63697c38adbda155a90eadcaca37698a55c5`; pre-ROFS ELF `564c4268faf7f7224bc5a4dc1d67c758a2af003f2c5487a4056af8d537a2041f`; post-ROFS ELF `4b59521acbfc96b68a6a934a7eb2442b8e426288714065f96f1980aeff3516f8`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **224** dependency-free tests (10 skips); **224** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r23-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r23.iso`. Do not launch PCSX2 automatically.
