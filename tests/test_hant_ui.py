@@ -37,7 +37,7 @@ class HantTutorialTests(unittest.TestCase):
 
         self.assertEqual(160849, info.payload_size)
         self.assertEqual(
-            "39eb17fce13eb05fe4c469cfddb2f599c30b125048b5cc642f962839e21d1ab9",
+            "70dcf7621a841ab1ec67854c515abc2d78049d673116da8d2b9e1b102b0fb861",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -460,18 +460,15 @@ class HantTutorialTests(unittest.TestCase):
         # generic constructor or the r15-critical 0x190A40 singleton.
         self.assertEqual(6, struct.unpack_from("<I", RAW, 0x588C84)[0])
         self.assertEqual(12, struct.unpack_from("<I", result, 0x588C84)[0])
-        # Enemy uses the same header pattern. r17/r18 moved categories to y=110,
-        # which runtime shows below the divider. r19 restores y=93 and owns L1/R1
-        # plus all three category bases as one compact row. The renderer adds 21px
-        # to bases 205/271/337, giving visible starts 226/292/358.
+        # Enemy uses the same header pattern. r21 keeps y=93/style 1 and packs
+        # category starts to 220/282/344 so Human clears runtime-good R1 x=407.
         self.assertEqual(0x3C024382, struct.unpack_from("<I", RAW, 0x195BCC)[0])
         self.assertEqual(0x3C024342, struct.unpack_from("<I", result, 0x195BCC)[0])
         self.assertEqual(0x24020197, struct.unpack_from("<I", RAW, 0x195C14)[0])
-        # r19 runtime shows x=428 clips R1. Restore the original proven x=407
-        # while leaving the now-good English category text positions unchanged.
+        # r19 runtime shows x=428 clips R1. Keep the original proven x=407.
         self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
         self.assertEqual((0x2402010F, 0x24020137, 0x2402015F), tuple(struct.unpack_from("<I", RAW, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
-        self.assertEqual((0x240200CD, 0x2402010F, 0x24020151), tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
+        self.assertEqual((0x240200C7, 0x24020105, 0x24020143), tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)))
         self.assertEqual(0x3C0242BA, struct.unpack_from("<I", RAW, 0x195D18)[0])
         self.assertEqual(0x3C0242BA, struct.unpack_from("<I", result, 0x195D18)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x195D5C)[0])
@@ -505,20 +502,57 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(12, struct.unpack_from("<I", result, 0x588C84)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", result, 0x190A40)[0])
 
-    def test_r20_enemy_selector_tracks_english_categories(self) -> None:
+    def test_r21_enemy_selector_tracks_compact_english_categories(self) -> None:
         result, _info = patch_hant_tutorial(RAW)
-        # Pristine selection box follows x = 288 + 40*category, exactly 4px
-        # before Japanese category text at 292/332/372. r19 English text is
-        # 226/292/358, so its box must follow 222 + 66*category.
+        # Pristine selection box follows x = 288 + 40*category, four pixels
+        # before Japanese category text. r21 preserves that inset while packing
+        # the English row to selector x = 216 + 62*category.
         self.assertEqual(0x3C024220, struct.unpack_from("<I", RAW, 0x195F28)[0])
-        self.assertEqual(0x3C024284, struct.unpack_from("<I", result, 0x195F28)[0])
+        self.assertEqual(0x3C024278, struct.unpack_from("<I", result, 0x195F28)[0])
         self.assertEqual(0x3C024390, struct.unpack_from("<I", RAW, 0x195F30)[0])
-        self.assertEqual(0x3C02435E, struct.unpack_from("<I", result, 0x195F30)[0])
-        # r19 category text geometry remains frozen.
-        self.assertEqual((0x240200CD, 0x2402010F, 0x24020151), tuple(
+        self.assertEqual(0x3C024358, struct.unpack_from("<I", result, 0x195F30)[0])
+        self.assertEqual((0x240200C7, 0x24020105, 0x24020143), tuple(
             struct.unpack_from("<I", result, o)[0]
             for o in (0x195CB4, 0x195CD0, 0x195CEC)
         ))
+
+    def test_r21_selector_resources_have_bounded_intrinsic_width_owners(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+
+        # Both red selectors are unique group-20 sprite resources. Keep their
+        # resource-table ownership fail-closed before changing only rendered width.
+        self.assertEqual(0x00482E50, struct.unpack_from("<I", RAW, 0x385310)[0])
+        self.assertEqual((0x00464B30, 1), struct.unpack_from("<II", RAW, 0x382FD8))
+        self.assertEqual((0x00465730, 1), struct.unpack_from("<II", RAW, 0x3830D8))
+
+        # Dictionary index 0x21 is intrinsically 24px wide, which spans two
+        # 12px English tabs in r20. r21 stretches the same texture to 14px; its
+        # UV rectangle remains byte-identical so no neighboring atlas art leaks.
+        self.assertEqual(24.0, struct.unpack_from("<f", RAW, 0x364BB4)[0])
+        self.assertEqual(14.0, struct.unpack_from("<f", result, 0x364BB4)[0])
+        self.assertEqual(RAW[0x364BB8:0x364BD0], result[0x364BB8:0x364BD0])
+
+        # Enemy index 0x41 is only 40px wide, shorter than a 5-glyph style-1
+        # English category (60px). Stretch to 64px while preserving its UVs.
+        self.assertEqual(40.0, struct.unpack_from("<f", RAW, 0x3657B4)[0])
+        self.assertEqual(64.0, struct.unpack_from("<f", result, 0x3657B4)[0])
+        self.assertEqual(RAW[0x3657B8:0x3657D0], result[0x3657B8:0x3657D0])
+
+    def test_r21_enemy_header_clears_r1_without_shrinking_text(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+
+        # Keep style 1 (12px). Pack the three 60px words at 220/282/344,
+        # leaving Human ending at x=404 before the runtime-good R1 at x=407.
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x195D5C)[0])
+        self.assertEqual(
+            (0x240200C7, 0x24020105, 0x24020143),
+            tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)),
+        )
+        # Selector retains its proven four-pixel leading inset and follows the
+        # same 62px cadence: x=216/278/340, with 64px rendered width.
+        self.assertEqual(0x3C024278, struct.unpack_from("<I", result, 0x195F28)[0])
+        self.assertEqual(0x3C024358, struct.unpack_from("<I", result, 0x195F30)[0])
+        self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
 
     def test_exploration_warning_text_preserves_two_cell_icon_gutter(self) -> None:
         import tools.hant_ui as hant_ui

@@ -280,9 +280,14 @@ _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x18E3AC, 0x3C024361, 0x3C024397),
     # r19 runtime exposes the separately animated red selector. Pristine tracks
     # the Japanese tabs at x = 223 + 18*i, two pixels before text at 225+18*i.
-    # Keep that inset against the r19 English text at 302 + 12*i.
+    # Keep that inset against the r19 English text at 302 + 12*i. r20 proves the
+    # position is correct but the group-20/index-0x21 sprite is still 24px wide,
+    # spanning two 12px tabs. r21 changes only its rendered width to 14px while
+    # keeping the same UV rectangle, so the existing selector art is scaled rather
+    # than sampling adjacent atlas pixels.
     (0x18DFD8, 0x3C03435F, 0x3C034396),  # selector base 223 -> 300
     (0x18F7B4, 0x3C034190, 0x3C034140),  # selector cadence 18 -> 12
+    (0x364BB4, 0x41C00000, 0x41600000),  # selector width 24 -> 14
 )
 _HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # The generic detail renderer consults this per-mode integer only at its
@@ -303,20 +308,22 @@ HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD = 0x0000282D
 _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # r18 runtime shows that pushing the categories below the divider is the
     # wrong composition. Keep every control on the original y=93 header row and
-    # own the complete horizontal cluster: title ends near x=187, L1=194,
-    # visible category starts are 226/292/358. r19 runtime proves moving R1 to
-    # x=428 clips it, so R1 stays at its pristine x=407. The renderer adds a
-    # fixed 21px to category bases 205/271/337.
+    # preserve the accepted style-1 12px text. r20 proves selector/text alignment
+    # but Human still reaches R1. Pack the three 60px words at 220/282/344,
+    # leaving Human ending at x=404 before runtime-good R1 x=407. The renderer
+    # adds a fixed 21px to category bases 199/261/323.
     (0x195BCC, 0x3C024382, 0x3C024342),
-    (0x195CB4, 0x2402010F, 0x240200CD),
-    (0x195CD0, 0x24020137, 0x2402010F),
-    (0x195CEC, 0x2402015F, 0x24020151),
+    (0x195CB4, 0x2402010F, 0x240200C7),
+    (0x195CD0, 0x24020137, 0x24020105),
+    (0x195CEC, 0x2402015F, 0x24020143),
     (0x195D5C, 0x0000282D, 0x24050001),
-    # The Enemy red selector is independent from category text. Pristine uses
-    # x = 288 + 40*i, four pixels before Japanese text at 292/332/372. Track
-    # r19 English text 226/292/358 with the same inset: x = 222 + 66*i.
-    (0x195F28, 0x3C024220, 0x3C024284),  # selector cadence 40 -> 66
-    (0x195F30, 0x3C024390, 0x3C02435E),  # selector base 288 -> 222
+    # The group-20/index-0x41 selector keeps its proven four-pixel leading inset:
+    # x = 216 + 62*i. Its pristine 40px width cannot contain a 60px English
+    # category, so stretch the same UV rectangle to 64px without touching atlas
+    # coordinates or shrinking the already accepted text style.
+    (0x195F28, 0x3C024220, 0x3C024278),  # selector cadence 40 -> 62
+    (0x195F30, 0x3C024390, 0x3C024358),  # selector base 288 -> 216
+    (0x3657B4, 0x42200000, 0x42800000),  # selector width 40 -> 64
 )
 _HANT_MAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # The empty state is assigned to row 4 after the ten Mail row objects are
@@ -337,6 +344,19 @@ HANT_RUNTIME_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     *_HANT_ENEMY_LAYOUT_PATCHES,
     *_HANT_MAIL_LAYOUT_PATCHES,
 )
+
+# r21 selector-width ownership: group 20 resolves through the executable resource
+# table to unique metadata records for Dictionary index 0x21 and Enemy index 0x41.
+# Width lives in the second metadata word; UV coordinates are intentionally not
+# patched so only rendered geometry changes.
+_HANT_SELECTOR_RESOURCE_OWNER_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x385310, 0x00482E50),  # group 20 -> resource table VA 0x482E50
+    (0x382FD8, 0x00464B30),  # index 0x21 -> Dictionary selector metadata
+    (0x382FDC, 0x00000001),  # exactly one metadata record
+    (0x3830D8, 0x00465730),  # index 0x41 -> Enemy selector metadata
+    (0x3830DC, 0x00000001),  # exactly one metadata record
+)
+
 
 _HANT_RINGTONE_RENDERER_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x18B674, 0x3C020068), (0x18B678, 0x24427160),
@@ -1122,7 +1142,7 @@ def _validate_source(raw: bytes) -> None:
         if actual_metadata != expected_metadata:
             raise ValueError(f"H.A.N.T help-body metadata preimage mismatch: {spec.key}")
 
-    for offset, expected in (*_HANT_RINGTONE_RENDERER_PREIMAGES, *_HANT_DICTIONARY_TAB_RENDERER_PREIMAGES, *_HANT_ENEMY_CATEGORY_RENDERER_PREIMAGES):
+    for offset, expected in (*_HANT_SELECTOR_RESOURCE_OWNER_PREIMAGES, *_HANT_RINGTONE_RENDERER_PREIMAGES, *_HANT_DICTIONARY_TAB_RENDERER_PREIMAGES, *_HANT_ENEMY_CATEGORY_RENDERER_PREIMAGES):
         if offset + 4 > len(raw) or struct.unpack_from("<I", raw, offset)[0] != expected:
             raise ValueError(f"H.A.N.T content renderer preimage mismatch at {offset:#x}")
 
