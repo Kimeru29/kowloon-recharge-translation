@@ -41,8 +41,8 @@ Status meanings:
 | H.A.N.T. selected Help topic bodies | **Working with minor r16 polish pending** | r15 runtime accepts H.A.N.T Functions, ADV Controls and Moving in Ruins; Exploration Controls is also correct except that its final `(!)` icon remains slightly too close to the warning text. r16 nudges only that final icon six pixels left. |
 | H.A.N.T. Config labels / values | **Working / runtime-proven** | r15 runtime reports Config looks fully translated and visually correct. r16 does not modify this path. |
 | H.A.N.T. Mail empty state | **Working / runtime-proven** | r19 runtime accepts the empty-state presentation. Freeze the shared Mail-row x=120 owner and `No mail received.` payload. |
-| H.A.N.T. Enemy category tabs | **Working; r22 padding polish candidate** | r21 runtime is good enough; r22 keeps labels at 220/282/344, R1 x=407 and 64px selector width, shifting only selector base 216→218 for 2px symmetric padding around all three labels. |
-| H.A.N.T. Dictionary tabs + term lists | **Working; r22 padding polish candidate** | r21 runtime tracks each active tab correctly; r22 widens the selector 14→16px while keeping x=300+12*i, yielding 2px padding around every 12px A/K/S/T/N/H/M/Y/R/W glyph. |
+| H.A.N.T. Enemy category tabs | **Working; r23 final header-clearance candidate** | r22 runtime says the selector/text geometry is good but its first 64px box still covers part of L1. r23 preserves labels 220/282/344, selector 218+62*i, width 64 and R1 x=407, moving only L1 x=194→190. |
+| H.A.N.T. Dictionary tabs + term lists | **Working; r23 final header-clearance candidate** | r22 runtime accepts the 16px selector/tab presentation but the right R1 control remains clipped. r23 preserves tabs x=302+12*i and selector x=300+12*i/16px, moving only Dictionary R1 x=428→424. |
 | H.A.N.T. Dictionary selected definitions | **Working / runtime-proven** | r18 runtime accepts Cairo, H.A.N.T and Heracleion detail pages. Freeze the 3,827-row official definition reflow, mode-1 offset `0x588C84 = 12`, and pristine `0x190A40`. |
 | Command/menu labels | **Not runtime-tested** | v11 replaces fit-driven patches with the 19-label semantic manifest and 21-entry pointer ownership table. Fixed labels use accepted English; `Return above ground` and `Report card` relocate through their proven aliases; unresolved `メディア` remains intentionally Japanese. All three menu acceptance classes pass, but runtime semantics/layout still need observation. |
 
@@ -490,3 +490,19 @@ r19 freezes the now-accepted Dictionary detail path. It changes only three revie
 - PCSX2 status: **runtime proof pending**.
 
 r20 changes no translated content and no accepted detail/list geometry. It changes only Dictionary's moving selector from `223+18*i` to `300+12*i`, Enemy's moving selector from `288+40*i` to `222+66*i`, and restores Enemy R1 from the clipped r19 x=428 to pristine x=407.
+
+
+### v11-r23 — final H.A.N.T. header-clearance candidate
+
+- path: `/private/tmp/kowloon-recharge-startup-en-v11-r23.iso`
+- ISO SHA-256: `4465f4322fc252d1fa0cf734fc4c63697c38adbda155a90eadcaca37698a55c5`
+- translated ELF SHA-256 before ROFS rewrite: `564c4268faf7f7224bc5a4dc1d67c758a2af003f2c5487a4056af8d537a2041f`
+- final post-ROFS ELF SHA-256: `4b59521acbfc96b68a6a934a7eb2442b8e426288714065f96f1980aeff3516f8`
+- translated/final ELF size: 8,562,114 bytes
+- final-image startup acceptance: **150/150**
+- dependency-free suite: **224 tests OK** (10 expected skips)
+- Pillow-enabled suite: **224 tests OK** (1 owned-corpus skip)
+- deterministic repeat: `/private/tmp/kowloon-recharge-startup-en-v11-r23-repeat.iso` is byte-for-byte identical.
+- PCSX2 status: **runtime proof pending only for Dictionary R1 clearance and Enemy L1/selector clearance**.
+
+r23 changes no translated content and no accepted selector/text geometry. It moves only Dictionary R1 x=428→424 and Enemy L1 x=194→190. Final-image regression coverage now tamper-checks every owned H.A.N.T. runtime-layout patch so later rounds cannot silently alter already-complete Config/Dictionary/Enemy geometry.

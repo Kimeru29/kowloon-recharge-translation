@@ -37,7 +37,7 @@ class HantTutorialTests(unittest.TestCase):
 
         self.assertEqual(160849, info.payload_size)
         self.assertEqual(
-            "c085742ab2e5b1d35168cf9ea0167bf674f18b970b48d0efb9ce63f1f7bf0ea6",
+            "5eab03846f79991132f61acfec1db516167f01a8076c929dcff38ccc05f5b5bf",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -448,7 +448,7 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(0x3C024343, struct.unpack_from("<I", RAW, 0x18E1A4)[0])
         self.assertEqual(0x3C024389, struct.unpack_from("<I", result, 0x18E1A4)[0])
         self.assertEqual(0x24020197, struct.unpack_from("<I", RAW, 0x18E1EC)[0])
-        self.assertEqual(0x240201AC, struct.unpack_from("<I", result, 0x18E1EC)[0])
+        self.assertEqual(0x240201A8, struct.unpack_from("<I", result, 0x18E1EC)[0])
         self.assertEqual(0x3C024190, struct.unpack_from("<I", RAW, 0x18E398)[0])
         self.assertEqual(0x3C024140, struct.unpack_from("<I", result, 0x18E398)[0])
         self.assertEqual(0x3C024361, struct.unpack_from("<I", RAW, 0x18E3AC)[0])
@@ -463,7 +463,7 @@ class HantTutorialTests(unittest.TestCase):
         # Enemy uses the same header pattern. r21 keeps y=93/style 1 and packs
         # category starts to 220/282/344 so Human clears runtime-good R1 x=407.
         self.assertEqual(0x3C024382, struct.unpack_from("<I", RAW, 0x195BCC)[0])
-        self.assertEqual(0x3C024342, struct.unpack_from("<I", result, 0x195BCC)[0])
+        self.assertEqual(0x3C02433E, struct.unpack_from("<I", result, 0x195BCC)[0])
         self.assertEqual(0x24020197, struct.unpack_from("<I", RAW, 0x195C14)[0])
         # r19 runtime shows x=428 clips R1. Keep the original proven x=407.
         self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
@@ -558,8 +558,7 @@ class HantTutorialTests(unittest.TestCase):
         result, _info = patch_hant_tutorial(RAW)
 
         # Dictionary tabs remain 12px glyphs at x=302+12*i. A 16px box at
-        # x=300+12*i gives 2px padding on both sides; the final box ends at
-        # x=424, leaving four pixels before Dictionary R1 at x=428.
+        # x=300+12*i gives 2px padding on both sides.
         self.assertEqual(16.0, struct.unpack_from("<f", result, 0x364BB4)[0])
         self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x18DFD8)[0])
         self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x18F7B4)[0])
@@ -575,6 +574,28 @@ class HantTutorialTests(unittest.TestCase):
             tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)),
         )
         self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
+
+    def test_r23_header_controls_clear_runtime_clip_boundaries(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+
+        # r22 runtime still clips Dictionary R1 at x=428. Pull only R1 four
+        # pixels inward to x=424; the accepted tabs/selector remain unchanged.
+        self.assertEqual(0x240201A8, struct.unpack_from("<I", result, 0x18E1EC)[0])
+        self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x18DFD8)[0])
+        self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x18F7B4)[0])
+        self.assertEqual(16.0, struct.unpack_from("<f", result, 0x364BB4)[0])
+
+        # Enemy's selector starts at x=218. The shared L1 control occupies the
+        # same ~28px header footprint as Dictionary, so x=194 overlaps its arrow.
+        # Move only Enemy L1 to x=190; categories, selector and R1 stay frozen.
+        self.assertEqual(0x3C02433E, struct.unpack_from("<I", result, 0x195BCC)[0])
+        self.assertEqual(0x3C02435A, struct.unpack_from("<I", result, 0x195F30)[0])
+        self.assertEqual(0x3C024278, struct.unpack_from("<I", result, 0x195F28)[0])
+        self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
+        self.assertEqual(
+            (0x240200C7, 0x24020105, 0x24020143),
+            tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)),
+        )
 
 
     def test_exploration_warning_text_preserves_two_cell_icon_gutter(self) -> None:

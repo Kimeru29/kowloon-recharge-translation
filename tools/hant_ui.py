@@ -272,10 +272,11 @@ _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     # r18 runtime proves that the longer English chrome and pristine L1 cannot
     # coexist: 【Dictionary】 spans x=75..267 while L1 begins at x=195. Own the
     # complete root-nav row and pack it inside the same header instead of moving
-    # only the letters. L1=274, ten 12px tabs span x=302..422 at 12px cadence,
-    # and R1=428. The accepted selected-detail mode offset remains independent.
+    # only the letters. L1=274 and ten 12px tabs span x=302..422 at 12px cadence.
+    # r22 runtime still clips R1 at x=428, so r23 pulls only R1 inward to x=424.
+    # The accepted selected-detail mode offset remains independent.
     (0x18E1A4, 0x3C024343, 0x3C024389),
-    (0x18E1EC, 0x24020197, 0x240201AC),
+    (0x18E1EC, 0x24020197, 0x240201A8),
     (0x18E398, 0x3C024190, 0x3C024140),
     (0x18E3AC, 0x3C024361, 0x3C024397),
     # r19 runtime exposes the separately animated red selector. Pristine tracks
@@ -310,9 +311,11 @@ _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # wrong composition. Keep every control on the original y=93 header row and
     # preserve the accepted style-1 12px text. r20 proves selector/text alignment
     # but Human still reaches R1. Pack the three 60px words at 220/282/344,
-    # leaving Human ending at x=404 before runtime-good R1 x=407. The renderer
-    # adds a fixed 21px to category bases 199/261/323.
-    (0x195BCC, 0x3C024382, 0x3C024342),
+    # leaving Human ending at x=404 before runtime-good R1 x=407. r22 runtime
+    # shows the first 64px selector at x=218 still covers the L1 arrow, so r23
+    # moves only L1 from x=194 to x=190. The renderer adds a fixed 21px to
+    # category bases 199/261/323.
+    (0x195BCC, 0x3C024382, 0x3C02433E),
     (0x195CB4, 0x2402010F, 0x240200C7),
     (0x195CD0, 0x24020137, 0x24020105),
     (0x195CEC, 0x2402015F, 0x24020143),
