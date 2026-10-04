@@ -243,3 +243,12 @@ Do not launch PCSX2 automatically. The r21 visual gate is only: cycle Dictionary
 5. Regenerate ignored `local/` evidence if implementation changed; never trust stale generated files.
 6. Always build from the pristine PS2 ISO.
 7. Never launch PCSX2 without the exact-visual-scope approval gate.
+
+
+### v11-r22 final selector-padding polish
+
+r21 runtime is accepted as functionally correct for Dictionary/Enemy selection tracking. r22 is a bounded visual polish only: Dictionary selector width changes 14→16px while keeping `x=300+12*i`, giving each 12px tab glyph 2px padding on both sides; Enemy keeps the accepted 64px selector and 60px labels, but shifts only the selector base 216→218 so `Small/Large/Human` also receive 2px symmetric padding without moving text or R1. All other r21 owners are frozen.
+
+These fixes are shared by menu family, not per item. Dictionary's selector resource/index path is shared by all ten top categories, and the mode-1 Dictionary detail renderer/208 generated definitions remain common to terms that unlock later. Enemy's top selector resource is shared by Small/Large/Human, so later content inside those categories inherits the corrected header. Other H.A.N.T menu/help families may have independent body/selector owners; unlocking a new leaf does not automatically translate a separate unpromoted body table.
+
+Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r22.iso`, SHA-256 `1b3a9c916ec8436af94f702138efbdde3028158c4af256ba517293a2f3f2f009`; pre-ROFS ELF `60122115b3109f0acfc0c4f895a6fa79eb18fda7a3ff7d645310c050a7cab75d`; post-ROFS ELF `f1f6c68345e806296702fdd2f290b7cfbfb602dbe00992cd62819fe2954ec8ea`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **223** tests in both suites (10 dependency-free skips / 1 Pillow skip); deterministic repeat is byte-for-byte identical. Runtime proof remains Pablo's gate.

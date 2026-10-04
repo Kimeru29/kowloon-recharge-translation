@@ -282,12 +282,12 @@ _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     # the Japanese tabs at x = 223 + 18*i, two pixels before text at 225+18*i.
     # Keep that inset against the r19 English text at 302 + 12*i. r20 proves the
     # position is correct but the group-20/index-0x21 sprite is still 24px wide,
-    # spanning two 12px tabs. r21 changes only its rendered width to 14px while
-    # keeping the same UV rectangle, so the existing selector art is scaled rather
-    # than sampling adjacent atlas pixels.
+    # spanning two 12px tabs. r21 changes only its rendered width to 14px; r22 adds the final symmetric
+    # padding by widening it to 16px while keeping the same UV rectangle, so the
+    # existing selector art is scaled rather than sampling adjacent atlas pixels.
     (0x18DFD8, 0x3C03435F, 0x3C034396),  # selector base 223 -> 300
     (0x18F7B4, 0x3C034190, 0x3C034140),  # selector cadence 18 -> 12
-    (0x364BB4, 0x41C00000, 0x41600000),  # selector width 24 -> 14
+    (0x364BB4, 0x41C00000, 0x41800000),  # selector width 24 -> 16
 )
 _HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # The generic detail renderer consults this per-mode integer only at its
@@ -317,12 +317,12 @@ _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x195CD0, 0x24020137, 0x24020105),
     (0x195CEC, 0x2402015F, 0x24020143),
     (0x195D5C, 0x0000282D, 0x24050001),
-    # The group-20/index-0x41 selector keeps its proven four-pixel leading inset:
-    # x = 216 + 62*i. Its pristine 40px width cannot contain a 60px English
-    # category, so stretch the same UV rectangle to 64px without touching atlas
-    # coordinates or shrinking the already accepted text style.
+    # The group-20/index-0x41 selector is 64px around a 60px English label. r22
+    # shifts only its base from x=216 to x=218, preserving the 62px cadence and
+    # yielding symmetric 2px padding without touching atlas coordinates, label
+    # positions, or the already accepted text style.
     (0x195F28, 0x3C024220, 0x3C024278),  # selector cadence 40 -> 62
-    (0x195F30, 0x3C024390, 0x3C024358),  # selector base 288 -> 216
+    (0x195F30, 0x3C024390, 0x3C02435A),  # selector base 288 -> 218
     (0x3657B4, 0x42200000, 0x42800000),  # selector width 40 -> 64
 )
 _HANT_MAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (

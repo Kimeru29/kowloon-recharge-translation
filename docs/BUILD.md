@@ -1008,3 +1008,10 @@ Measured result: ISO `374a8813fcf10d148c35b9e0e47be6d1d943ebf447752ed461f4a0fb17
 r21 uses the same pristine source and overlay set as r20. It freezes all r20-accepted surfaces, changes Dictionary selector intrinsic width 24→14px with identical UVs, and changes Enemy selector width 40→64px while compacting the accepted 12px category row left enough to clear R1.
 
 Measured result: ISO `08a9781ecfec5096f3d50769fabb686d7d8fa2cc82dcdca003e687dd05f9aaa7`; pre-ROFS ELF `457e2c149493f01a7ffcea7cc896af9b4296a8e587f17cb3e67edbb1ad1bb3cd`; post-ROFS ELF `b2a70936d57c6750f1f54ad19d1f398a11e6c0f2444bf3edb30cfd6e99c81616`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **222** dependency-free tests (10 skips); **222** Pillow-enabled tests (1 skip); repeat ISO `/private/tmp/kowloon-recharge-startup-en-v11-r21-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r21.iso`. Do not launch PCSX2 automatically.
+
+
+## Build startup v11-r22 selector-padding candidate
+
+r22 uses the same pristine source/overlay pipeline. Only Dictionary selector width (14→16px) and Enemy selector base (216→218) differ from r21.
+
+Measured result: ISO `1b3a9c916ec8436af94f702138efbdde3028158c4af256ba517293a2f3f2f009`; pre-ROFS ELF `60122115b3109f0acfc0c4f895a6fa79eb18fda7a3ff7d645310c050a7cab75d`; post-ROFS ELF `f1f6c68345e806296702fdd2f290b7cfbfb602dbe00992cd62819fe2954ec8ea`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **223** dependency-free tests (10 skips); **223** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r22-repeat.iso` is byte-for-byte identical.

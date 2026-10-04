@@ -37,7 +37,7 @@ class HantTutorialTests(unittest.TestCase):
 
         self.assertEqual(160849, info.payload_size)
         self.assertEqual(
-            "70dcf7621a841ab1ec67854c515abc2d78049d673116da8d2b9e1b102b0fb861",
+            "c085742ab2e5b1d35168cf9ea0167bf674f18b970b48d0efb9ce63f1f7bf0ea6",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -510,7 +510,7 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(0x3C024220, struct.unpack_from("<I", RAW, 0x195F28)[0])
         self.assertEqual(0x3C024278, struct.unpack_from("<I", result, 0x195F28)[0])
         self.assertEqual(0x3C024390, struct.unpack_from("<I", RAW, 0x195F30)[0])
-        self.assertEqual(0x3C024358, struct.unpack_from("<I", result, 0x195F30)[0])
+        self.assertEqual(0x3C02435A, struct.unpack_from("<I", result, 0x195F30)[0])
         self.assertEqual((0x240200C7, 0x24020105, 0x24020143), tuple(
             struct.unpack_from("<I", result, o)[0]
             for o in (0x195CB4, 0x195CD0, 0x195CEC)
@@ -529,7 +529,7 @@ class HantTutorialTests(unittest.TestCase):
         # 12px English tabs in r20. r21 stretches the same texture to 14px; its
         # UV rectangle remains byte-identical so no neighboring atlas art leaks.
         self.assertEqual(24.0, struct.unpack_from("<f", RAW, 0x364BB4)[0])
-        self.assertEqual(14.0, struct.unpack_from("<f", result, 0x364BB4)[0])
+        self.assertEqual(16.0, struct.unpack_from("<f", result, 0x364BB4)[0])
         self.assertEqual(RAW[0x364BB8:0x364BD0], result[0x364BB8:0x364BD0])
 
         # Enemy index 0x41 is only 40px wide, shorter than a 5-glyph style-1
@@ -551,8 +551,31 @@ class HantTutorialTests(unittest.TestCase):
         # Selector retains its proven four-pixel leading inset and follows the
         # same 62px cadence: x=216/278/340, with 64px rendered width.
         self.assertEqual(0x3C024278, struct.unpack_from("<I", result, 0x195F28)[0])
-        self.assertEqual(0x3C024358, struct.unpack_from("<I", result, 0x195F30)[0])
+        self.assertEqual(0x3C02435A, struct.unpack_from("<I", result, 0x195F30)[0])
         self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
+
+    def test_r22_selectors_have_symmetric_padding_without_touching_labels(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+
+        # Dictionary tabs remain 12px glyphs at x=302+12*i. A 16px box at
+        # x=300+12*i gives 2px padding on both sides; the final box ends at
+        # x=424, leaving four pixels before Dictionary R1 at x=428.
+        self.assertEqual(16.0, struct.unpack_from("<f", result, 0x364BB4)[0])
+        self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x18DFD8)[0])
+        self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x18F7B4)[0])
+
+        # Enemy labels stay at 220/282/344 and remain 60px wide. Shift only
+        # the 64px selector base from x=216 to x=218, yielding symmetric 2px
+        # padding. Human's box ends at x=406, before runtime-good R1 x=407.
+        self.assertEqual(0x3C02435A, struct.unpack_from("<I", result, 0x195F30)[0])
+        self.assertEqual(0x3C024278, struct.unpack_from("<I", result, 0x195F28)[0])
+        self.assertEqual(64.0, struct.unpack_from("<f", result, 0x3657B4)[0])
+        self.assertEqual(
+            (0x240200C7, 0x24020105, 0x24020143),
+            tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)),
+        )
+        self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
+
 
     def test_exploration_warning_text_preserves_two_cell_icon_gutter(self) -> None:
         import tools.hant_ui as hant_ui
