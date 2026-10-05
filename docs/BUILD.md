@@ -1057,3 +1057,20 @@ Measured result: ISO `5210dde53302c6340cc27550f0f170a31ca317907759dbc29a92839c47
 r28 freezes all r27 Help category text geometry and changes only the selected red box. ADV uses a centered 48px box, Ruins a centered 72px box, and Other keeps its centered 64px box. Enemy, Dictionary, topic selectors and Help bodies are unchanged.
 
 Measured result: ISO `e7517dfafd98766733324d3b8f62dcccf29b69928e8242cf469114830e197a83`; pre-ROFS ELF `25bad09a73def9900addcb96bdfea01a564d3147b0544d425ac7edef11901eef`; post-ROFS ELF `44ab4e4a20e11ce2162fe1e262dfa1d59e6106ab2fa89dedfa3aeafe856a2547`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **229** dependency-free tests (10 skips); **229** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r28-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r28.iso`. Do not launch PCSX2 automatically.
+
+
+## v11-r30 companion HUD build
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r30.iso`
+
+- SHA-256: `7bed876be95e19fd7c2fe1ade882eaf9fb0518db1165510861fa69d89db63c5f`
+- pre-ROFS translated ELF SHA-256: `3da35c9939524c8e89c5df5b618c9556e721ec86051d9010dba9df0e303378ec`
+- post-ROFS ELF SHA-256: `a85d899f3fd6d6ca8ce88a4c8f3b71eb02aa960577367c456ab4fbb865049d17`
+- final ELF size: 8,642,989 bytes
+- final-image acceptance: **153/153**
+- dependency-free suite: **239 tests OK** (10 expected skips)
+- Pillow-enabled suite: **239 tests OK** (1 owned-corpus skip)
+- 1,145 overlays; 892 in place / 253 relocated; 1,145 executable ROFS records patched
+- repeat build `/private/tmp/kowloon-recharge-startup-en-v11-r30-repeat.iso` is byte-for-byte identical.
+
+Build uses the same pristine ISO/overlay set as r29. `tools.generate_companion_hud_data` derives the committed companion ownership manifest from pristine `SLPM_665.11` plus owned CUSA27034 `English.bytes`; normal builds do not require the PS4 extraction because the generated exact mappings and source hashes are committed.

@@ -33,6 +33,7 @@ from tools.hant_ui import (
     HANT_WRAPPED_LINES,
 )
 from tools.localization import encode_ps2_english
+from tools.companion_hud import COMPANION_ACTION_LABELS, COMPANION_COMMENT_LINES
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.menu_ui import MENU_LABELS
 from tools.memory_card_ui import (
@@ -270,6 +271,51 @@ def _verify_dungeon_semantics(
             break
 
     return action_ok, item_ok
+
+
+def _verify_companion_hud_semantics(
+    raw: bytes,
+    segment: tuple[int, int, int, int] | None,
+) -> tuple[bool, bool]:
+    comments_ok = segment is not None and len(COMPANION_COMMENT_LINES) == 1650
+    for spec in COMPANION_COMMENT_LINES:
+        if not comments_ok:
+            break
+        source = spec.source_text.encode("cp932") + b"\x00"
+        if raw[spec.source_offset:spec.source_offset + len(source)] != source:
+            comments_ok = False
+            break
+        for pointer_offset in spec.pointer_offsets:
+            if pointer_offset + 4 > len(raw):
+                comments_ok = False
+                break
+            target_va = struct.unpack_from("<I", raw, pointer_offset)[0]
+            if not _segment_has_wide_text(raw, segment, target_va, spec.display_english):
+                comments_ok = False
+                break
+
+    actions_ok = segment is not None and len(COMPANION_ACTION_LABELS) == 31
+    for spec in COMPANION_ACTION_LABELS:
+        if not actions_ok:
+            break
+        source = spec.source_text.encode("cp932") + b"\x00"
+        if raw[spec.source_offset:spec.source_offset + len(source)] != source:
+            actions_ok = False
+            break
+        if spec.pointer_offset + 4 > len(raw):
+            actions_ok = False
+            break
+        target_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+        if spec.english is None:
+            source_va = _ELF_MAIN_VADDR + spec.source_offset - _ELF_MAIN_FILE_OFFSET
+            if target_va != source_va:
+                actions_ok = False
+                break
+        elif not _segment_has_wide_text(raw, segment, target_va, spec.english):
+            actions_ok = False
+            break
+
+    return comments_ok, actions_ok
 
 
 def _translation_segment(raw: bytes) -> tuple[int, int, int, int] | None:
@@ -521,6 +567,22 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "dungeon_item_names",
             dungeon_items_ok,
             "one or more battle/L1 item-name pointers do not resolve to exact official wide English",
+        )
+    )
+
+    companion_comments_ok, companion_actions_ok = _verify_companion_hud_semantics(raw, segment)
+    checks.append(
+        _check(
+            "companion_hud_comments",
+            companion_comments_ok,
+            "one or more companion HUD comment aliases do not resolve to the exact PS4 English line",
+        )
+    )
+    checks.append(
+        _check(
+            "companion_hud_actions",
+            companion_actions_ok,
+            "one or more companion HUD action labels drifted from their translated/pristine owner",
         )
     )
     heap_break_ok = (
