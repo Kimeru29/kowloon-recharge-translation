@@ -588,3 +588,10 @@ Pablo's r25 runtime screenshot narrows the remaining defects to two geometry edg
 Help exposes the opposite failure mode. r25 moved the 72px category-selector family from x=200 to x=192 so `Other` would end at x=402 before R1, but that also moved `ADV`'s left edge into L1. The selector resource is shared, so r26 restores base x=200 and reduces width 72→64px: positions 200/269/338 still end at 264/333/402. The 12px labels are aligned at selector+2 (202/271/340); only `Ruins` needs to return to its pristine X base for that alignment. This fixes both left and right shoulders without touching selector cadence, R1, the 268px topic selector, Help bodies, or Enemy.
 
 Measured r26: ISO `189434d74b98fe2b1cacb4e1a2edfad9ac6943e12b6e8b655c4a4c4884fd57b0`; pre/post-ROFS ELF `fc001382a330a43313098adf3f70dfeec4fc1d77f2e93284de2d72cd39dcf940` / `572ff87377d3c2692309da36689b38c107988eaf8442fb510f9b034d3678b7c2`; **150/150** final-image checks; both suites execute **227 tests**; repeat ISO is byte-identical.
+
+
+## Startup v11-r27 final Help category-owner trace
+
+Pablo's r26 runtime screenshot resolves the remaining Help defect without changing selector geometry. The prior static attribution was backwards: the r26 mutation at `0x18C768` visibly moved `Ruins`, proving that owner belongs to `Ruins`; `0x18C778` is therefore the `ADV` X owner. r27 restores `0x18C768` to `0x3C02433D` and changes only `0x18C778` from `0x3C02437A` to `0x3C024372` (-8px). Selector base x=200, selector width 64px, `Other`, topic selector geometry and Help bodies remain unchanged.
+
+The same runtime review promotes Enemy and Dictionary from candidates to accepted/frozen geometry. A dedicated r27 regression pins the complete accepted Dictionary header cluster and the Enemy shoulders/category/selector geometry so later Help work cannot move either family.

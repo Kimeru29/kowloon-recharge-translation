@@ -1043,3 +1043,10 @@ Build only from the pristine PS2 ISO with the same overlay pipeline as r24. Meas
 r26 is a bounded follow-up to Pablo's r25 runtime screenshot. Dictionary moves the complete accepted L1→R1 cluster another four pixels left. Help keeps the r25 12px text and 268px topic selector, but fixes the category selector's L1 overlap by restoring selector base x=200, shrinking its shared width 72→64px while preserving right edge x=402, and aligning category labels at x=202/271/340. Enemy and all accepted detail/content owners remain frozen.
 
 Measured result: ISO `189434d74b98fe2b1cacb4e1a2edfad9ac6943e12b6e8b655c4a4c4884fd57b0`; pre-ROFS ELF `fc001382a330a43313098adf3f70dfeec4fc1d77f2e93284de2d72cd39dcf940`; post-ROFS ELF `572ff87377d3c2692309da36689b38c107988eaf8442fb510f9b034d3678b7c2`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **227** dependency-free tests (10 skips); **227** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r26-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r26.iso`. Do not launch PCSX2 automatically.
+
+
+## Build startup v11-r27 final Help owner-correction candidate
+
+r27 changes only the Help category X owner proven wrong by runtime: `Ruins` is restored at `0x18C768`, and `ADV` receives the intended -8px nudge at `0x18C778`. The accepted Help selector base/width, `Other`, Dictionary and Enemy geometry remain frozen.
+
+Measured result: ISO `5210dde53302c6340cc27550f0f170a31ca317907759dbc29a92839c4781fb9e`; pre-ROFS ELF `9a925cb3c5b930ecaea0669f85399c1ef1c3514edf8e18e656e21df81773a1ff`; post-ROFS ELF `a31135de31bba5baa367925b743d48ddb6ab8a9a2d169da176440a4b3777fc27`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **228** dependency-free tests (10 skips); **228** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r27-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r27.iso`. Do not launch PCSX2 automatically.

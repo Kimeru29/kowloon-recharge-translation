@@ -111,3 +111,8 @@ r25 extends the group-20 selector ownership model to Help without coupling it to
 ### v11-r26 bounded header/selector geometry
 
 r26 keeps the existing family-owned renderers and changes no text ownership. Dictionary remains one rigid header cluster: L1, tab text base, animated selector base and R1 all move four pixels left together while cadence/width stay fixed. Help keeps the shared category-selector resource but corrects both shoulders without a new renderer: selector base returns to x=200 and shared width shrinks 72→64px, preserving the same x=402 right edge; category labels align at x=202/271/340. The 268px Help topic selector, all 55 topic labels, Help bodies, Dictionary details/definitions and the runtime-proven Enemy family remain independent/frozen.
+
+
+### v11-r27 Help category-owner correction
+
+r27 changes no renderer or resource ownership. Runtime observation identifies the r26 Help category X-owner attribution as reversed: file offset `0x18C768` controls `Ruins`, while `0x18C778` controls `ADV`. The selector remains at x=200 with the accepted 64px shared width; `Ruins` is restored to its pristine owner word and only `ADV` receives the intended -8px X nudge. `Other`, the 268px Help topic selector, Help bodies, and all accepted content remain unchanged. Enemy and Dictionary are now runtime-accepted and explicitly frozen by dedicated geometry regressions.
