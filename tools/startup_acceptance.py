@@ -951,7 +951,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         )
     )
     checks.append(_check("hant_help_body_metadata", hant_help_body_metadata_ok, "one or more selected Help-body icon records do not follow the English 12px/16px geometry"))
-    checks.append(_check("hant_runtime_layout", hant_runtime_layout_ok, "Config/Dictionary/Enemy H.A.N.T renderer geometry is stale"))
+    checks.append(_check("hant_runtime_layout", hant_runtime_layout_ok, "Config/Dictionary/Help/Enemy H.A.N.T renderer geometry is stale"))
     checks.append(_check("hant_mail_chrome", hant_mail_chrome_ok, "Mail count/status chrome does not resolve to its translated direct-code owner"))
     checks.append(_check("hant_dictionary_definitions", hant_dictionary_definitions_ok, "one or more observed Dictionary definition pages are stale or unresolved"))
     checks.append(_check("hant_content_values", hant_content_values_ok, "Mail/Config/Dictionary/Enemy H.A.N.T content values are stale or unresolved"))

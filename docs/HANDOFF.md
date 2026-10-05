@@ -270,3 +270,14 @@ Pablo runtime-tested r23. Enemy is now accepted as perfect for the current story
 Dictionary is also accepted except for a smaller remaining right-edge R1 clip. Since r23's 428→424 move reduced the clip with no regression, r24 repeats the same bounded correction once, changing only Dictionary R1 x=424→420. Tabs, 16px selector, detail-page geometry, `0x588C84 = 12`, pristine `0x190A40`, and all other accepted H.A.N.T. owners remain frozen.
 
 Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r24.iso`, SHA-256 `46112aaaefb80a317dec4bed36e526d3e9f05f780dd435b4ecb0516c85e304d0`; pre/post-ROFS ELF `2242f5472f9ab228c51da4f776eb011e47b2facbfec02baf64159f3be71be58f` / `930770fdad8ac71d1291e250400e467c0258cc57a1176f1bc330aa09e8de88e5`; final-image acceptance **150/150**; both suites **225 tests**; repeat ISO byte-identical. The only runtime gate for this round is Dictionary R1 visibility. Do not launch PCSX2 automatically.
+
+
+### v11-r25 Dictionary/Help final-layout candidate
+
+Pablo runtime-tested r24. Enemy is accepted as perfect at the current story point and remains frozen exactly at L1 x=190, labels 220/282/344, selector x=218+62*i/64px, R1 x=407, y=93/style 1. r25 adds no Enemy mutations and re-pins the complete reviewed header in regression coverage.
+
+Dictionary still shows a slight right-edge R1 clip. r25 moves the complete accepted cluster four pixels left rather than continuing with R1-only nudges: L1 x=270, tabs x=298+12*i, selector x=296+12*i with width 16, and R1 x=416. The selected-detail path, generated definitions, `0x588C84 = 12` and pristine `0x190A40` remain unchanged.
+
+Help now has bounded presentation ownership too. Topic/category label constructors use style 1 (12px). The `ADV / Ruins / Other` category row shifts eight pixels left while retaining its 72px selector; the topic-row selector is unique group-20 index `0x22` and widens 168→268px with unchanged UVs, enough for the longest 22-cell translated topic plus 2px padding per side. This change applies to the shared Help topic family, including later-unlocked rows that use the same owner; it does not change selected Help body text.
+
+Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r25.iso`, SHA-256 `8cd3e369c08f8c29609c54236e73bfb06bf62b1c9aaaa9b0529fd08a17aec6c4`; pre/post-ROFS ELF `4100ea75fd1d82819521279fbf8edfc8038f6ec0dc852e68309896db6f47ed1b` / `d0dfaa4390d6aaba4162b6a5115dfc4fb0b9e40d533737911d4c29557c6c86d5`; final-image acceptance **150/150**; **226** dependency-free tests (10 skips); **226** Pillow-enabled tests (1 skip); repeat ISO byte-identical. Runtime visual gates are Dictionary R1 and Help selector/text encapsulation only. Do not launch PCSX2 automatically.
