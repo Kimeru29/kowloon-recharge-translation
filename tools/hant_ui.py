@@ -272,21 +272,21 @@ _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     # r18 runtime proves that the longer English chrome and pristine L1 cannot
     # coexist: 【Dictionary】 spans x=75..267 while L1 begins at x=195. Own the
     # complete root-nav row and pack it inside the same header instead of moving
-    # only the letters. r24 left L1=274, tabs at x=302+12*i, selector at x=300,
-    # and R1=420. r25 moves that complete accepted cluster four pixels left as
-    # one unit so R1 clears the remaining right-edge clip without changing
-    # cadence, selector width, or selected-detail geometry.
-    (0x18E1A4, 0x3C024343, 0x3C024387),  # L1 195 -> 270
-    (0x18E1EC, 0x24020197, 0x240201A0),  # R1 407 -> 416
+    # only the letters. r25 left L1=270, tabs at x=298+12*i, selector at x=296,
+    # and R1=416. r26 repeats the same proven four-pixel cluster shift once more
+    # so the complete header moves left together without changing cadence,
+    # selector width, or selected-detail geometry.
+    (0x18E1A4, 0x3C024343, 0x3C024385),  # L1 195 -> 266
+    (0x18E1EC, 0x24020197, 0x2402019C),  # R1 407 -> 412
     (0x18E398, 0x3C024190, 0x3C024140),  # tab cadence 18 -> 12
-    (0x18E3AC, 0x3C024361, 0x3C024395),  # tab base 225 -> 298
+    (0x18E3AC, 0x3C024361, 0x3C024393),  # tab base 225 -> 294
     # r19 runtime exposes the separately animated red selector. Pristine tracks
     # the Japanese tabs at x = 223 + 18*i, two pixels before text at 225+18*i.
     # Keep that inset against the English tab row. r20 proves the position is
     # correct but the group-20/index-0x21 sprite is still 24px wide, spanning two
-    # 12px tabs. r21/r22 settle on 16px with symmetric 2px padding; r25 keeps that
-    # width/cadence and shifts only the complete cluster base four pixels left.
-    (0x18DFD8, 0x3C03435F, 0x3C034394),  # selector base 223 -> 296
+    # 12px tabs. r21/r22 settle on 16px with symmetric 2px padding; r26 keeps that
+    # width/cadence and shifts the complete cluster base another four pixels left.
+    (0x18DFD8, 0x3C03435F, 0x3C034392),  # selector base 223 -> 292
     (0x18F7B4, 0x3C034190, 0x3C034140),  # selector cadence 18 -> 12
     (0x364BB4, 0x41C00000, 0x41800000),  # selector width 24 -> 16
 )
@@ -307,21 +307,23 @@ _HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], .
 HANT_TUTORIAL_SINGLETON_STYLE_OFFSET = 0x190A40
 HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD = 0x0000282D
 _HANT_HELP_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
-    # r25 runtime screenshots expose two independent Help presentation defects:
-    # topic/category text is still style 0 (16px), and the Japanese-era geometry
-    # is too wide for the translated labels. Reuse the already-proven style 1
+    # r24 runtime screenshots exposed two independent Help presentation defects:
+    # topic/category text was still style 0 (16px), and Japanese-era geometry was
+    # too wide for the translated labels. r25 reused the already-proven style 1
     # (12px) for both text constructors. Topic rows retain x=143, preserving the
     # selector's existing 2px leading inset.
     (0x18C674, 0x0000282D, 0x24050001),  # topic rows style 0 -> 1
     (0x18C7F8, 0x0000282D, 0x24050001),  # category labels style 0 -> 1
-    # Keep the existing 72px category selector and its 69px cadence, but shift
-    # the whole ADV/Ruins/Other composition eight pixels left. Selector positions
-    # become 192/261/330; text becomes 202/263/340 after the renderer's fixed
-    # +21px label inset, so the final box ends at x=402 before R1 at x=403.
-    (0x18C3F4, 0x3C034348, 0x3C034340),  # category selector base 200 -> 192
-    (0x18C768, 0x3C02433D, 0x3C024335),  # ADV base 189 -> 181
-    (0x18C778, 0x3C02437A, 0x3C024372),  # Ruins base 250 -> 242
-    (0x18C788, 0x24020147, 0x2402013F),  # Other base 327 -> 319
+    # r25 preserved the right boundary by moving the whole 72px selector cluster
+    # left, but runtime shows the ADV selector now reaches into L1. r26 instead
+    # restores selector base x=200 and shrinks the shared category selector to
+    # 64px, preserving the same x=402 right edge. Put every label at selector+2:
+    # ADV x=202, Ruins x=271, Other x=340.
+    (0x18C3F4, 0x3C034348, 0x3C034348),  # selector base stays 200
+    (0x18C768, 0x3C02433D, 0x3C024335),  # ADV base 189 -> 181 (x=202)
+    (0x18C778, 0x3C02437A, 0x3C02437A),  # Ruins base stays 250 (x=271)
+    (0x18C788, 0x24020147, 0x2402013F),  # Other base 327 -> 319 (x=340)
+    (0x364EE4, 0x42900000, 0x42800000),  # category selector width 72 -> 64
     # The group-20/index-0x22 topic selector is shared by every Help row. With
     # style 1, the longest translated topic is 22*12=264px; 268px preserves the
     # existing 2px text inset on both sides while leaving the UV rectangle intact.

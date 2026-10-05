@@ -106,3 +106,8 @@ Dictionary group-20 selector index `0x21` and Enemy index `0x41` are family-leve
 ### v11-r25 Help selector-family geometry
 
 r25 extends the group-20 selector ownership model to Help without coupling it to Dictionary or Enemy. The Help topic selector is index `0x22`, resolved uniquely through table file `0x382FE0` to metadata file `0x364BE0`; its second metadata word is the rendered width owner and changes 168→268px while the UV rectangle remains byte-identical. The three Help category tabs use independent selector index `0x32`, resolved through `0x383060` to metadata file `0x364EE0`; its 72px width remains pristine. Topic and category text constructors are also separate owners at files `0x18C674` and `0x18C7F8`, both switched from style 0 to the existing style 1. This family-level ownership means every Help topic row inherits the 268px selector, while Dictionary index `0x21` and Enemy index `0x41` remain isolated and regression-frozen.
+
+
+### v11-r26 bounded header/selector geometry
+
+r26 keeps the existing family-owned renderers and changes no text ownership. Dictionary remains one rigid header cluster: L1, tab text base, animated selector base and R1 all move four pixels left together while cadence/width stay fixed. Help keeps the shared category-selector resource but corrects both shoulders without a new renderer: selector base returns to x=200 and shared width shrinks 72→64px, preserving the same x=402 right edge; category labels align at x=202/271/340. The 268px Help topic selector, all 55 topic labels, Help bodies, Dictionary details/definitions and the runtime-proven Enemy family remain independent/frozen.
