@@ -273,10 +273,11 @@ _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     # coexist: 【Dictionary】 spans x=75..267 while L1 begins at x=195. Own the
     # complete root-nav row and pack it inside the same header instead of moving
     # only the letters. L1=274 and ten 12px tabs span x=302..422 at 12px cadence.
-    # r22 runtime still clips R1 at x=428, so r23 pulls only R1 inward to x=424.
+    # r22/r23 runtime show the right-edge clipping shrinking as R1 moves inward;
+    # r24 repeats the same bounded correction once more, x=424 -> x=420.
     # The accepted selected-detail mode offset remains independent.
     (0x18E1A4, 0x3C024343, 0x3C024389),
-    (0x18E1EC, 0x24020197, 0x240201A8),
+    (0x18E1EC, 0x24020197, 0x240201A4),
     (0x18E398, 0x3C024190, 0x3C024140),
     (0x18E3AC, 0x3C024361, 0x3C024397),
     # r19 runtime exposes the separately animated red selector. Pristine tracks

@@ -561,3 +561,12 @@ Pablo's r22 runtime screenshots leave only two header-edge defects. Dictionary r
 Regression coverage is strengthened at the same boundary: `tests/test_startup_acceptance.py` now tampers every offset in `HANT_RUNTIME_LAYOUT_PATCHES` and requires the `hant_runtime_layout` final-image gate to fail, so all completed Config/Dictionary/Enemy layout owners remain fail-closed as the project continues.
 
 Measured r23: ISO `4465f4322fc252d1fa0cf734fc4c63697c38adbda155a90eadcaca37698a55c5`, pre-ROFS ELF `564c4268faf7f7224bc5a4dc1d67c758a2af003f2c5487a4056af8d537a2041f`, post-ROFS ELF `4b59521acbfc96b68a6a934a7eb2442b8e426288714065f96f1980aeff3516f8`, final ELF size 8,562,114 bytes, **150/150** final-image checks, **224** tests in each suite, repeat ISO byte-identical.
+
+
+## Startup v11-r24 Dictionary right-navigation clearance
+
+Pablo's r23 runtime pass promotes Enemy's complete reviewed header geometry: L1 x=190, labels 220/282/344, selector x=218+62*i at 64px, R1 x=407, y=93/style 1. r24 freezes those exact values in a dedicated regression test.
+
+Dictionary shows the same monotonic right-edge response as the previous round: R1 x=428 clipped more; x=424 clips less while all tabs/selector/detail paths remain correct. r24 therefore repeats the smallest proven correction and changes only file `0x18E1EC` from runtime x=424 (`0x240201A8`) to x=420 (`0x240201A4`). No other Dictionary or H.A.N.T. owner changes.
+
+Measured r24: ISO `46112aaaefb80a317dec4bed36e526d3e9f05f780dd435b4ecb0516c85e304d0`; pre/post-ROFS ELF `2242f5472f9ab228c51da4f776eb011e47b2facbfec02baf64159f3be71be58f` / `930770fdad8ac71d1291e250400e467c0258cc57a1176f1bc330aa09e8de88e5`; **150/150** final-image checks; both suites execute **225 tests**; repeat ISO is byte-identical.
