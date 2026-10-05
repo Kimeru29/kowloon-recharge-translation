@@ -116,3 +116,8 @@ r26 keeps the existing family-owned renderers and changes no text ownership. Dic
 ### v11-r27 Help category-owner correction
 
 r27 changes no renderer or resource ownership. Runtime observation identifies the r26 Help category X-owner attribution as reversed: file offset `0x18C768` controls `Ruins`, while `0x18C778` controls `ADV`. The selector remains at x=200 with the accepted 64px shared width; `Ruins` is restored to its pristine owner word and only `ADV` receives the intended -8px X nudge. `Other`, the 268px Help topic selector, Help bodies, and all accepted content remain unchanged. Enemy and Dictionary are now runtime-accepted and explicitly frozen by dedicated geometry regressions.
+
+
+### v11-r28 per-category Help selector geometry
+
+r28 keeps the r27 Help labels byte-for-byte fixed. The category highlight cannot be solved with another shared-resource width edit because ADV, Ruins and Other all instantiate group-20/index-0x32. The live Help update path writes selector X through sprite field `+0x3c`; generic sprite construction and the independently proven title path establish `+0x60` as X scale. A 48-byte helper is placed in the existing zero padding at file `0x287388` / VA `0x387308`, with a 24-byte geometry table in zero padding at file `0x290484` / VA `0x390404`. The original category-X FPU sequence calls that helper; it writes only X and X scale for the selected selector. Geometry is ADV `(204,.75)`, Ruins `(257,1.125)`, Other `(338,1.0)`, yielding 48/72/64px boxes centered on the frozen 12px labels.

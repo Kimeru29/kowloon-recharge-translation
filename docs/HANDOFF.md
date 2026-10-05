@@ -297,3 +297,10 @@ Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r26.iso`, SHA-2
 Pablo's r26 runtime review accepts Enemy and Dictionary as perfect and identifies one remaining Help defect: r26 moved `Ruins` when the intended target was `ADV`. Runtime therefore corrects the owner map: `0x18C768` is `Ruins` and is restored; `0x18C778` is `ADV` and gets the -8px nudge. Help selector x=200/64px, `Other`, the 268px topic selector and all body/content owners remain frozen. Dedicated r27 tests pin the accepted Enemy and Dictionary geometry against future regressions.
 
 Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r27.iso`, SHA-256 `5210dde53302c6340cc27550f0f170a31ca317907759dbc29a92839c4781fb9e`; pre/post-ROFS ELF `9a925cb3c5b930ecaea0669f85399c1ef1c3514edf8e18e656e21df81773a1ff` / `a31135de31bba5baa367925b743d48ddb6ab8a9a2d169da176440a4b3777fc27`; final-image acceptance **150/150**; both suites **228 tests**; repeat ISO byte-identical. Do not launch PCSX2 automatically.
+
+
+### v11-r28 Help selector-box sizing
+
+Pablo runtime-accepts `ADV`, `Ruins`, and `Other` text alignment and explicitly freezes those labels. r28 therefore does not move any text. It replaces only the selected category box geometry: ADV is 48px centered at x=204, Ruins is 72px centered at x=257, and Other remains 64px at x=338. The implementation uses the existing selector sprite's X/X-scale fields and bounded inter-function padding; all new callsite/helper/table words are fail-closed through the normal H.A.N.T. runtime-layout gate. Enemy and Dictionary stay frozen.
+
+Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r28.iso`, SHA-256 `e7517dfafd98766733324d3b8f62dcccf29b69928e8242cf469114830e197a83`; pre/post-ROFS ELF `25bad09a73def9900addcb96bdfea01a564d3147b0544d425ac7edef11901eef` / `44ab4e4a20e11ce2162fe1e262dfa1d59e6106ab2fa89dedfa3aeafe856a2547`; final-image acceptance **150/150**; both suites **229 tests**; repeat ISO byte-identical. Runtime gate is now limited to visually confirming the ADV/Ruins red-box widths/centering. Do not launch PCSX2 automatically.

@@ -1050,3 +1050,10 @@ Measured result: ISO `189434d74b98fe2b1cacb4e1a2edfad9ac6943e12b6e8b655c4a4c4884
 r27 changes only the Help category X owner proven wrong by runtime: `Ruins` is restored at `0x18C768`, and `ADV` receives the intended -8px nudge at `0x18C778`. The accepted Help selector base/width, `Other`, Dictionary and Enemy geometry remain frozen.
 
 Measured result: ISO `5210dde53302c6340cc27550f0f170a31ca317907759dbc29a92839c4781fb9e`; pre-ROFS ELF `9a925cb3c5b930ecaea0669f85399c1ef1c3514edf8e18e656e21df81773a1ff`; post-ROFS ELF `a31135de31bba5baa367925b743d48ddb6ab8a9a2d169da176440a4b3777fc27`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **228** dependency-free tests (10 skips); **228** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r27-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r27.iso`. Do not launch PCSX2 automatically.
+
+
+## Build startup v11-r28 Help selector-box candidate
+
+r28 freezes all r27 Help category text geometry and changes only the selected red box. ADV uses a centered 48px box, Ruins a centered 72px box, and Other keeps its centered 64px box. Enemy, Dictionary, topic selectors and Help bodies are unchanged.
+
+Measured result: ISO `e7517dfafd98766733324d3b8f62dcccf29b69928e8242cf469114830e197a83`; pre-ROFS ELF `25bad09a73def9900addcb96bdfea01a564d3147b0544d425ac7edef11901eef`; post-ROFS ELF `44ab4e4a20e11ce2162fe1e262dfa1d59e6106ab2fa89dedfa3aeafe856a2547`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **229** dependency-free tests (10 skips); **229** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r28-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r28.iso`. Do not launch PCSX2 automatically.
