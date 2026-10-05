@@ -26,6 +26,7 @@ from tools.hant_ui import (
     HANT_TUTORIAL_SINGLETON_STYLE_OFFSET,
     HANT_TUTORIAL_ROW_SPACING_OFFSET,
 )
+from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.menu_ui import MENU_LABELS
 from tools.startup_acceptance import STARTUP_GRAPHICS_PATHS, verify_startup_elf
 
@@ -73,9 +74,10 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("name_prompt_3", names)
         self.assertIn("runtime_name_Habaki", names)
         self.assertIn("title_english_label_geometry", names)
-        self.assertIn("menu_semantic_fixed_labels", names)
         self.assertIn("menu_relocated_labels", names)
         self.assertIn("menu_unresolved_pristine", names)
+        self.assertIn("dungeon_action_labels", names)
+        self.assertIn("dungeon_item_names", names)
 
     def test_pristine_elf_fails_translated_renderer_checks(self) -> None:
         checks = verify_startup_elf(RAW)
@@ -103,19 +105,17 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("name_confirmation_focus_layout", failed_names)
         self.assertIn("memory_card_1_boot_aliases", failed_names)
         self.assertIn("title_english_label_geometry", failed_names)
-        self.assertIn("menu_semantic_fixed_labels", failed_names)
         self.assertIn("menu_relocated_labels", failed_names)
         self.assertNotIn("menu_unresolved_pristine", failed_names)
+        self.assertIn("dungeon_action_labels", failed_names)
+        self.assertIn("dungeon_item_names", failed_names)
 
     def test_menu_acceptance_fails_closed_per_semantic_storage_class(self) -> None:
         translated = build_early_ui_elf(RAW)
-        fixed = next(spec for spec in MENU_LABELS if spec.storage == "fixed-slot")
         relocated = next(spec for spec in MENU_LABELS if spec.storage == "relocated")
         unresolved = next(spec for spec in MENU_LABELS if spec.storage == "pristine")
 
         cases = (
-            ("menu_semantic_fixed_labels", fixed.source_offset),
-            ("menu_semantic_fixed_labels", fixed.pointer_offsets[0]),
             ("menu_relocated_labels", relocated.source_offset),
             ("menu_relocated_labels", relocated.pointer_offsets[0]),
             ("menu_unresolved_pristine", unresolved.source_offset),
@@ -123,6 +123,24 @@ class StartupAcceptanceTests(unittest.TestCase):
         )
         for name, offset in cases:
             with self.subTest(name=name, offset=f"{offset:#x}"):
+                tampered = bytearray(translated)
+                tampered[offset] ^= 1
+                check = next(check for check in verify_startup_elf(bytes(tampered)) if check["name"] == name)
+                self.assertFalse(check["ok"])
+
+    def test_dungeon_ui_acceptance_fails_closed_on_each_owner_class(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        action = DUNGEON_ACTION_LABELS[0]
+        item = DUNGEON_ITEM_NAMES[0]
+        cases = (
+            ("dungeon_action_labels", action.source_offset),
+            ("dungeon_action_labels", action.code_reference.lui_offset),
+            ("dungeon_action_labels", action.code_reference.addiu_offset),
+            ("dungeon_item_names", item.source_offset),
+            ("dungeon_item_names", item.pointer_offset),
+        )
+        for name, offset in cases:
+            with self.subTest(name=name, offset=hex(offset)):
                 tampered = bytearray(translated)
                 tampered[offset] ^= 1
                 check = next(check for check in verify_startup_elf(bytes(tampered)) if check["name"] == name)

@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
-from tools.elf_strings import ElfFixedStringPatch, patch_fixed_strings
+from tools.elf_strings import ElfFixedStringPatch
 from tools.executable_text import RelocatedText
+from tools.localization import encode_ps2_english
 
 
 _ELF_MAIN_FILE_OFFSET = 0x80
@@ -26,10 +27,11 @@ class MenuLabelSpec:
     pointer_offsets: tuple[int, ...] = ()
 
 
-# v11's manifest replaces the previous tuple-only patch list. Existing fixed-slot
-# translations preserve the accepted pre-v11 official-remaster terminology. The
-# three non-fitting/unresolved rows are modeled explicitly but remain pristine
-# until their complete runtime ownership is proven.
+# The command-thumbnail renderer consumes the game's two-byte glyph stream. r29
+# runtime evidence (Items -> ISdlR, Noise -> NnhRd while H.A.N.T survives) proves
+# that earlier ASCII fixed-slot writes were interpreted through the wrong glyph
+# path. Every proven command label is therefore pointer-relocated as wide PS2
+# text; the compact Japanese source slots remain immutable provenance.
 _COMMAND_MENU_OWNER = (
     "command-menu label table VA 0x004BC830; selected pointer is loaded at "
     "renderer VAs 0x150C68/0x150FEC and passed to text object VA 0x1529E0"
@@ -37,18 +39,18 @@ _COMMAND_MENU_OWNER = (
 _ACCEPTED_MAPPING = "accepted official-remaster mapping; " + _COMMAND_MENU_OWNER
 
 MENU_LABELS: tuple[MenuLabelSpec, ...] = (
-    MenuLabelSpec("items", 0x3BC7C8, 16, "アイテム", "command-label id 3", "Items", "Items", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8BC", "fixed-slot", "proven", (0x3BC8BC,)),
-    MenuLabelSpec("quests", 0x3BC7D8, 16, "クエスト", "command-label id 4", "Quests", "Quests", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8C0", "fixed-slot", "proven", (0x3BC8C0,)),
-    MenuLabelSpec("hant", 0x3BC7E8, 16, "Ｈ．Ａ．Ｎ．Ｔ", "command-label id 5", "H.A.N.T", "H.A.N.T", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8C4", "fixed-slot", "proven", (0x3BC8C4,)),
-    MenuLabelSpec("save_load", 0x3BC7F8, 16, "セーブ＆ロード", "command-label id 6", "Save & load", "Save & load", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8C8", "fixed-slot", "proven", (0x3BC8C8,)),
-    MenuLabelSpec("leave_room", 0x3BC808, 16, "部屋を出る", "command-label ids 7/20", "Leave room", "Leave room", _ACCEPTED_MAPPING + "; source pointer aliases file 0x3BC8CC/0x3BC900", "fixed-slot", "proven", (0x3BC8CC, 0x3BC900)),
-    MenuLabelSpec("shop", 0x3BC818, 16, "ショップ", "command-label id 8", "Shop", "Shop", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8D0", "fixed-slot", "proven", (0x3BC8D0,)),
-    MenuLabelSpec("guild_site", 0x3BC828, 16, "ギルドサイト", "command-label id 9", "Guild site", "Guild site", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8D4", "fixed-slot", "proven", (0x3BC8D4,)),
-    MenuLabelSpec("broadband", 0x3BC838, 16, "ブロードバンド", "command-label id 10", "Broadband", "Broadband", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8D8", "fixed-slot", "proven", (0x3BC8D8,)),
-    MenuLabelSpec("collection", 0x3BC848, 16, "コレクション", "command-label ids 11/18", "Collection", "Collection", _ACCEPTED_MAPPING + "; source pointer aliases file 0x3BC8DC/0x3BC8F8", "fixed-slot", "proven", (0x3BC8DC, 0x3BC8F8)),
+    MenuLabelSpec("items", 0x3BC7C8, 16, "アイテム", "command-label id 3", "Items", "Items", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8BC", "relocated", "proven", (0x3BC8BC,)),
+    MenuLabelSpec("quests", 0x3BC7D8, 16, "クエスト", "command-label id 4", "Quests", "Quests", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8C0", "relocated", "proven", (0x3BC8C0,)),
+    MenuLabelSpec("hant", 0x3BC7E8, 16, "Ｈ．Ａ．Ｎ．Ｔ", "command-label id 5", "H.A.N.T", "H.A.N.T", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8C4", "relocated", "proven", (0x3BC8C4,)),
+    MenuLabelSpec("save_load", 0x3BC7F8, 16, "セーブ＆ロード", "command-label id 6", "Save & load", "Save & load", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8C8", "relocated", "proven", (0x3BC8C8,)),
+    MenuLabelSpec("leave_room", 0x3BC808, 16, "部屋を出る", "command-label ids 7/20", "Leave room", "Leave room", _ACCEPTED_MAPPING + "; source pointer aliases file 0x3BC8CC/0x3BC900", "relocated", "proven", (0x3BC8CC, 0x3BC900)),
+    MenuLabelSpec("shop", 0x3BC818, 16, "ショップ", "command-label id 8", "Shop", "Shop", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8D0", "relocated", "proven", (0x3BC8D0,)),
+    MenuLabelSpec("guild_site", 0x3BC828, 16, "ギルドサイト", "command-label id 9", "Guild site", "Guild site", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8D4", "relocated", "proven", (0x3BC8D4,)),
+    MenuLabelSpec("broadband", 0x3BC838, 16, "ブロードバンド", "command-label id 10", "Broadband", "Broadband", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8D8", "relocated", "proven", (0x3BC8D8,)),
+    MenuLabelSpec("collection", 0x3BC848, 16, "コレクション", "command-label ids 11/18", "Collection", "Collection", _ACCEPTED_MAPPING + "; source pointer aliases file 0x3BC8DC/0x3BC8F8", "relocated", "proven", (0x3BC8DC, 0x3BC8F8)),
     MenuLabelSpec("media", 0x3BC858, 16, "メディア", "command-label id 12", None, None, _COMMAND_MENU_OWNER + "; source pointer file 0x3BC8E0; no exact official counterpart/action semantic proven", "pristine", "unresolved", (0x3BC8E0,)),
-    MenuLabelSpec("next_chapter", 0x3BC868, 16, "次の話へ", "command-label id 14", "Next chapter", "Next chapter", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8E8", "fixed-slot", "proven", (0x3BC8E8,)),
-    MenuLabelSpec("end_turn", 0x3BC878, 16, "ターン終了", "command-label id 15", "End turn", "End turn", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8EC", "fixed-slot", "proven", (0x3BC8EC,)),
+    MenuLabelSpec("next_chapter", 0x3BC868, 16, "次の話へ", "command-label id 14", "Next chapter", "Next chapter", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8E8", "relocated", "proven", (0x3BC8E8,)),
+    MenuLabelSpec("end_turn", 0x3BC878, 16, "ターン終了", "command-label id 15", "End turn", "End turn", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8EC", "relocated", "proven", (0x3BC8EC,)),
     MenuLabelSpec(
         "return_above_ground",
         0x3BC888,
@@ -63,9 +65,9 @@ MENU_LABELS: tuple[MenuLabelSpec, ...] = (
         "proven",
         (0x3BC8F4,),
     ),
-    MenuLabelSpec("interior", 0x3BC898, 16, "インテリア", "command-label id 19", "Interior", "Interior", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8FC", "fixed-slot", "proven", (0x3BC8FC,)),
-    MenuLabelSpec("none", 0x694180, 8, "なし", "command-label id 0", "None", "None", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8B0", "fixed-slot", "proven", (0x3BC8B0,)),
-    MenuLabelSpec("map", 0x694188, 8, "マップ", "command-label id 1", "Map", "Map", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8B4", "fixed-slot", "proven", (0x3BC8B4,)),
+    MenuLabelSpec("interior", 0x3BC898, 16, "インテリア", "command-label id 19", "Interior", "Interior", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8FC", "relocated", "proven", (0x3BC8FC,)),
+    MenuLabelSpec("none", 0x694180, 8, "なし", "command-label id 0", "None", "None", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8B0", "relocated", "proven", (0x3BC8B0,)),
+    MenuLabelSpec("map", 0x694188, 8, "マップ", "command-label id 1", "Map", "Map", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8B4", "relocated", "proven", (0x3BC8B4,)),
     MenuLabelSpec(
         "report_card",
         0x694190,
@@ -80,8 +82,8 @@ MENU_LABELS: tuple[MenuLabelSpec, ...] = (
         "proven",
         (0x3BC8B8,),
     ),
-    MenuLabelSpec("noise", 0x694198, 8, "ノイズ", "command-label id 13", "Noise", "Noise", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8E4", "fixed-slot", "proven", (0x3BC8E4,)),
-    MenuLabelSpec("battle", 0x6941A0, 8, "戦闘", "command-label id 16", "Battle", "Battle", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8F0", "fixed-slot", "proven", (0x3BC8F0,)),
+    MenuLabelSpec("noise", 0x694198, 8, "ノイズ", "command-label id 13", "Noise", "Noise", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8E4", "relocated", "proven", (0x3BC8E4,)),
+    MenuLabelSpec("battle", 0x6941A0, 8, "戦闘", "command-label id 16", "Battle", "Battle", _ACCEPTED_MAPPING + "; source pointer file 0x3BC8F0", "relocated", "proven", (0x3BC8F0,)),
 )
 
 
@@ -157,7 +159,7 @@ def fixed_menu_patches() -> tuple[ElfFixedStringPatch, ...]:
 
 
 def relocated_menu_entries(raw: bytes) -> tuple[RelocatedText, ...]:
-    """Return only relocation-proven long labels after validating their owners."""
+    """Return every proven command label in the renderer's two-byte glyph path."""
 
     entries: list[RelocatedText] = []
     for spec in MENU_LABELS:
@@ -179,7 +181,7 @@ def relocated_menu_entries(raw: bytes) -> tuple[RelocatedText, ...]:
         entries.append(
             RelocatedText(
                 key=f"menu_{spec.key}",
-                encoded=spec.selected_english.encode("ascii") + b"\x00",
+                encoded=encode_ps2_english(spec.selected_english, collapse_spaces=False) + b"\x00",
                 pointer_offsets=spec.pointer_offsets,
             )
         )
@@ -189,16 +191,15 @@ def patch_menu_labels(
     raw: bytes,
     relocated_targets: Mapping[str, int] | None = None,
 ) -> bytes:
-    """Patch proven fixed menu labels and optionally redirect proven relocated owners.
+    """Validate command-label provenance and optionally redirect proven owners.
 
-    Task 8 leaves relocation candidates pristine until their complete pointer
-    ownership is established. A future relocated entry can be activated only by
-    supplying a target VA for its stable manifest key; every declared source
-    pointer is then checked against the pristine source VA before modification.
+    Normal composite builds install ``relocated_menu_entries`` through the shared
+    translation PT_LOAD, so this function intentionally leaves source slots
+    untouched when no explicit target mapping is supplied.
     """
 
     _validate_source_slots(raw)
-    result = bytearray(patch_fixed_strings(raw, fixed_menu_patches()))
+    result = bytearray(raw)
 
     if relocated_targets is None:
         return bytes(result)

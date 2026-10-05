@@ -33,6 +33,7 @@ from tools.hant_ui import (
     HANT_WRAPPED_LINES,
 )
 from tools.localization import encode_ps2_english
+from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.menu_ui import MENU_LABELS
 from tools.memory_card_ui import (
     MEMORY_CARD_MESSAGES,
@@ -183,7 +184,7 @@ def _verify_menu_semantics(
                 continue
             target_va = targets.pop()
             p_offset, p_vaddr, p_filesz, _p_memsz = segment
-            expected = spec.selected_english.encode("ascii") + b"\x00"
+            expected = encode_ps2_english(spec.selected_english, collapse_spaces=False) + b"\x00"
             relative = target_va - p_vaddr
             if relative < 0 or relative + len(expected) > p_filesz:
                 relocated_ok = False
@@ -201,6 +202,74 @@ def _verify_menu_semantics(
             pristine_ok = False
 
     return fixed_ok, relocated_ok, pristine_ok
+
+
+def _decode_lui_addiu_target(raw: bytes, lui_offset: int, addiu_offset: int) -> int | None:
+    if lui_offset + 4 > len(raw) or addiu_offset + 4 > len(raw):
+        return None
+    lui_word = struct.unpack_from("<I", raw, lui_offset)[0]
+    addiu_word = struct.unpack_from("<I", raw, addiu_offset)[0]
+    if lui_word & 0xFFFF0000 != 0x3C060000 or addiu_word & 0xFFFF0000 != 0x24C60000:
+        return None
+    hi = lui_word & 0xFFFF
+    lo = addiu_word & 0xFFFF
+    signed_lo = lo if lo < 0x8000 else lo - 0x10000
+    return ((hi << 16) + signed_lo) & 0xFFFFFFFF
+
+
+def _segment_has_wide_text(
+    raw: bytes,
+    segment: tuple[int, int, int, int] | None,
+    target_va: int,
+    english: str,
+) -> bool:
+    if segment is None:
+        return False
+    p_offset, p_vaddr, p_filesz, _p_memsz = segment
+    expected = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
+    relative = target_va - p_vaddr
+    if relative < 0 or relative + len(expected) > p_filesz:
+        return False
+    target_file = p_offset + relative
+    return raw[target_file:target_file + len(expected)] == expected
+
+
+def _verify_dungeon_semantics(
+    raw: bytes,
+    segment: tuple[int, int, int, int] | None,
+) -> tuple[bool, bool]:
+    action_ok = segment is not None
+    for spec in DUNGEON_ACTION_LABELS:
+        source = spec.source_text.encode("cp932") + b"\x00"
+        if raw[spec.source_offset:spec.source_offset + len(source)] != source:
+            action_ok = False
+            break
+        target_va = _decode_lui_addiu_target(
+            raw,
+            spec.code_reference.lui_offset,
+            spec.code_reference.addiu_offset,
+        )
+        if target_va is None or not _segment_has_wide_text(raw, segment, target_va, spec.english):
+            action_ok = False
+            break
+
+    item_ok = segment is not None and len(DUNGEON_ITEM_NAMES) == 446
+    for spec in DUNGEON_ITEM_NAMES:
+        if not item_ok:
+            break
+        source = spec.source_text.encode("cp932") + b"\x00"
+        if raw[spec.source_offset:spec.source_offset + len(source)] != source:
+            item_ok = False
+            break
+        if spec.pointer_offset + 4 > len(raw):
+            item_ok = False
+            break
+        target_va = struct.unpack_from("<I", raw, spec.pointer_offset)[0]
+        if not _segment_has_wide_text(raw, segment, target_va, spec.english):
+            item_ok = False
+            break
+
+    return action_ok, item_ok
 
 
 def _translation_segment(raw: bytes) -> tuple[int, int, int, int] | None:
@@ -423,19 +492,12 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
     segment = _translation_segment(raw)
     checks.append(_check("translation_segment", segment is not None, "translation PT_LOAD is not active/valid"))
 
-    menu_fixed_ok, menu_relocated_ok, menu_pristine_ok = _verify_menu_semantics(raw, segment)
-    checks.append(
-        _check(
-            "menu_semantic_fixed_labels",
-            menu_fixed_ok,
-            "one or more fixed command labels or their semantic pointer aliases are stale",
-        )
-    )
+    _menu_fixed_ok, menu_relocated_ok, menu_pristine_ok = _verify_menu_semantics(raw, segment)
     checks.append(
         _check(
             "menu_relocated_labels",
             menu_relocated_ok,
-            "one or more long command labels do not resolve through all proven aliases into the translation segment",
+            "one or more proven command labels do not resolve as wide PS2 text through their semantic aliases",
         )
     )
     checks.append(
@@ -443,6 +505,22 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "menu_unresolved_pristine",
             menu_pristine_ok,
             "one or more unresolved/pristine command labels or pointer aliases changed",
+        )
+    )
+
+    dungeon_actions_ok, dungeon_items_ok = _verify_dungeon_semantics(raw, segment)
+    checks.append(
+        _check(
+            "dungeon_action_labels",
+            dungeon_actions_ok,
+            "exploration action-palette labels do not resolve through their proven direct-code owners",
+        )
+    )
+    checks.append(
+        _check(
+            "dungeon_item_names",
+            dungeon_items_ok,
+            "one or more battle/L1 item-name pointers do not resolve to exact official wide English",
         )
     )
     heap_break_ok = (
@@ -870,8 +948,11 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         *(spec.source_offset for spec in HANT_DICTIONARY_TABS),
         *(spec.source_offset for spec in HANT_DICTIONARY_TERMS),
     }
+    promoted_menu_sources = {
+        spec.source_offset for spec in MENU_LABELS if spec.status == "proven"
+    }
     for source_offset, pointer_offsets, source_text in _HANT_UNRESOLVED_SIGNATURES:
-        if source_offset in promoted_hant_sources:
+        if source_offset in promoted_hant_sources or source_offset in promoted_menu_sources:
             continue
         expected_va = _ELF_MAIN_VADDR + source_offset - _ELF_MAIN_FILE_OFFSET
         if source_text is not None:
