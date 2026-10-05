@@ -80,33 +80,29 @@ class CompanionHudTests(unittest.TestCase):
             source = spec.source_text.encode("cp932") + b"\x00"
             self.assertEqual(source, result[spec.source_offset:spec.source_offset + len(source)])
 
-    def test_r31_companion_action_callout_uses_compact_font_and_clears_action_palette(self) -> None:
+    def test_r32_companion_action_callout_matches_accepted_ps4_style_alignment(self) -> None:
         result = build_early_ui_elf(RAW)
 
-        # r30 proved the English payload but retained the Japanese 16px callout
-        # geometry. r31 keeps the 160x32 backing, moves the whole callout one
-        # backing-height upward, uses the existing 12px style, and gives the
-        # observed "Throw a Rock" label symmetric 8px horizontal padding.
+        # r31 proved the 12px English font and vertical clearance. Runtime then
+        # showed that the fixed 160x32 bubble's visible body/spike sat slightly
+        # to the right of the caption. r32 shifts only the backing 8px left and
+        # freezes the accepted text/font/Y owners.
         expected_words = {
-            0x66708: 0x3C02C274,  # backing Y: anchor - 61px (was -29)
-            0x66804: 0x3C0241A0,  # text X: anchor + 20px (was +49)
-            0x6681C: 0x3C02C258,  # text Y: anchor - 54px (was -22)
-            0x6686C: 0x24050001,  # existing style 1 = 12x12 (was style 0)
+            0x666F0: 0x3C024080,  # backing X: anchor + 4px (r31 was +12)
+            0x66708: 0x3C02C274,  # backing Y: anchor - 61px
+            0x66804: 0x3C0241A0,  # text X: anchor + 20px
+            0x6681C: 0x3C02C258,  # text Y: anchor - 54px
+            0x6686C: 0x24050001,  # style 1 = 12x12
         }
         for offset, expected in expected_words.items():
             with self.subTest(offset=hex(offset)):
                 self.assertEqual(expected, struct.unpack_from("<I", result, offset)[0])
 
-        # Group-2 index 0x18 is the callout backing. Keep its proven intrinsic
-        # 160x32 resource geometry/UV owner unchanged; only placement/font move.
+        # Group-2 index 0x18 remains the proven fixed 160x32 bubble resource.
         self.assertEqual(160.0, struct.unpack_from("<f", result, 0x34EAD4)[0])
         self.assertEqual(32.0, struct.unpack_from("<f", result, 0x34EAD8)[0])
 
-        text_width = len("Throw a Rock") * 12
-        self.assertEqual(8, 20 - 12)
-        self.assertEqual(8, 160 - (20 - 12) - text_width)
-
-    def test_r31_layout_patch_fails_closed_on_each_pristine_owner(self) -> None:
+    def test_r32_layout_patch_fails_closed_on_each_pristine_owner(self) -> None:
         for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
             with self.subTest(offset=hex(offset)):
                 tampered = bytearray(RAW)

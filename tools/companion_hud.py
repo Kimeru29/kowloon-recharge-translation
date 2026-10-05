@@ -12,15 +12,16 @@ _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
 _MAX_STRING_BYTES = 512
 
-# r31 presentation owners for the persistent companion action caption. r30
+# r31/r32 presentation owners for the persistent companion action caption. r30
 # translated the payload but left the Japanese-era style/geometry in place.
-# Group-2 index 0x18 is a fixed 160x32 backing sprite; use the existing 12px
-# English style and move the whole callout one backing-height above the action
-# palette. Japanese/English text owners and the backing resource itself remain
-# unchanged.
+# Group-2 index 0x18 is a fixed 160x32 backing sprite; r31 selected the proven
+# 12px English style and moved the callout one backing-height above the action
+# palette. r32 keeps that accepted text geometry and shifts only the backing 8px
+# left so its visible body/spike aligns with the caption like the PS4 HUD.
 COMPANION_ACTION_BACKING_WIDTH_OFFSET = 0x34EAD4
 COMPANION_ACTION_BACKING_HEIGHT_OFFSET = 0x34EAD8
 COMPANION_ACTION_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x666F0, 0x3C024140, 0x3C024080),  # backing X: +12.0 -> +4.0
     (0x66708, 0x3C02C1E8, 0x3C02C274),  # backing Y: -29.0 -> -61.0
     (0x66804, 0x3C024244, 0x3C0241A0),  # text X: +49.0 -> +20.0
     (0x6681C, 0x3C02C1B0, 0x3C02C258),  # text Y: -22.0 -> -54.0
@@ -128,7 +129,7 @@ def validate_companion_hud_source(raw: bytes) -> None:
 
 
 def patch_companion_action_layout(raw: bytes) -> bytes:
-    """Apply the bounded r31 companion-action callout presentation patch."""
+    """Apply the bounded r31/r32 companion-action callout presentation patch."""
 
     width = struct.unpack_from("<f", raw, COMPANION_ACTION_BACKING_WIDTH_OFFSET)[0]
     height = struct.unpack_from("<f", raw, COMPANION_ACTION_BACKING_HEIGHT_OFFSET)[0]

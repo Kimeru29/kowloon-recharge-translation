@@ -324,3 +324,12 @@ Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r30.iso`, SHA-2
 Pablo runtime-tested r30 and accepted the companion translation itself; the remaining defect was presentation: the persistent companion action strip was too large/low and hid part of the action HUD. r31 freezes all r30 text owners and the 160x32 backing resource, switches this caption to the existing 12px style 1, places the observed `Throw a Rock` text with 8px padding on both sides, and moves the entire strip/text pair 32px upward. New fail-closed checks cover every geometry/style owner plus the backing dimensions.
 
 Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r31.iso`, SHA-256 `85bbe609fbe6ee875015a3c02ba685ca0d21f40d4b65ab164e2f0d82ba850833`; pre/post-ROFS ELF `249f074d753dcedb438725847ebadd6985145fdf3dbe0d8869394982c5fe7d4e` / `ef66c365be8c7c4ed28c7b2e98893572e6fe9566e785af5b5b83e39b6fe731d1`; final-image acceptance **154/154**; both suites execute **242 tests**; repeat ISO byte-identical. Runtime gate is limited to visually confirming the companion action caption no longer overlaps the action palette. Do not launch PCSX2 automatically.
+
+
+### v11-r32 companion HUD bubble alignment
+
+Pablo runtime-accepted r31's translated companion caption, 12px font, and vertical clearance, but the fixed bubble's visible backing sat slightly to the right of the first glyph. r32 changes only the backing X owner at file `0x666F0` from `+12.0` to `+4.0`, shifting the existing 160x32 bubble/spike 8px left. Text X/Y, font style, backing Y, companion translations, action palette, H.A.N.T., Enemy and Dictionary owners remain frozen and fail-closed.
+
+Translation policy remains PS4/remaster-first: exact owned PS4 strings must be reused before any authored translation. `Throw a Rock` is confirmed `official_exact` from CUSA27034 `English.bytes` (remaster offset 284809). Only Re:charge-exclusive text without an owned PS4 equivalent may receive context-aware authored English.
+
+Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r32.iso`, SHA-256 `acbc138a1c89ab0d81979e2d531dd5706c369df2cf49ef070311014ed833cb56`; final-image acceptance **154/154**; both complete suites execute **242 tests**; repeat ISO byte-identical. Do not launch PCSX2 automatically.
