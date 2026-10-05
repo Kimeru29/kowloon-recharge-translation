@@ -6,7 +6,7 @@ import hashlib
 import struct
 
 from tools.elf_translation_segment import TranslationSegmentInfo
-from tools.executable_text import RelocatedText, install_executable_text
+from tools.executable_text import RelocatedCodeReference, RelocatedText, install_executable_text
 from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells, wrap_hant_text
 from tools.hant_content_data import HANT_DICTIONARY_TAB_DATA, HANT_DICTIONARY_TERM_DATA, HANT_RINGTONE_DATA
 from tools.hant_dictionary_definitions import DICTIONARY_DEFINITION_MAX_CELLS, definition_source_fingerprint
@@ -1495,18 +1495,25 @@ def patch_hant_tutorial(
     *,
     reserve_size: int = 0x100000,
     extra_entries: Sequence[RelocatedText] = (),
+    extra_code_references: Sequence[RelocatedCodeReference] = (),
 ) -> tuple[bytes, TranslationSegmentInfo]:
     """Install all proven shared executable text through one translation PT_LOAD.
 
     ``extra_entries`` lets the composite early-UI build append independently
-    validated relocation classes (currently long command-menu labels) without a
-    second translation-segment installation. The base payload includes the
-    accepted name/H.A.N.T./memory-card classes plus the separately owned semantic
-    H.A.N.T. chrome labels.
+    validated relocation classes without a second translation-segment install.
+    ``extra_code_references`` owns direct LUI/ADDIU address materializations for
+    those extra entries; exact instruction preimages are validated before use.
     """
 
     _validate_source(raw)
     _validate_name_prompt_preimages(raw)
+    for ref in extra_code_references:
+        if ref.lui_offset + 4 > len(raw) or ref.addiu_offset + 4 > len(raw):
+            raise ValueError(f"Relocated code reference is outside executable: {ref.key}")
+        if struct.unpack_from("<I", raw, ref.lui_offset)[0] != ref.expected_lui:
+            raise ValueError(f"Relocated code LUI preimage mismatch: {ref.key}")
+        if struct.unpack_from("<I", raw, ref.addiu_offset)[0] != ref.expected_addiu:
+            raise ValueError(f"Relocated code ADDIU preimage mismatch: {ref.key}")
 
     entries = (*_base_relocated_entries(raw), *tuple(extra_entries))
     installed = install_executable_text(raw, entries, reserve_size=reserve_size)
@@ -1517,6 +1524,15 @@ def patch_hant_tutorial(
         raise ValueError("H.A.N.T structured translation payload lost word alignment")
 
     result = bytearray(installed.raw)
+    for ref in extra_code_references:
+        target_va = installed.target_vas.get(ref.key)
+        if target_va is None:
+            raise ValueError(f"Relocated code reference has no text entry: {ref.key}")
+        hi = ((target_va + 0x8000) >> 16) & 0xFFFF
+        lo = target_va & 0xFFFF
+        struct.pack_into("<I", result, ref.lui_offset, (ref.expected_lui & 0xFFFF0000) | hi)
+        struct.pack_into("<I", result, ref.addiu_offset, (ref.expected_addiu & 0xFFFF0000) | lo)
+
     struct.pack_into(
         "<I",
         result,

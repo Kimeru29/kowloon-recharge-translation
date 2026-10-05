@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tests.local_fixtures import require_local_fixture
 from tools.menu_ui import MENU_LABELS, MenuLabelSpec, patch_menu_labels, relocated_menu_entries
+from tools.localization import encode_ps2_english
 
 ELF = require_local_fixture(Path(__file__).parents[1] / "fixtures" / "elf" / "SLPM_665.11")
 RAW = ELF.read_bytes()
@@ -48,7 +49,7 @@ class MenuUiTests(unittest.TestCase):
                 self.assertEqual(source, spec.source_text)
                 self.assertEqual(english, spec.official_english)
                 self.assertEqual(english, spec.selected_english)
-                self.assertEqual("fixed-slot", spec.storage)
+                self.assertEqual("relocated", spec.storage)
                 self.assertEqual("proven", spec.status)
 
     def test_unresolved_media_and_overflow_candidates_are_explicit(self) -> None:
@@ -102,13 +103,23 @@ class MenuUiTests(unittest.TestCase):
         }
         self.assertEqual(expected, {spec.key: spec.pointer_offsets for spec in MENU_LABELS})
 
-    def test_relocated_entry_builder_uses_only_proven_long_labels(self) -> None:
+    def test_relocated_entry_builder_uses_every_proven_label_in_wide_ps2_encoding(self) -> None:
         entries = relocated_menu_entries(RAW)
-        self.assertEqual(("menu_return_above_ground", "menu_report_card"), tuple(entry.key for entry in entries))
-        self.assertEqual(b"Return above ground\x00", entries[0].encoded)
-        self.assertEqual((0x3BC8F4,), entries[0].pointer_offsets)
-        self.assertEqual(b"Report card\x00", entries[1].encoded)
-        self.assertEqual((0x3BC8B8,), entries[1].pointer_offsets)
+        proven = tuple(spec for spec in MENU_LABELS if spec.status == "proven")
+        self.assertEqual(len(proven), len(entries))
+        self.assertEqual(18, len(entries))
+        self.assertEqual(
+            tuple(f"menu_{spec.key}" for spec in proven),
+            tuple(entry.key for entry in entries),
+        )
+        for spec, entry in zip(proven, entries, strict=True):
+            with self.subTest(key=spec.key):
+                assert spec.selected_english is not None
+                self.assertEqual(
+                    encode_ps2_english(spec.selected_english, collapse_spaces=False) + b"\x00",
+                    entry.encoded,
+                )
+                self.assertEqual(spec.pointer_offsets, entry.pointer_offsets)
         self.assertNotIn("menu_media", {entry.key for entry in entries})
 
     def test_relocated_targets_patch_only_proven_pointer_words_and_preserve_sources(self) -> None:
@@ -145,30 +156,19 @@ class MenuUiTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not relocation-owned"):
             patch_menu_labels(RAW, {"media": 0x00910000})
 
-    def test_fixed_slot_patch_preserves_current_behavior_and_pristine_candidates(self) -> None:
+    def test_patch_menu_labels_without_targets_is_validation_only(self) -> None:
         result = patch_menu_labels(RAW)
+        self.assertEqual(RAW, result)
 
-        for spec in MENU_LABELS:
-            source_region = RAW[spec.source_offset:spec.source_offset + spec.capacity]
-            output_region = result[spec.source_offset:spec.source_offset + spec.capacity]
-            if spec.storage == "fixed-slot":
-                assert spec.selected_english is not None
-                expected = spec.selected_english.encode("ascii") + b"\x00"
-                self.assertEqual(expected, output_region[:len(expected)])
-                self.assertEqual(b"\x00" * (spec.capacity - len(expected)), output_region[len(expected):])
-            else:
-                self.assertEqual(source_region, output_region)
-
-    def test_fixed_slot_patch_mutates_only_declared_fixed_slots_without_relocation_targets(self) -> None:
+    def test_all_proven_menu_sources_remain_pristine_for_relocation(self) -> None:
         result = patch_menu_labels(RAW)
-        allowed: set[int] = set()
         for spec in MENU_LABELS:
-            if spec.storage == "fixed-slot":
-                allowed.update(range(spec.source_offset, spec.source_offset + spec.capacity))
+            with self.subTest(key=spec.key):
+                self.assertEqual(
+                    RAW[spec.source_offset:spec.source_offset + spec.capacity],
+                    result[spec.source_offset:spec.source_offset + spec.capacity],
+                )
 
-        changed = {index for index, (before, after) in enumerate(zip(RAW, result, strict=True)) if before != after}
-        self.assertTrue(changed)
-        self.assertTrue(changed <= allowed)
 
 
 if __name__ == "__main__":

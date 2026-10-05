@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES, ADV_SPEAKER_LAYOUT_PATCHES
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
+from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.menu_ui import MENU_LABELS
 from tools.hant_inventory import inventory_hant_text
 from tools.startup_ui import (
@@ -61,34 +62,30 @@ RAW = ELF_PATH.read_bytes()
 
 
 class EarlyUiPatchTests(unittest.TestCase):
-    def test_manifest_uses_official_title_and_menu_localization(self) -> None:
+    def test_manifest_uses_wide_relocated_command_menu_localization(self) -> None:
         actual = {(patch.offset, patch.expected): patch.text for patch in EARLY_UI_PATCHES}
-        semantic_menu = {spec.source_offset: spec for spec in MENU_LABELS}
+        by_offset = {spec.source_offset: spec for spec in MENU_LABELS}
 
         # Exact title labels are pointer-relocated and tested in test_startup_ui.
         self.assertNotIn((0x5CBDE8, "初めから"), actual)
         self.assertNotIn((0x5CBDF8, "続きから"), actual)
-        self.assertEqual("Items", actual[(0x3BC7C8, "アイテム")])
-        self.assertEqual("Quests", actual[(0x3BC7D8, "クエスト")])
-        self.assertEqual("H.A.N.T", actual[(0x3BC7E8, "Ｈ．Ａ．Ｎ．Ｔ")])
-        self.assertEqual("Save & load", actual[(0x3BC7F8, "セーブ＆ロード")])
-        self.assertEqual("Leave room", actual[(0x3BC808, "部屋を出る")])
-        self.assertEqual("Shop", actual[(0x3BC818, "ショップ")])
-        self.assertEqual("Guild site", actual[(0x3BC828, "ギルドサイト")])
-        self.assertEqual("Broadband", actual[(0x3BC838, "ブロードバンド")])
-        self.assertEqual("Collection", actual[(0x3BC848, "コレクション")])
-        self.assertEqual("Next chapter", actual[(0x3BC868, "次の話へ")])
-        self.assertEqual("End turn", actual[(0x3BC878, "ターン終了")])
-        self.assertEqual("Interior", actual[(0x3BC898, "インテリア")])
-        self.assertEqual("None", actual[(0x694180, "なし")])
-        self.assertEqual("Map", actual[(0x694188, "マップ")])
-        self.assertEqual("Noise", actual[(0x694198, "ノイズ")])
-        self.assertEqual("Battle", actual[(0x6941A0, "戦闘")])
-        self.assertEqual("relocated", semantic_menu[0x3BC888].storage)
-        self.assertEqual((0x3BC8F4,), semantic_menu[0x3BC888].pointer_offsets)
-        self.assertEqual("relocated", semantic_menu[0x694190].storage)
-        self.assertEqual((0x3BC8B8,), semantic_menu[0x694190].pointer_offsets)
-        self.assertEqual("unresolved", semantic_menu[0x3BC858].status)
+        expected = {
+            0x3BC7C8: "Items", 0x3BC7D8: "Quests", 0x3BC7E8: "H.A.N.T",
+            0x3BC7F8: "Save & load", 0x3BC808: "Leave room", 0x3BC818: "Shop",
+            0x3BC828: "Guild site", 0x3BC838: "Broadband", 0x3BC848: "Collection",
+            0x3BC868: "Next chapter", 0x3BC878: "End turn", 0x3BC888: "Return above ground",
+            0x3BC898: "Interior", 0x694180: "None", 0x694188: "Map",
+            0x694190: "Report card", 0x694198: "Noise", 0x6941A0: "Battle",
+        }
+        for offset, english in expected.items():
+            with self.subTest(offset=hex(offset)):
+                spec = by_offset[offset]
+                self.assertEqual(english, spec.selected_english)
+                self.assertEqual("relocated", spec.storage)
+                self.assertEqual("proven", spec.status)
+                self.assertNotIn((offset, spec.source_text), actual)
+        self.assertEqual("unresolved", by_offset[0x3BC858].status)
+        self.assertEqual("pristine", by_offset[0x3BC858].storage)
 
     def test_build_changes_only_declared_pristine_regions_before_appended_segment(self) -> None:
         result = build_early_ui_elf(RAW)
@@ -157,6 +154,11 @@ class EarlyUiPatchTests(unittest.TestCase):
             if spec.storage == "relocated":
                 for off in spec.pointer_offsets:
                     allowed.update(range(off, off + 4))
+        for spec in DUNGEON_ACTION_LABELS:
+            allowed.update(range(spec.code_reference.lui_offset, spec.code_reference.lui_offset + 4))
+            allowed.update(range(spec.code_reference.addiu_offset, spec.code_reference.addiu_offset + 4))
+        for spec in DUNGEON_ITEM_NAMES:
+            allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
         allowed.update(range(NAME_FLOW_STATE9_FLAG_OFFSET, NAME_FLOW_STATE9_FLAG_OFFSET + 4))
         # ELF program header / heap metadata used by the appended translation segment.
         allowed.update(range(0x54, 0x54 + 32))
@@ -194,31 +196,29 @@ class EarlyUiPatchTests(unittest.TestCase):
         promoted_hant_sources.update(spec.source_offset for spec in HANT_DICTIONARY_TABS)
         promoted_hant_sources.update(spec.source_offset for spec in HANT_DICTIONARY_TERMS)
         candidates = [
-            entry
-            for entry in entries
+            entry for entry in entries
             if entry.owner == "executable_hant_candidate"
             and entry.classification == "unresolved"
             and entry.source_offset not in promoted_hant_sources
         ]
         self.assertTrue(candidates)
-        cross_owned_sources = {
-            spec.source_offset for spec in MENU_LABELS if spec.storage == "fixed-slot"
-        }
+        cross_owned_sources = {spec.source_offset for spec in MENU_LABELS if spec.status == "proven"}
 
         for entry in candidates:
             with self.subTest(key=entry.key):
-                for pointer_offset in entry.pointer_offsets:
-                    self.assertEqual(
-                        RAW[pointer_offset:pointer_offset + 4],
-                        result[pointer_offset:pointer_offset + 4],
-                    )
-                if entry.source_offset in cross_owned_sources:
-                    continue
                 source = entry.source_text.encode("cp932") + b"\x00"
                 self.assertEqual(
                     RAW[entry.source_offset:entry.source_offset + len(source)],
                     result[entry.source_offset:entry.source_offset + len(source)],
                 )
+                if entry.source_offset in cross_owned_sources:
+                    # The command-label renderer owns this alias now; provenance stays pristine.
+                    continue
+                for pointer_offset in entry.pointer_offsets:
+                    self.assertEqual(
+                        RAW[pointer_offset:pointer_offset + 4],
+                        result[pointer_offset:pointer_offset + 4],
+                    )
 
     def test_composite_build_recenters_title_labels_and_preserves_packed_title_art(self) -> None:
         result = build_early_ui_elf(RAW)
@@ -229,36 +229,31 @@ class EarlyUiPatchTests(unittest.TestCase):
         self.assertEqual(RAW[0x1AC600:0x1AC604], result[0x1AC600:0x1AC604])
 
 
-    def test_composite_build_relocates_only_proven_long_menu_labels(self) -> None:
+    def test_composite_build_relocates_every_proven_menu_label_as_wide_text(self) -> None:
         result = build_early_ui_elf(RAW)
-        segment = struct.unpack_from("<IIIIIIII", result, 0x54)
-        segment_file = segment[1]
-        segment_va = segment[2]
-        segment_size = segment[4]
-        by_key = {spec.key: spec for spec in MENU_LABELS}
-        self.assertEqual(160882, segment_size)
-
-        for key, expected in (("return_above_ground", b"Return above ground\x00"), ("report_card", b"Report card\x00")):
-            spec = by_key[key]
-            self.assertEqual(
-                RAW[spec.source_offset:spec.source_offset + spec.capacity],
-                result[spec.source_offset:spec.source_offset + spec.capacity],
-            )
-            targets = {struct.unpack_from("<I", result, off)[0] for off in spec.pointer_offsets}
-            self.assertEqual(1, len(targets))
-            target_va = targets.pop()
-            self.assertGreaterEqual(target_va, segment_va)
-            self.assertLess(target_va, segment_va + segment_size)
-            expected_offset = {"return_above_ground": 0x27452, "report_card": 0x27466}[key]
-            self.assertEqual(segment_va + expected_offset, target_va)
-            target_file = segment_file + target_va - segment_va
-            self.assertEqual(expected, result[target_file:target_file + len(expected)])
-
-        media = by_key["media"]
-        self.assertEqual(
-            RAW[media.source_offset:media.source_offset + media.capacity],
-            result[media.source_offset:media.source_offset + media.capacity],
+        _type, segment_file, segment_va, _paddr, segment_size, _memsz, _flags, _align = struct.unpack_from(
+            "<IIIIIIII", result, 0x54
         )
+        proven = [spec for spec in MENU_LABELS if spec.status == "proven"]
+        self.assertEqual(18, len(proven))
+
+        for spec in proven:
+            with self.subTest(key=spec.key):
+                self.assertEqual(
+                    RAW[spec.source_offset:spec.source_offset + spec.capacity],
+                    result[spec.source_offset:spec.source_offset + spec.capacity],
+                )
+                targets = {struct.unpack_from("<I", result, off)[0] for off in spec.pointer_offsets}
+                self.assertEqual(1, len(targets))
+                target_va = targets.pop()
+                self.assertGreaterEqual(target_va, segment_va)
+                self.assertLess(target_va, segment_va + segment_size)
+                target_file = segment_file + target_va - segment_va
+                assert spec.selected_english is not None
+                expected = encode_ps2_english(spec.selected_english, collapse_spaces=False) + b"\x00"
+                self.assertEqual(expected, result[target_file:target_file + len(expected)])
+
+        media = next(spec for spec in MENU_LABELS if spec.key == "media")
         self.assertEqual(
             RAW[media.pointer_offsets[0]:media.pointer_offsets[0] + 4],
             result[media.pointer_offsets[0]:media.pointer_offsets[0] + 4],
@@ -322,17 +317,21 @@ class EarlyUiPatchTests(unittest.TestCase):
             result[HANT_POINTER_TABLE_OFFSET:HANT_POINTER_TABLE_OFFSET + 17 * 4],
         )
 
-    def test_compact_menu_source_slots_remain_pristine_when_relocated_or_unresolved(self) -> None:
+    def test_command_menu_source_slots_remain_pristine(self) -> None:
         result = build_early_ui_elf(RAW)
-        by_key = {spec.key: spec for spec in MENU_LABELS}
-
-        for key in ("return_above_ground", "report_card", "media"):
-            spec = by_key[key]
-            with self.subTest(key=key):
+        for spec in MENU_LABELS:
+            with self.subTest(key=spec.key):
                 self.assertEqual(
                     RAW[spec.source_offset:spec.source_offset + spec.capacity],
                     result[spec.source_offset:spec.source_offset + spec.capacity],
                 )
+
+    def test_r29_preserves_every_frozen_hant_layout_owner(self) -> None:
+        result = build_early_ui_elf(RAW)
+        for offset, _expected, replacement in HANT_RUNTIME_LAYOUT_PATCHES:
+            with self.subTest(offset=hex(offset)):
+                self.assertEqual(replacement, struct.unpack_from("<I", result, offset)[0])
+
 
 
 if __name__ == "__main__":

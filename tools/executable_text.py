@@ -15,6 +15,15 @@ class RelocatedText:
 
 
 @dataclass(frozen=True)
+class RelocatedCodeReference:
+    key: str
+    lui_offset: int
+    addiu_offset: int
+    expected_lui: int
+    expected_addiu: int
+
+
+@dataclass(frozen=True)
 class ExecutableTextResult:
     raw: bytes
     info: TranslationSegmentInfo
