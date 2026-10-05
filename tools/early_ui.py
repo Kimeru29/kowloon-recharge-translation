@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tools.adv_layout import patch_adv_horizontal_layout
-from tools.companion_hud import relocated_companion_entries
+from tools.companion_hud import patch_companion_action_layout, relocated_companion_entries
 from tools.dungeon_ui import dungeon_code_references, relocated_dungeon_entries
 from tools.elf_strings import ElfFixedStringPatch
 from tools.menu_ui import fixed_menu_patches, patch_menu_labels, relocated_menu_entries
@@ -19,11 +19,12 @@ def build_early_ui_elf(raw: bytes) -> bytes:
     menus = patch_menu_labels(startup)
     menu_entries = relocated_menu_entries(menus)
     horizontal_adv = patch_adv_horizontal_layout(menus)
-    dungeon_entries = relocated_dungeon_entries(horizontal_adv)
-    dungeon_refs = dungeon_code_references(horizontal_adv)
-    companion_entries = relocated_companion_entries(horizontal_adv)
+    companion_layout = patch_companion_action_layout(horizontal_adv)
+    dungeon_entries = relocated_dungeon_entries(companion_layout)
+    dungeon_refs = dungeon_code_references(companion_layout)
+    companion_entries = relocated_companion_entries(companion_layout)
     translated, _ = patch_hant_tutorial(
-        horizontal_adv,
+        companion_layout,
         extra_entries=(*menu_entries, *dungeon_entries, *companion_entries),
         extra_code_references=dungeon_refs,
     )

@@ -1074,3 +1074,10 @@ Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r30.iso`
 - repeat build `/private/tmp/kowloon-recharge-startup-en-v11-r30-repeat.iso` is byte-for-byte identical.
 
 Build uses the same pristine ISO/overlay set as r29. `tools.generate_companion_hud_data` derives the committed companion ownership manifest from pristine `SLPM_665.11` plus owned CUSA27034 `English.bytes`; normal builds do not require the PS4 extraction because the generated exact mappings and source hashes are committed.
+
+
+## v11-r31 companion HUD presentation candidate
+
+r31 is a bounded presentation-only follow-up to Pablo's r30 runtime screenshot. It leaves all r30 companion translations and the proven 160x32 group-2 backing resource unchanged, switches the persistent companion action caption from style 0 (16px) to the existing style 1 (12px), repositions the observed `Throw a Rock` text to 8px horizontal padding inside that backing, and moves the backing/text pair one 32px strip-height upward so it no longer covers the dungeon action palette. The four executable geometry/style owners and the backing dimensions are fail-closed in unit and final-image acceptance tests.
+
+Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r31.iso`, SHA-256 `85bbe609fbe6ee875015a3c02ba685ca0d21f40d4b65ab164e2f0d82ba850833`; pre/post-ROFS ELF `249f074d753dcedb438725847ebadd6985145fdf3dbe0d8869394982c5fe7d4e` / `ef66c365be8c7c4ed28c7b2e98893572e6fe9566e785af5b5b83e39b6fe731d1`; final ELF size 8,642,989 bytes; final-image acceptance **154/154**; both suites execute **242 tests** (10 dependency-free skips / 1 Pillow skip); `/private/tmp/kowloon-recharge-startup-en-v11-r31-repeat.iso` is byte-for-byte identical. Do not launch PCSX2 automatically.

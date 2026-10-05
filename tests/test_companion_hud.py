@@ -7,7 +7,9 @@ from pathlib import Path
 from tests.local_fixtures import require_local_fixture
 from tools.companion_hud import (
     COMPANION_ACTION_LABELS,
+    COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_COMMENT_LINES,
+    patch_companion_action_layout,
     validate_companion_hud_source,
 )
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
@@ -77,6 +79,40 @@ class CompanionHudTests(unittest.TestCase):
         for spec in (COMPANION_COMMENT_LINES[0], COMPANION_ACTION_LABELS[25]):
             source = spec.source_text.encode("cp932") + b"\x00"
             self.assertEqual(source, result[spec.source_offset:spec.source_offset + len(source)])
+
+    def test_r31_companion_action_callout_uses_compact_font_and_clears_action_palette(self) -> None:
+        result = build_early_ui_elf(RAW)
+
+        # r30 proved the English payload but retained the Japanese 16px callout
+        # geometry. r31 keeps the 160x32 backing, moves the whole callout one
+        # backing-height upward, uses the existing 12px style, and gives the
+        # observed "Throw a Rock" label symmetric 8px horizontal padding.
+        expected_words = {
+            0x66708: 0x3C02C274,  # backing Y: anchor - 61px (was -29)
+            0x66804: 0x3C0241A0,  # text X: anchor + 20px (was +49)
+            0x6681C: 0x3C02C258,  # text Y: anchor - 54px (was -22)
+            0x6686C: 0x24050001,  # existing style 1 = 12x12 (was style 0)
+        }
+        for offset, expected in expected_words.items():
+            with self.subTest(offset=hex(offset)):
+                self.assertEqual(expected, struct.unpack_from("<I", result, offset)[0])
+
+        # Group-2 index 0x18 is the callout backing. Keep its proven intrinsic
+        # 160x32 resource geometry/UV owner unchanged; only placement/font move.
+        self.assertEqual(160.0, struct.unpack_from("<f", result, 0x34EAD4)[0])
+        self.assertEqual(32.0, struct.unpack_from("<f", result, 0x34EAD8)[0])
+
+        text_width = len("Throw a Rock") * 12
+        self.assertEqual(8, 20 - 12)
+        self.assertEqual(8, 160 - (20 - 12) - text_width)
+
+    def test_r31_layout_patch_fails_closed_on_each_pristine_owner(self) -> None:
+        for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
+            with self.subTest(offset=hex(offset)):
+                tampered = bytearray(RAW)
+                tampered[offset] ^= 1
+                with self.assertRaisesRegex(ValueError, "companion action layout preimage mismatch"):
+                    patch_companion_action_layout(bytes(tampered))
 
     def test_r30_keeps_accepted_r29_dungeon_owners_frozen(self) -> None:
         result = build_early_ui_elf(RAW)

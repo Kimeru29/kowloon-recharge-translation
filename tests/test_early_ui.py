@@ -5,7 +5,11 @@ import unittest
 from pathlib import Path
 
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES, ADV_SPEAKER_LAYOUT_PATCHES
-from tools.companion_hud import COMPANION_ACTION_LABELS, COMPANION_COMMENT_LINES
+from tools.companion_hud import (
+    COMPANION_ACTION_LABELS,
+    COMPANION_ACTION_LAYOUT_PATCHES,
+    COMPANION_COMMENT_LINES,
+)
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.menu_ui import MENU_LABELS
@@ -166,6 +170,8 @@ class EarlyUiPatchTests(unittest.TestCase):
         for spec in COMPANION_ACTION_LABELS:
             if spec.english is not None:
                 allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
+        for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
+            allowed.update(range(offset, offset + 4))
         allowed.update(range(NAME_FLOW_STATE9_FLAG_OFFSET, NAME_FLOW_STATE9_FLAG_OFFSET + 4))
         # ELF program header / heap metadata used by the appended translation segment.
         allowed.update(range(0x54, 0x54 + 32))

@@ -12,6 +12,21 @@ _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
 _MAX_STRING_BYTES = 512
 
+# r31 presentation owners for the persistent companion action caption. r30
+# translated the payload but left the Japanese-era style/geometry in place.
+# Group-2 index 0x18 is a fixed 160x32 backing sprite; use the existing 12px
+# English style and move the whole callout one backing-height above the action
+# palette. Japanese/English text owners and the backing resource itself remain
+# unchanged.
+COMPANION_ACTION_BACKING_WIDTH_OFFSET = 0x34EAD4
+COMPANION_ACTION_BACKING_HEIGHT_OFFSET = 0x34EAD8
+COMPANION_ACTION_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    (0x66708, 0x3C02C1E8, 0x3C02C274),  # backing Y: -29.0 -> -61.0
+    (0x66804, 0x3C024244, 0x3C0241A0),  # text X: +49.0 -> +20.0
+    (0x6681C, 0x3C02C1B0, 0x3C02C258),  # text Y: -22.0 -> -54.0
+    (0x6686C, 0x0000282D, 0x24050001),  # style 0 (16px) -> style 1 (12px)
+)
+
 
 @dataclass(frozen=True)
 class CompanionCommentLine:
@@ -110,6 +125,31 @@ def validate_companion_hud_source(raw: bytes) -> None:
                 "companion action pointer preimage mismatch: "
                 f"id={spec.action_id}, expected {expected_va:#x}, got {actual_va:#x}"
             )
+
+
+def patch_companion_action_layout(raw: bytes) -> bytes:
+    """Apply the bounded r31 companion-action callout presentation patch."""
+
+    width = struct.unpack_from("<f", raw, COMPANION_ACTION_BACKING_WIDTH_OFFSET)[0]
+    height = struct.unpack_from("<f", raw, COMPANION_ACTION_BACKING_HEIGHT_OFFSET)[0]
+    if (width, height) != (160.0, 32.0):
+        raise ValueError(
+            "companion action backing geometry drifted: "
+            f"expected 160x32, got {width:g}x{height:g}"
+        )
+
+    out = bytearray(raw)
+    for offset, expected, replacement in COMPANION_ACTION_LAYOUT_PATCHES:
+        if offset < 0 or offset + 4 > len(out):
+            raise ValueError(f"companion action layout owner is outside executable: {offset:#x}")
+        actual = struct.unpack_from("<I", out, offset)[0]
+        if actual != expected:
+            raise ValueError(
+                "companion action layout preimage mismatch: "
+                f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
+            )
+        struct.pack_into("<I", out, offset, replacement)
+    return bytes(out)
 
 
 def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:

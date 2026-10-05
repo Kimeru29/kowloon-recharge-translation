@@ -33,7 +33,13 @@ from tools.hant_ui import (
     HANT_WRAPPED_LINES,
 )
 from tools.localization import encode_ps2_english
-from tools.companion_hud import COMPANION_ACTION_LABELS, COMPANION_COMMENT_LINES
+from tools.companion_hud import (
+    COMPANION_ACTION_BACKING_HEIGHT_OFFSET,
+    COMPANION_ACTION_BACKING_WIDTH_OFFSET,
+    COMPANION_ACTION_LABELS,
+    COMPANION_ACTION_LAYOUT_PATCHES,
+    COMPANION_COMMENT_LINES,
+)
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.menu_ui import MENU_LABELS
 from tools.memory_card_ui import (
@@ -318,6 +324,19 @@ def _verify_companion_hud_semantics(
     return comments_ok, actions_ok
 
 
+def _verify_companion_hud_layout(raw: bytes) -> bool:
+    if max(COMPANION_ACTION_BACKING_WIDTH_OFFSET, COMPANION_ACTION_BACKING_HEIGHT_OFFSET) + 4 > len(raw):
+        return False
+    if struct.unpack_from("<f", raw, COMPANION_ACTION_BACKING_WIDTH_OFFSET)[0] != 160.0:
+        return False
+    if struct.unpack_from("<f", raw, COMPANION_ACTION_BACKING_HEIGHT_OFFSET)[0] != 32.0:
+        return False
+    return all(
+        offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
+        for offset, _expected, replacement in COMPANION_ACTION_LAYOUT_PATCHES
+    )
+
+
 def _translation_segment(raw: bytes) -> tuple[int, int, int, int] | None:
     if len(raw) < _SECOND_PH_OFFSET + 32:
         return None
@@ -583,6 +602,13 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "companion_hud_actions",
             companion_actions_ok,
             "one or more companion HUD action labels drifted from their translated/pristine owner",
+        )
+    )
+    checks.append(
+        _check(
+            "companion_hud_layout",
+            _verify_companion_hud_layout(raw),
+            "companion action callout is not using the compact 12px/non-overlapping r31 geometry",
         )
     )
     heap_break_ok = (

@@ -26,7 +26,12 @@ from tools.hant_ui import (
     HANT_TUTORIAL_SINGLETON_STYLE_OFFSET,
     HANT_TUTORIAL_ROW_SPACING_OFFSET,
 )
-from tools.companion_hud import COMPANION_ACTION_LABELS, COMPANION_COMMENT_LINES
+from tools.companion_hud import (
+    COMPANION_ACTION_BACKING_WIDTH_OFFSET,
+    COMPANION_ACTION_LABELS,
+    COMPANION_ACTION_LAYOUT_PATCHES,
+    COMPANION_COMMENT_LINES,
+)
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.menu_ui import MENU_LABELS
 from tools.startup_acceptance import STARTUP_GRAPHICS_PATHS, verify_startup_elf
@@ -81,6 +86,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("dungeon_item_names", names)
         self.assertIn("companion_hud_comments", names)
         self.assertIn("companion_hud_actions", names)
+        self.assertIn("companion_hud_layout", names)
 
     def test_pristine_elf_fails_translated_renderer_checks(self) -> None:
         checks = verify_startup_elf(RAW)
@@ -114,6 +120,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("dungeon_item_names", failed_names)
         self.assertIn("companion_hud_comments", failed_names)
         self.assertIn("companion_hud_actions", failed_names)
+        self.assertIn("companion_hud_layout", failed_names)
 
     def test_menu_acceptance_fails_closed_per_semantic_storage_class(self) -> None:
         translated = build_early_ui_elf(RAW)
@@ -166,6 +173,20 @@ class StartupAcceptanceTests(unittest.TestCase):
                 tampered = bytearray(translated)
                 tampered[offset] ^= 1
                 check = next(check for check in verify_startup_elf(bytes(tampered)) if check["name"] == name)
+                self.assertFalse(check["ok"])
+
+    def test_companion_hud_layout_acceptance_fails_closed_on_each_owner(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        offsets = [offset for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES]
+        offsets.append(COMPANION_ACTION_BACKING_WIDTH_OFFSET)
+        for offset in offsets:
+            with self.subTest(offset=hex(offset)):
+                tampered = bytearray(translated)
+                tampered[offset] ^= 1
+                check = next(
+                    check for check in verify_startup_elf(bytes(tampered))
+                    if check["name"] == "companion_hud_layout"
+                )
                 self.assertFalse(check["ok"])
 
     def test_hant_runtime_layout_acceptance_fails_closed_on_style_or_chrome_drift(self) -> None:
