@@ -37,7 +37,7 @@ class HantTutorialTests(unittest.TestCase):
 
         self.assertEqual(160849, info.payload_size)
         self.assertEqual(
-            "2bf252ecb7c5352e9f28fb96a449914b1c6350fe77f2e0eecf2a56a6e9ad92f7",
+            "c12433a45014fc21e75d6c2ed81e58f8f2787317ff5aee0c1864c39f93fc8de4",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -691,6 +691,35 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(0x3C02433D, struct.unpack_from("<I", result, 0x18C768)[0])  # Ruins restored
         self.assertEqual(0x3C024372, struct.unpack_from("<I", result, 0x18C778)[0])  # ADV moved left
         self.assertEqual(0x2402013F, struct.unpack_from("<I", result, 0x18C788)[0])  # Other frozen
+
+    def test_r28_help_category_text_is_frozen_and_selector_boxes_center_on_labels(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+
+        # r27 text alignment is runtime-accepted. These owners must never move again.
+        self.assertEqual(0x3C02433D, struct.unpack_from("<I", result, 0x18C768)[0])
+        self.assertEqual(0x3C024372, struct.unpack_from("<I", result, 0x18C778)[0])
+        self.assertEqual(0x2402013F, struct.unpack_from("<I", result, 0x18C788)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x18C7F8)[0])
+
+        # The shared category resource remains 64px. r28 uses per-selected-tab X/scale
+        # geometry so ADV can shrink and Ruins can grow without moving any label.
+        base_width = struct.unpack_from("<f", result, 0x364EE4)[0]
+        self.assertEqual(64.0, base_width)
+        selector_geometry = tuple(
+            struct.unpack_from("<ff", result, 0x290484 + index * 8)
+            for index in range(3)
+        )
+        self.assertEqual(((204.0, 0.75), (257.0, 1.125), (338.0, 1.0)), selector_geometry)
+
+        # 12px category text: ADV=36px, Ruins/Other=60px. Each box is centered
+        # on the already-accepted text; Other remains exactly at r27 geometry.
+        text_geometry = ((210.0, 36.0), (263.0, 60.0), (340.0, 60.0))
+        for (box_x, scale), (text_x, text_width) in zip(selector_geometry, text_geometry, strict=True):
+            self.assertEqual(text_x + text_width / 2, box_x + base_width * scale / 2)
+
+        # The live Help update path must dispatch through the bounded helper cave.
+        self.assertEqual(0x0C0E1CC2, struct.unpack_from("<I", result, 0x18D9A4)[0])
+        self.assertEqual(0x8E4200AC, struct.unpack_from("<I", result, 0x287388)[0])
 
     def test_r27_enemy_and_dictionary_runtime_accepted_geometry_is_frozen(self) -> None:
         result, _info = patch_hant_tutorial(RAW)

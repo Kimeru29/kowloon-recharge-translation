@@ -329,6 +329,47 @@ _HANT_HELP_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # existing 2px text inset on both sides while leaving the UV rectangle intact.
     (0x364BE4, 0x43280000, 0x43860000),  # topic selector width 168 -> 268
 )
+# r28 keeps the runtime-accepted category text absolutely fixed and changes only
+# the selected red box. Group-20/index-0x32 is a single 64px resource shared by
+# ADV/Ruins/Other, so resource width alone cannot make ADV narrower while making
+# Ruins wider. The live Help update path is therefore redirected through a tiny
+# bounded helper in existing inter-function padding. It indexes a fixed geometry
+# table by selected category and writes only sprite X (+0x3c) and X scale (+0x60).
+# Geometry is centered on the accepted 12px labels: ADV 204+48/2 = 210+36/2,
+# Ruins 257+72/2 = 263+60/2, Other remains 338+64/2 = 340+60/2.
+_HANT_HELP_SELECTOR_DYNAMIC_PATCHES: tuple[tuple[int, int, int], ...] = (
+    # Replace the original x = base + 69*index FPU sequence with jal 0x387308.
+    (0x18D9A4, 0xC64000AC, 0x0C0E1CC2),
+    (0x18D9A8, 0x468000A0, 0x00000000),
+    (0x18D9AC, 0x3C03428A, 0x00000000),
+    (0x18D9B0, 0x44830800, 0x00000000),
+    (0x18D9B4, 0xC64000C0, 0x00000000),
+    (0x18D9B8, 0x46001818, 0x00000000),
+    (0x18D9BC, 0x4602081C, 0x00000000),
+    (0x18D9C0, 0x8E430014, 0x00000000),
+    (0x18D9C4, 0xE460003C, 0x00000000),
+    # Helper cave, file 0x287388 / VA 0x387308. v0/v1/at are caller-scratch.
+    (0x287388, 0x00000000, 0x8E4200AC),  # lw v0,0xac(s2): selected category
+    (0x28738C, 0x00000000, 0x000210C0),  # sll v0,v0,3
+    (0x287390, 0x00000000, 0x3C030039),  # lui v1,0x39
+    (0x287394, 0x00000000, 0x24630404),  # addiu v1,v1,0x404 -> VA 0x390404
+    (0x287398, 0x00000000, 0x00431021),  # addu v0,v0,v1
+    (0x28739C, 0x00000000, 0x8C410000),  # lw at,0(v0): selected X
+    (0x2873A0, 0x00000000, 0x8C420004),  # lw v0,4(v0): selected X scale
+    (0x2873A4, 0x00000000, 0x8E430014),  # lw v1,0x14(s2): selector sprite
+    (0x2873A8, 0x00000000, 0xAC61003C),  # sw at,0x3c(v1): X
+    (0x2873AC, 0x00000000, 0xAC620060),  # sw v0,0x60(v1): X scale
+    (0x2873B0, 0x00000000, 0x03E00008),  # jr ra
+    (0x2873B4, 0x00000000, 0x00000000),  # nop
+    # Geometry table, file 0x290484 / VA 0x390404: (X, X scale) per category.
+    (0x290484, 0x00000000, 0x434C0000),  # ADV:   x=204, 64*.75 = 48px
+    (0x290488, 0x00000000, 0x3F400000),  #        scale=.75
+    (0x29048C, 0x00000000, 0x43808000),  # Ruins: x=257, 64*1.125 = 72px
+    (0x290490, 0x00000000, 0x3F900000),  #        scale=1.125
+    (0x290494, 0x00000000, 0x43A90000),  # Other: x=338, unchanged 64px
+    (0x290498, 0x00000000, 0x3F800000),  #        scale=1.0
+)
+
 _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # r18 runtime shows that pushing the categories below the divider is the
     # wrong composition. Keep every control on the original y=93 header row and
@@ -368,6 +409,7 @@ HANT_RUNTIME_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     *_HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES,
     *_HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES,
     *_HANT_HELP_LAYOUT_PATCHES,
+    *_HANT_HELP_SELECTOR_DYNAMIC_PATCHES,
     *_HANT_ENEMY_LAYOUT_PATCHES,
     *_HANT_MAIL_LAYOUT_PATCHES,
 )
