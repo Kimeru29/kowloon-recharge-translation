@@ -272,22 +272,21 @@ _HANT_DICTIONARY_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = (
     # r18 runtime proves that the longer English chrome and pristine L1 cannot
     # coexist: 【Dictionary】 spans x=75..267 while L1 begins at x=195. Own the
     # complete root-nav row and pack it inside the same header instead of moving
-    # only the letters. L1=274 and ten 12px tabs span x=302..422 at 12px cadence.
-    # r22/r23 runtime show the right-edge clipping shrinking as R1 moves inward;
-    # r24 repeats the same bounded correction once more, x=424 -> x=420.
-    # The accepted selected-detail mode offset remains independent.
-    (0x18E1A4, 0x3C024343, 0x3C024389),
-    (0x18E1EC, 0x24020197, 0x240201A4),
-    (0x18E398, 0x3C024190, 0x3C024140),
-    (0x18E3AC, 0x3C024361, 0x3C024397),
+    # only the letters. r24 left L1=274, tabs at x=302+12*i, selector at x=300,
+    # and R1=420. r25 moves that complete accepted cluster four pixels left as
+    # one unit so R1 clears the remaining right-edge clip without changing
+    # cadence, selector width, or selected-detail geometry.
+    (0x18E1A4, 0x3C024343, 0x3C024387),  # L1 195 -> 270
+    (0x18E1EC, 0x24020197, 0x240201A0),  # R1 407 -> 416
+    (0x18E398, 0x3C024190, 0x3C024140),  # tab cadence 18 -> 12
+    (0x18E3AC, 0x3C024361, 0x3C024395),  # tab base 225 -> 298
     # r19 runtime exposes the separately animated red selector. Pristine tracks
     # the Japanese tabs at x = 223 + 18*i, two pixels before text at 225+18*i.
-    # Keep that inset against the r19 English text at 302 + 12*i. r20 proves the
-    # position is correct but the group-20/index-0x21 sprite is still 24px wide,
-    # spanning two 12px tabs. r21 changes only its rendered width to 14px; r22 adds the final symmetric
-    # padding by widening it to 16px while keeping the same UV rectangle, so the
-    # existing selector art is scaled rather than sampling adjacent atlas pixels.
-    (0x18DFD8, 0x3C03435F, 0x3C034396),  # selector base 223 -> 300
+    # Keep that inset against the English tab row. r20 proves the position is
+    # correct but the group-20/index-0x21 sprite is still 24px wide, spanning two
+    # 12px tabs. r21/r22 settle on 16px with symmetric 2px padding; r25 keeps that
+    # width/cadence and shifts only the complete cluster base four pixels left.
+    (0x18DFD8, 0x3C03435F, 0x3C034394),  # selector base 223 -> 296
     (0x18F7B4, 0x3C034190, 0x3C034140),  # selector cadence 18 -> 12
     (0x364BB4, 0x41C00000, 0x41800000),  # selector width 24 -> 16
 )
@@ -307,6 +306,27 @@ _HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
 _HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES: tuple[tuple[int, int, int], ...] = ()
 HANT_TUTORIAL_SINGLETON_STYLE_OFFSET = 0x190A40
 HANT_TUTORIAL_SINGLETON_STYLE_PRISTINE_WORD = 0x0000282D
+_HANT_HELP_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
+    # r25 runtime screenshots expose two independent Help presentation defects:
+    # topic/category text is still style 0 (16px), and the Japanese-era geometry
+    # is too wide for the translated labels. Reuse the already-proven style 1
+    # (12px) for both text constructors. Topic rows retain x=143, preserving the
+    # selector's existing 2px leading inset.
+    (0x18C674, 0x0000282D, 0x24050001),  # topic rows style 0 -> 1
+    (0x18C7F8, 0x0000282D, 0x24050001),  # category labels style 0 -> 1
+    # Keep the existing 72px category selector and its 69px cadence, but shift
+    # the whole ADV/Ruins/Other composition eight pixels left. Selector positions
+    # become 192/261/330; text becomes 202/263/340 after the renderer's fixed
+    # +21px label inset, so the final box ends at x=402 before R1 at x=403.
+    (0x18C3F4, 0x3C034348, 0x3C034340),  # category selector base 200 -> 192
+    (0x18C768, 0x3C02433D, 0x3C024335),  # ADV base 189 -> 181
+    (0x18C778, 0x3C02437A, 0x3C024372),  # Ruins base 250 -> 242
+    (0x18C788, 0x24020147, 0x2402013F),  # Other base 327 -> 319
+    # The group-20/index-0x22 topic selector is shared by every Help row. With
+    # style 1, the longest translated topic is 22*12=264px; 268px preserves the
+    # existing 2px text inset on both sides while leaving the UV rectangle intact.
+    (0x364BE4, 0x43280000, 0x43860000),  # topic selector width 168 -> 268
+)
 _HANT_ENEMY_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # r18 runtime shows that pushing the categories below the divider is the
     # wrong composition. Keep every control on the original y=93 header row and
@@ -345,18 +365,25 @@ HANT_RUNTIME_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     *_HANT_DICTIONARY_ENGLISH_STYLE_PATCHES,
     *_HANT_DICTIONARY_DETAIL_LAYOUT_PATCHES,
     *_HANT_DICTIONARY_DEFINITION_ENGLISH_STYLE_PATCHES,
+    *_HANT_HELP_LAYOUT_PATCHES,
     *_HANT_ENEMY_LAYOUT_PATCHES,
     *_HANT_MAIL_LAYOUT_PATCHES,
 )
 
-# r21 selector-width ownership: group 20 resolves through the executable resource
-# table to unique metadata records for Dictionary index 0x21 and Enemy index 0x41.
+# Selector-width ownership: group 20 resolves through the executable resource
+# table to unique metadata records. r21 proved Dictionary index 0x21 and Enemy
+# index 0x41; r25 adds Help topic index 0x22 and pins category index 0x32 so the
+# widened topic selector cannot accidentally mutate unrelated atlas resources.
 # Width lives in the second metadata word; UV coordinates are intentionally not
 # patched so only rendered geometry changes.
 _HANT_SELECTOR_RESOURCE_OWNER_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x385310, 0x00482E50),  # group 20 -> resource table VA 0x482E50
     (0x382FD8, 0x00464B30),  # index 0x21 -> Dictionary selector metadata
     (0x382FDC, 0x00000001),  # exactly one metadata record
+    (0x382FE0, 0x00464B60),  # index 0x22 -> Help topic selector metadata
+    (0x382FE4, 0x00000001),  # exactly one metadata record
+    (0x383060, 0x00464E60),  # index 0x32 -> Help category selector metadata
+    (0x383064, 0x00000001),  # exactly one metadata record
     (0x3830D8, 0x00465730),  # index 0x41 -> Enemy selector metadata
     (0x3830DC, 0x00000001),  # exactly one metadata record
 )

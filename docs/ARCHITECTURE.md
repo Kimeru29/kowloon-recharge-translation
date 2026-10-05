@@ -101,3 +101,8 @@ r20 proves selector position and selector size are independent owners. Both Dict
 ### v11-r22 selector-family inheritance
 
 Dictionary group-20 selector index `0x21` and Enemy index `0x41` are family-level resources, not per-item assets. The runtime computes selector position from the selected category index, so width/base changes apply uniformly to every item in that family. Dictionary's mode-1 detail renderer is likewise shared across all enumerated terms; the generated corpus already covers 208 definition leaves, including currently locked ones when they become reachable. This inheritance does not extend across unrelated H.A.N.T families: Help/topic bodies and other menu classes may own separate descriptors, text tables or selectors and remain fail-closed until promoted.
+
+
+### v11-r25 Help selector-family geometry
+
+r25 extends the group-20 selector ownership model to Help without coupling it to Dictionary or Enemy. The Help topic selector is index `0x22`, resolved uniquely through table file `0x382FE0` to metadata file `0x364BE0`; its second metadata word is the rendered width owner and changes 168→268px while the UV rectangle remains byte-identical. The three Help category tabs use independent selector index `0x32`, resolved through `0x383060` to metadata file `0x364EE0`; its 72px width remains pristine. Topic and category text constructors are also separate owners at files `0x18C674` and `0x18C7F8`, both switched from style 0 to the existing style 1. This family-level ownership means every Help topic row inherits the 268px selector, while Dictionary index `0x21` and Enemy index `0x41` remain isolated and regression-frozen.

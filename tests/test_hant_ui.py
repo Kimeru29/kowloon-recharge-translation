@@ -37,7 +37,7 @@ class HantTutorialTests(unittest.TestCase):
 
         self.assertEqual(160849, info.payload_size)
         self.assertEqual(
-            "cc4a3727279cfa8eeab7168698c8df3a27a1fa496f84587e6739b59a0af8ce99",
+            "097bf9c24246d08fa9a5275b05dfe823c211c76aed01c12fdb8d5c71376e5299",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -443,17 +443,17 @@ class HantTutorialTests(unittest.TestCase):
         # r18 runtime proves that moving only the Dictionary tabs cannot produce a
         # coherent header: the 192px English chrome already overlaps pristine L1.
         # r19 owns the complete root-nav row instead. Keep the 12px tab glyphs,
-        # pack them at 12px cadence, and place the cluster after the title: title
-        # ends at x=267, L1 starts at 274 and tabs span 302..422. Runtime r23/r24
-        # then pulls only R1 inward to x=420 to clear the right-edge clip.
+        # pack them at 12px cadence, and place the cluster after the title. r24
+        # reached L1=274/tabs=302+12*i/R1=420; r25 shifts that complete cluster
+        # four pixels left to L1=270/tabs=298+12*i/R1=416.
         self.assertEqual(0x3C024343, struct.unpack_from("<I", RAW, 0x18E1A4)[0])
-        self.assertEqual(0x3C024389, struct.unpack_from("<I", result, 0x18E1A4)[0])
+        self.assertEqual(0x3C024387, struct.unpack_from("<I", result, 0x18E1A4)[0])
         self.assertEqual(0x24020197, struct.unpack_from("<I", RAW, 0x18E1EC)[0])
-        self.assertEqual(0x240201A4, struct.unpack_from("<I", result, 0x18E1EC)[0])
+        self.assertEqual(0x240201A0, struct.unpack_from("<I", result, 0x18E1EC)[0])
         self.assertEqual(0x3C024190, struct.unpack_from("<I", RAW, 0x18E398)[0])
         self.assertEqual(0x3C024140, struct.unpack_from("<I", result, 0x18E398)[0])
         self.assertEqual(0x3C024361, struct.unpack_from("<I", RAW, 0x18E3AC)[0])
-        self.assertEqual(0x3C024397, struct.unpack_from("<I", result, 0x18E3AC)[0])
+        self.assertEqual(0x3C024395, struct.unpack_from("<I", result, 0x18E3AC)[0])
         # Dictionary detail title/icon X derives only from the mode-offset table.
         # Japanese 【用語辞典】 is six 16px glyphs; English 【Dictionary】 is twelve.
         # Mode 1 therefore needs six extra 16px cells, not r17's two. Offset 12
@@ -493,10 +493,10 @@ class HantTutorialTests(unittest.TestCase):
         result, _info = patch_hant_tutorial(RAW)
         # The moving selector is a separate owner from the ten text canvases.
         # Pristine uses selector x = 223 + 18*category while text is
-        # x = 225 + 18*category. r19 moved only text to 302 + 12*category.
-        # Preserve the original 2px inset with selector x = 300 + 12*category.
+        # x = 225 + 18*category. r19 moved text to 302 + 12*category and the
+        # selector to 300 + 12*category; r25 shifts both bases four pixels left.
         self.assertEqual(0x3C03435F, struct.unpack_from("<I", RAW, 0x18DFD8)[0])
-        self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x18DFD8)[0])
+        self.assertEqual(0x3C034394, struct.unpack_from("<I", result, 0x18DFD8)[0])
         self.assertEqual(0x3C034190, struct.unpack_from("<I", RAW, 0x18F7B4)[0])
         self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x18F7B4)[0])
         # Detail-page clearance and the H.A.N.T Functions singleton stay frozen.
@@ -558,10 +558,10 @@ class HantTutorialTests(unittest.TestCase):
     def test_r22_selectors_have_symmetric_padding_without_touching_labels(self) -> None:
         result, _info = patch_hant_tutorial(RAW)
 
-        # Dictionary tabs remain 12px glyphs at x=302+12*i. A 16px box at
-        # x=300+12*i gives 2px padding on both sides.
+        # Dictionary tabs remain 12px glyphs with a 16px selector and 2px
+        # symmetric padding; r25 shifts the accepted pair to x=298/296+12*i.
         self.assertEqual(16.0, struct.unpack_from("<f", result, 0x364BB4)[0])
-        self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x18DFD8)[0])
+        self.assertEqual(0x3C034394, struct.unpack_from("<I", result, 0x18DFD8)[0])
         self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x18F7B4)[0])
 
         # Enemy labels stay at 220/282/344 and remain 60px wide. Shift only
@@ -580,8 +580,8 @@ class HantTutorialTests(unittest.TestCase):
         result, _info = patch_hant_tutorial(RAW)
 
         # r23 preserved the accepted Dictionary tabs/selector while adjusting
-        # only the navigation boundary. r24 owns the newer final R1 position.
-        self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x18DFD8)[0])
+        # only navigation. r25 owns the current four-pixel-left cluster position.
+        self.assertEqual(0x3C034394, struct.unpack_from("<I", result, 0x18DFD8)[0])
         self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x18F7B4)[0])
         self.assertEqual(16.0, struct.unpack_from("<f", result, 0x364BB4)[0])
 
@@ -600,21 +600,75 @@ class HantTutorialTests(unittest.TestCase):
     def test_r24_dictionary_r1_clears_final_clip_and_enemy_stays_frozen(self) -> None:
         result, _info = patch_hant_tutorial(RAW)
 
-        # r23 runtime proves that 428 -> 424 reduces the Dictionary R1 clipping
-        # without disturbing the accepted header. Repeat the same bounded 4px
-        # correction once more: R1 x=420, with every other Dictionary owner fixed.
-        self.assertEqual(0x240201A4, struct.unpack_from("<I", result, 0x18E1EC)[0])
-        self.assertEqual(0x3C024389, struct.unpack_from("<I", result, 0x18E1A4)[0])
-        self.assertEqual(0x3C024397, struct.unpack_from("<I", result, 0x18E3AC)[0])
+        # r24 moved only R1 to x=420. r25 supersedes that final output by moving
+        # the complete accepted Dictionary header cluster four pixels left:
+        # L1=270, tabs=298+12*i, selector=296+12*i, R1=416.
+        self.assertEqual(0x240201A0, struct.unpack_from("<I", result, 0x18E1EC)[0])
+        self.assertEqual(0x3C024387, struct.unpack_from("<I", result, 0x18E1A4)[0])
+        self.assertEqual(0x3C024395, struct.unpack_from("<I", result, 0x18E3AC)[0])
         self.assertEqual(0x3C024140, struct.unpack_from("<I", result, 0x18E398)[0])
-        self.assertEqual(0x3C034396, struct.unpack_from("<I", result, 0x18DFD8)[0])
+        self.assertEqual(0x3C034394, struct.unpack_from("<I", result, 0x18DFD8)[0])
         self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x18F7B4)[0])
         self.assertEqual(16.0, struct.unpack_from("<f", result, 0x364BB4)[0])
         self.assertEqual(12, struct.unpack_from("<I", result, 0x588C84)[0])
         self.assertEqual(0x0000282D, struct.unpack_from("<I", result, 0x190A40)[0])
 
         # Enemy is runtime-accepted in r23. Freeze its complete reviewed header
-        # geometry so this Dictionary-only round cannot regress it.
+        # geometry so later Dictionary/Help polish cannot regress it.
+        self.assertEqual(0x3C02433E, struct.unpack_from("<I", result, 0x195BCC)[0])
+        self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
+        self.assertEqual(0x3C02435A, struct.unpack_from("<I", result, 0x195F30)[0])
+        self.assertEqual(0x3C024278, struct.unpack_from("<I", result, 0x195F28)[0])
+        self.assertEqual(64.0, struct.unpack_from("<f", result, 0x3657B4)[0])
+        self.assertEqual(0x3C0242BA, struct.unpack_from("<I", result, 0x195D18)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x195D5C)[0])
+        self.assertEqual(
+            (0x240200C7, 0x24020105, 0x24020143),
+            tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)),
+        )
+
+    def test_r25_help_geometry_and_dictionary_cluster_shift_while_enemy_stays_frozen(self) -> None:
+        import tools.hant_ui as hant_ui
+
+        result, _info = patch_hant_tutorial(RAW)
+
+        # Dictionary r25 moves the complete accepted L1 -> R1 cluster four pixels
+        # left as one unit. Cadence and widths stay unchanged.
+        self.assertEqual(0x3C024387, struct.unpack_from("<I", result, 0x18E1A4)[0])  # L1 x=270
+        self.assertEqual(0x240201A0, struct.unpack_from("<I", result, 0x18E1EC)[0])  # R1 x=416
+        self.assertEqual(0x3C034394, struct.unpack_from("<I", result, 0x18DFD8)[0])  # selector x=296
+        self.assertEqual(0x3C024395, struct.unpack_from("<I", result, 0x18E3AC)[0])  # tabs x=298
+        self.assertEqual(0x3C024140, struct.unpack_from("<I", result, 0x18E398)[0])  # 12px cadence
+        self.assertEqual(16.0, struct.unpack_from("<f", result, 0x364BB4)[0])
+
+        # Help topic/category canvases use the proven 12px style-1 renderer.
+        self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x18C674)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x18C674)[0])
+        self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x18C7F8)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x18C7F8)[0])
+
+        # Keep the existing 72px category selector, but shift the complete
+        # ADV/Ruins/Other cluster eight pixels left. The selector positions become
+        # 192/261/330, and the 12px labels become 202/263/340, so every label is
+        # enclosed while the final box ends at x=402 before R1 at x=403.
+        self.assertEqual(0x3C034340, struct.unpack_from("<I", result, 0x18C3F4)[0])
+        self.assertEqual(0x3C024335, struct.unpack_from("<I", result, 0x18C768)[0])
+        self.assertEqual(0x3C024372, struct.unpack_from("<I", result, 0x18C778)[0])
+        self.assertEqual(0x2402013F, struct.unpack_from("<I", result, 0x18C788)[0])
+        self.assertEqual(72.0, struct.unpack_from("<f", RAW, 0x364EE4)[0])
+        self.assertEqual(72.0, struct.unpack_from("<f", result, 0x364EE4)[0])
+
+        # Topic rows share one group-20 selector. Style 1 makes the longest Help
+        # label 22*12=264px; a 268px selector retains the proven 2px text inset on
+        # both sides without changing atlas UVs.
+        self.assertEqual(168.0, struct.unpack_from("<f", RAW, 0x364BE4)[0])
+        self.assertEqual(268.0, struct.unpack_from("<f", result, 0x364BE4)[0])
+        self.assertEqual(RAW[0x364BE8:0x364C00], result[0x364BE8:0x364C00])
+        longest = max(measured_hant_cells(spec.english) for spec in hant_ui.HANT_ALL_HELP_TOPICS)
+        self.assertEqual(22, longest)
+        self.assertGreaterEqual(268, longest * 12 + 4)
+
+        # Enemy was accepted by runtime review and is not part of r25.
         self.assertEqual(0x3C02433E, struct.unpack_from("<I", result, 0x195BCC)[0])
         self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
         self.assertEqual(0x3C02435A, struct.unpack_from("<I", result, 0x195F30)[0])
