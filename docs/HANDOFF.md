@@ -261,3 +261,12 @@ Pablo runtime-tested r22 and reported only two remaining H.A.N.T. issues: Dictio
 H.A.N.T. regression protection was also tightened: final-image acceptance is now explicitly tamper-tested against every owner in `HANT_RUNTIME_LAYOUT_PATCHES`, while existing fail-closed checks continue to protect `0x588C84 = 12`, pristine `0x190A40`, selector UVs, translated content owners, and previously accepted Help/Mail/Config surfaces.
 
 Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r23.iso`, SHA-256 `4465f4322fc252d1fa0cf734fc4c63697c38adbda155a90eadcaca37698a55c5`; pre-ROFS ELF `564c4268faf7f7224bc5a4dc1d67c758a2af003f2c5487a4056af8d537a2041f`; post-ROFS ELF `4b59521acbfc96b68a6a934a7eb2442b8e426288714065f96f1980aeff3516f8`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **224** tests in both suites (10 dependency-free skips / 1 Pillow skip); deterministic repeat is byte-for-byte identical. Runtime proof of these two final header nudges remains Pablo's gate. Do not launch PCSX2 automatically.
+
+
+### v11-r24 Dictionary R1 final-clearance candidate
+
+Pablo runtime-tested r23. Enemy is now accepted as perfect for the current story point and must stay frozen: L1 x=190, labels 220/282/344, selector x=218+62*i with width 64, R1 x=407, y=93/style 1. r24 adds an explicit regression test for this full reviewed Enemy geometry.
+
+Dictionary is also accepted except for a smaller remaining right-edge R1 clip. Since r23's 428→424 move reduced the clip with no regression, r24 repeats the same bounded correction once, changing only Dictionary R1 x=424→420. Tabs, 16px selector, detail-page geometry, `0x588C84 = 12`, pristine `0x190A40`, and all other accepted H.A.N.T. owners remain frozen.
+
+Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r24.iso`, SHA-256 `46112aaaefb80a317dec4bed36e526d3e9f05f780dd435b4ecb0516c85e304d0`; pre/post-ROFS ELF `2242f5472f9ab228c51da4f776eb011e47b2facbfec02baf64159f3be71be58f` / `930770fdad8ac71d1291e250400e467c0258cc57a1176f1bc330aa09e8de88e5`; final-image acceptance **150/150**; both suites **225 tests**; repeat ISO byte-identical. The only runtime gate for this round is Dictionary R1 visibility. Do not launch PCSX2 automatically.

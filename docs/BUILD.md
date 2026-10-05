@@ -1022,3 +1022,10 @@ Measured result: ISO `1b3a9c916ec8436af94f702138efbdde3028158c4af256ba517293a2f3
 r23 is a bounded follow-up to Pablo's r22 runtime screenshots. It preserves all r22 selector/text geometry and changes only two navigation-control owners: Dictionary R1 moves x=428→424, and Enemy L1 moves x=194→190. The H.A.N.T. final-image regression test now fail-closes every owner in `HANT_RUNTIME_LAYOUT_PATCHES`, not a representative subset.
 
 Measured result: ISO `4465f4322fc252d1fa0cf734fc4c63697c38adbda155a90eadcaca37698a55c5`; pre-ROFS ELF `564c4268faf7f7224bc5a4dc1d67c758a2af003f2c5487a4056af8d537a2041f`; post-ROFS ELF `4b59521acbfc96b68a6a934a7eb2442b8e426288714065f96f1980aeff3516f8`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **224** dependency-free tests (10 skips); **224** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r23-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r23.iso`. Do not launch PCSX2 automatically.
+
+
+## Build startup v11-r24 Dictionary R1 final-clearance candidate
+
+r24 follows Pablo's r23 runtime review. Enemy is promoted to runtime-proven/frozen at its r23 geometry. Dictionary improved but still clips R1 slightly, so r24 changes only the Dictionary R1 owner from x=424 to x=420. Tabs, selector, Dictionary detail layout, Enemy, and all other accepted H.A.N.T. owners remain unchanged.
+
+Measured result: ISO `46112aaaefb80a317dec4bed36e526d3e9f05f780dd435b4ecb0516c85e304d0`; pre-ROFS ELF `2242f5472f9ab228c51da4f776eb011e47b2facbfec02baf64159f3be71be58f`; post-ROFS ELF `930770fdad8ac71d1291e250400e467c0258cc57a1176f1bc330aa09e8de88e5`; final ELF size 8,562,114 bytes; **150/150** final-image checks; **225** dependency-free tests (10 skips); **225** Pillow tests (1 skip); `/private/tmp/kowloon-recharge-startup-en-v11-r24-repeat.iso` is byte-for-byte identical. Candidate path: `/private/tmp/kowloon-recharge-startup-en-v11-r24.iso`. Do not launch PCSX2 automatically.
