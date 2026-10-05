@@ -614,3 +614,9 @@ The battle/L1 path is data-driven instead. VA `0x134AB0` indexes a 500-pointer i
 
 
 Measured r29: ISO `1692b234b810bf966b94d0d3959abab07ad0c611bca469a5e022727eaac3de0e`; pre/post-ROFS ELF `8caddb81607bd1afe7d30344d2b4bc0e87e979e7df9bd8714bd2e18d27f41062` / `923bc218585f0b9d1ee1edb12ea73d5c04ca6447c653b6aff3b2b43fd30e754f`; final ELF size 8,573,437 bytes; **151/151** final-image checks; **234** dependency-free tests (10 skips); **234** Pillow-enabled tests (1 skip); repeat ISO is byte-for-byte identical. Runtime proof remains limited to the newly promoted SELECT/dungeon-HUD paths.
+
+## Startup v11-r30 companion HUD trace
+
+Pablo's r29 runtime pass accepts both dungeon action-menu sections and the SELECT/start menu as complete; those owners are frozen. The remaining Japanese companion HUD is not part of `H_CmdIconDraw`. `H_TalkBuddyTask`/`H_VoiceDraw` consume the `h_buddy.c` event table at file `0x3D3320`: 601 event records × 0x80 bytes, eight 0x10-byte slots, two optional text pointers per slot. Static inventory finds 1,784 live non-empty aliases referencing 1,650 unique CP932 source strings. All 1,650 sources resolve uniquely by Japanese key in owned CUSA27034 `English.bytes`; there are no unmatched promoted comment rows. The first pair, for example, maps `千年以上の昔、地震で水没した` / `伝説の古代都市ヘラクレイオン。` to `Heracleion flooded after an` / `earthquake 1,000 years ago.`.
+
+The always-visible companion action caption comes from the 31-pointer table at `0x3F8D20`. 26 non-placeholder rows reuse exact PS4 strings; the screenshot-visible `石を投げる` maps to `Throw a Rock`. Four Re:charge-only labels have no exact PS4 key and are kept in a separately provenance-tagged semantic mapping. r30 redirects only these proven pointer owners into the existing wide-text translation segment, preserving all original Japanese source bytes and r29/H.A.N.T. geometry.
