@@ -290,3 +290,10 @@ Pablo runtime-tested r25. Dictionary is nearly perfect but still needs the compl
 Help's remaining issue is specifically the category red frame at the two shoulders. r25's 72px selector at x=192 keeps `Other` clear of R1 but reaches into L1 at `ADV`. r26 restores selector base x=200 and shrinks the shared resource to 64px, preserving right edge x=402. Labels are x=202/271/340, giving the long `Ruins`/`Other` labels 2px padding on both sides and keeping `ADV` clear of L1. The 268px topic selector and all 55 topic labels/bodies remain unchanged. Enemy stays fully frozen.
 
 Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r26.iso`, SHA-256 `189434d74b98fe2b1cacb4e1a2edfad9ac6943e12b6e8b655c4a4c4884fd57b0`; pre/post-ROFS ELF `fc001382a330a43313098adf3f70dfeec4fc1d77f2e93284de2d72cd39dcf940` / `572ff87377d3c2692309da36689b38c107988eaf8442fb510f9b034d3678b7c2`; final-image acceptance **150/150**; both suites **227 tests**; repeat ISO byte-identical. Runtime gate: visually confirm Dictionary R1 clearance plus Help `ADV`/`Ruins`/`Other` selector shoulders. Do not launch PCSX2 automatically.
+
+
+### v11-r27 final Help category-owner correction
+
+Pablo's r26 runtime review accepts Enemy and Dictionary as perfect and identifies one remaining Help defect: r26 moved `Ruins` when the intended target was `ADV`. Runtime therefore corrects the owner map: `0x18C768` is `Ruins` and is restored; `0x18C778` is `ADV` and gets the -8px nudge. Help selector x=200/64px, `Other`, the 268px topic selector and all body/content owners remain frozen. Dedicated r27 tests pin the accepted Enemy and Dictionary geometry against future regressions.
+
+Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r27.iso`, SHA-256 `5210dde53302c6340cc27550f0f170a31ca317907759dbc29a92839c4781fb9e`; pre/post-ROFS ELF `9a925cb3c5b930ecaea0669f85399c1ef1c3514edf8e18e656e21df81773a1ff` / `a31135de31bba5baa367925b743d48ddb6ab8a9a2d169da176440a4b3777fc27`; final-image acceptance **150/150**; both suites **228 tests**; repeat ISO byte-identical. Do not launch PCSX2 automatically.

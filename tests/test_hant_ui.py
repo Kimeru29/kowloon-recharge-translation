@@ -37,7 +37,7 @@ class HantTutorialTests(unittest.TestCase):
 
         self.assertEqual(160849, info.payload_size)
         self.assertEqual(
-            "0975ed002a2757df24cea782810f4e0b4b3dee2e16094fc8b64e0bafad12a50a",
+            "2bf252ecb7c5352e9f28fb96a449914b1c6350fe77f2e0eecf2a56a6e9ad92f7",
             hashlib.sha256(result).hexdigest(),
         )
         self.assertEqual(
@@ -627,7 +627,7 @@ class HantTutorialTests(unittest.TestCase):
             tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)),
         )
 
-    def test_r25_geometry_is_superseded_by_r26_while_enemy_stays_frozen(self) -> None:
+    def test_r25_geometry_is_superseded_by_r27_while_enemy_stays_frozen(self) -> None:
         import tools.hant_ui as hant_ui
 
         result, _info = patch_hant_tutorial(RAW)
@@ -647,12 +647,12 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(0x0000282D, struct.unpack_from("<I", RAW, 0x18C7F8)[0])
         self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x18C7F8)[0])
 
-        # r26 supersedes r25's all-left shift: the category selector base returns
-        # to x=200 while its shared width shrinks 72->64px, preserving the x=402
-        # right edge. Labels are aligned at selector+2: 202/271/340.
+        # r27 preserves r26 selector geometry but corrects the runtime-proven owner
+        # attribution: 0x18C768 is Ruins and stays pristine; 0x18C778 is ADV and
+        # receives the eight-pixel nudge. Other stays frozen.
         self.assertEqual(0x3C034348, struct.unpack_from("<I", result, 0x18C3F4)[0])
-        self.assertEqual(0x3C024335, struct.unpack_from("<I", result, 0x18C768)[0])
-        self.assertEqual(0x3C02437A, struct.unpack_from("<I", result, 0x18C778)[0])
+        self.assertEqual(0x3C02433D, struct.unpack_from("<I", result, 0x18C768)[0])
+        self.assertEqual(0x3C024372, struct.unpack_from("<I", result, 0x18C778)[0])
         self.assertEqual(0x2402013F, struct.unpack_from("<I", result, 0x18C788)[0])
         self.assertEqual(72.0, struct.unpack_from("<f", RAW, 0x364EE4)[0])
         self.assertEqual(64.0, struct.unpack_from("<f", result, 0x364EE4)[0])
@@ -667,7 +667,7 @@ class HantTutorialTests(unittest.TestCase):
         self.assertEqual(22, longest)
         self.assertGreaterEqual(268, longest * 12 + 4)
 
-        # Enemy was accepted by runtime review and is not part of r26.
+        # Enemy was accepted by runtime review and is not part of r27.
         self.assertEqual(0x3C02433E, struct.unpack_from("<I", result, 0x195BCC)[0])
         self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
         self.assertEqual(0x3C02435A, struct.unpack_from("<I", result, 0x195F30)[0])
@@ -680,31 +680,45 @@ class HantTutorialTests(unittest.TestCase):
             tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)),
         )
 
-    def test_r26_dictionary_moves_left_and_help_selector_clears_both_shoulders(self) -> None:
+    def test_r27_help_moves_adv_not_ruins(self) -> None:
         result, _info = patch_hant_tutorial(RAW)
 
-        # Dictionary: keep the accepted r25 geometry as one rigid cluster, but
-        # move it another four pixels left to finish the remaining R1 clearance.
+        # Runtime review of r26 proves the two category-owner offsets were named
+        # backwards: changing 0x18C768 moved Ruins, while ADV stayed put. Keep the
+        # accepted 64px selector geometry, restore Ruins, and move only ADV left.
+        self.assertEqual(0x3C034348, struct.unpack_from("<I", result, 0x18C3F4)[0])  # selector base 200
+        self.assertEqual(64.0, struct.unpack_from("<f", result, 0x364EE4)[0])
+        self.assertEqual(0x3C02433D, struct.unpack_from("<I", result, 0x18C768)[0])  # Ruins restored
+        self.assertEqual(0x3C024372, struct.unpack_from("<I", result, 0x18C778)[0])  # ADV moved left
+        self.assertEqual(0x2402013F, struct.unpack_from("<I", result, 0x18C788)[0])  # Other frozen
+
+    def test_r27_enemy_and_dictionary_runtime_accepted_geometry_is_frozen(self) -> None:
+        result, _info = patch_hant_tutorial(RAW)
+
+        # Dictionary is runtime-accepted in r26. Freeze the complete header cluster,
+        # selector cadence/width, and definition-mode offset.
         self.assertEqual(0x3C024385, struct.unpack_from("<I", result, 0x18E1A4)[0])  # L1 x=266
         self.assertEqual(0x2402019C, struct.unpack_from("<I", result, 0x18E1EC)[0])  # R1 x=412
         self.assertEqual(0x3C034392, struct.unpack_from("<I", result, 0x18DFD8)[0])  # selector x=292
         self.assertEqual(0x3C024393, struct.unpack_from("<I", result, 0x18E3AC)[0])  # tabs x=294
+        self.assertEqual(0x3C024140, struct.unpack_from("<I", result, 0x18E398)[0])  # 12px cadence
+        self.assertEqual(0x3C034140, struct.unpack_from("<I", result, 0x18F7B4)[0])  # selector cadence
         self.assertEqual(16.0, struct.unpack_from("<f", result, 0x364BB4)[0])
+        self.assertEqual(12, struct.unpack_from("<I", result, 0x588C84)[0])
 
-        # Help: r25 fixed the right boundary but left the 72px selector reaching
-        # into L1 at ADV. Move the selector base back right by 8px and shrink the
-        # shared category selector 72->64px so its right edge stays fixed. Put all
-        # three labels at selector+2; Ruins is the only label that needs an X nudge.
-        self.assertEqual(0x3C034348, struct.unpack_from("<I", result, 0x18C3F4)[0])  # selector base 200
-        self.assertEqual(64.0, struct.unpack_from("<f", result, 0x364EE4)[0])
-        self.assertEqual(0x3C024335, struct.unpack_from("<I", result, 0x18C768)[0])  # ADV x=202
-        self.assertEqual(0x3C02437A, struct.unpack_from("<I", result, 0x18C778)[0])  # Ruins x=271
-        self.assertEqual(0x2402013F, struct.unpack_from("<I", result, 0x18C788)[0])  # Other x=340
-
-        # Accepted Enemy geometry remains untouched.
+        # Enemy is runtime-accepted. Freeze both navigation shoulders, all three
+        # category bases, text style, selector width, and category cadence.
         self.assertEqual(0x3C02433E, struct.unpack_from("<I", result, 0x195BCC)[0])
         self.assertEqual(0x24020197, struct.unpack_from("<I", result, 0x195C14)[0])
+        self.assertEqual(0x3C02435A, struct.unpack_from("<I", result, 0x195F30)[0])
+        self.assertEqual(0x3C024278, struct.unpack_from("<I", result, 0x195F28)[0])
+        self.assertEqual(0x24050001, struct.unpack_from("<I", result, 0x195D5C)[0])
         self.assertEqual(64.0, struct.unpack_from("<f", result, 0x3657B4)[0])
+        self.assertEqual(0x3C0242BA, struct.unpack_from("<I", result, 0x195D18)[0])
+        self.assertEqual(
+            (0x240200C7, 0x24020105, 0x24020143),
+            tuple(struct.unpack_from("<I", result, o)[0] for o in (0x195CB4, 0x195CD0, 0x195CEC)),
+        )
 
     def test_exploration_warning_text_preserves_two_cell_icon_gutter(self) -> None:
         import tools.hant_ui as hant_ui

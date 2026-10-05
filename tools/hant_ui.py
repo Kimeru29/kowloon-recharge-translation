@@ -314,15 +314,15 @@ _HANT_HELP_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     # selector's existing 2px leading inset.
     (0x18C674, 0x0000282D, 0x24050001),  # topic rows style 0 -> 1
     (0x18C7F8, 0x0000282D, 0x24050001),  # category labels style 0 -> 1
-    # r25 preserved the right boundary by moving the whole 72px selector cluster
-    # left, but runtime shows the ADV selector now reaches into L1. r26 instead
-    # restores selector base x=200 and shrinks the shared category selector to
-    # 64px, preserving the same x=402 right edge. Put every label at selector+2:
-    # ADV x=202, Ruins x=271, Other x=340.
+    # r26 correctly restored selector x=200 and reduced its width to 64px, but
+    # runtime review proves the two category-owner offsets were attributed in the
+    # wrong order: changing 0x18C768 moved Ruins, not ADV. r27 restores that owner
+    # and applies the same eight-pixel text nudge to 0x18C778, the actual ADV owner.
+    # Selector geometry and Other remain frozen.
     (0x18C3F4, 0x3C034348, 0x3C034348),  # selector base stays 200
-    (0x18C768, 0x3C02433D, 0x3C024335),  # ADV base 189 -> 181 (x=202)
-    (0x18C778, 0x3C02437A, 0x3C02437A),  # Ruins base stays 250 (x=271)
-    (0x18C788, 0x24020147, 0x2402013F),  # Other base 327 -> 319 (x=340)
+    (0x18C768, 0x3C02433D, 0x3C02433D),  # Ruins restored / frozen
+    (0x18C778, 0x3C02437A, 0x3C024372),  # ADV moves left by 8px
+    (0x18C788, 0x24020147, 0x2402013F),  # Other frozen at r26 geometry
     (0x364EE4, 0x42900000, 0x42800000),  # category selector width 72 -> 64
     # The group-20/index-0x22 topic selector is shared by every Help row. With
     # style 1, the longest translated topic is 22*12=264px; 268px preserves the
