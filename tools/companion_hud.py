@@ -12,11 +12,12 @@ _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
 _MAX_STRING_BYTES = 512
 
-# r31-r36 presentation owners for the persistent companion action caption.
-# r35 proved the accepted one-line 224x48 down-tail presentation. r36 keeps
-# that exact one-line geometry, word-wraps every action label generically, and
-# installs a tiny runtime selector that changes only height/pivot/text-Y from a
-# generated per-action table. Width stays capped at 224px for HUD clearance.
+# r31-r37 presentation owners for the persistent companion action caption.
+# r35 proved the accepted one-line 224x48 down-tail presentation. r36 added
+# generic wrapping, while r37 corrects the runtime selector to use the game's
+# real action-id getter instead of misreading HUD+0x2D0 (the companion-slot
+# index). The original two-slot X/Y table remains pristine and still positions
+# the bubble independently for companion slot 1 or 2.
 COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET = 0x380E30
 COMPANION_ACTION_BUBBLE_METADATA_VA = 0x00450AC0
 COMPANION_ACTION_BUBBLE_WIDTH_OFFSET = 0x350B44
@@ -25,13 +26,17 @@ COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET = 0x350B4C
 COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET = 0x350B50
 COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY = (288.0, 80.0, 67.0, 77.0)
 COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY = (224.0, 48.0, 52.0, 45.0)
+COMPANION_SLOT_POSITION_TABLE_OFFSET = 0x3F8E80
+COMPANION_SLOT_POSITIONS = ((172.0, 407.0), (230.0, 407.0))
+COMPANION_ACTION_ID_GETTER_VA = 0x0012FEE0
+COMPANION_ACTION_ID_KEY = 0x8000
 COMPANION_ACTION_MAX_CELLS = 17
 COMPANION_ACTION_MAX_LINES = 4
 COMPANION_ACTION_LINE_STEP = 16.0
 COMPANION_ACTION_LAYOUT_TABLE_KEY = "companion_action_layout_table"
 COMPANION_ACTION_RUNTIME_STATE_KEY = "companion_action_runtime_text_y"
 COMPANION_ACTION_RUNTIME_HOOK_KEY = "companion_action_layout_hook"
-COMPANION_ACTION_RUNTIME_HOOK_SIZE = 96
+COMPANION_ACTION_RUNTIME_HOOK_SIZE = 132
 
 # Static owners that are independent of the current action id. The resource
 # selection and text-Y load are patched after translation allocation because
@@ -49,6 +54,24 @@ COMPANION_ACTION_RUNTIME_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x66820, 0x44820000),  # mtc1 v0,f0
     (0x66824, 0x00000000),
     (0x66828, 0x46000800),  # add.s f0,f1,f0
+)
+# Pristine slot selection: HUD+0x2D0 is scaled by eight and indexes the two
+# (x,y) pairs at VA 0x4F8E00 / file 0x3F8E80.
+COMPANION_SLOT_INDEX_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x66674, 0x860202D0),  # lh v0,0x2d0(s0)
+    (0x66678, 0x000218C0),  # sll v1,v0,3
+    (0x6667C, 0x3C020050),  # lui v0,0x50
+    (0x66680, 0x24428E00),  # addiu v0,v0,-0x7200 -> 0x4f8e00
+    (0x66684, 0x00431021),  # addu v0,v0,v1
+)
+# Pristine action lookup later in the same renderer. r37 reuses this exact
+# read-only getter contract before constructing the bubble.
+COMPANION_ACTION_ID_REFERENCE_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x66830, 0x34048000),  # ori a0,zero,0x8000
+    (0x66834, 0x0C04BFB8),  # jal 0x0012fee0
+    (0x66838, 0x00000000),
+    (0x6683C, 0x3042FFFF),  # andi v0,v0,0xffff
+    (0x66840, 0x38428000),  # xori v0,v0,0x8000
 )
 COMPANION_ACTION_RUNTIME_PATCH_OFFSETS = tuple(offset for offset, _ in COMPANION_ACTION_RUNTIME_PREIMAGES)
 
@@ -188,10 +211,21 @@ def _runtime_hook_bytes(*, table_va: int, state_va: int) -> bytes:
     table_hi, table_lo = _split_address(table_va)
     state_hi, state_lo = _split_address(state_va)
 
-    # Registers are caller-saved only: v0/v1/t0/t1/t2/a1. s0 is the live HUD
-    # object and contains the action id at +0x2D0.
+    # The pristine renderer proves HUD+0x2D0 is only the 0/1 companion-slot
+    # index: it scales that value by eight and indexes the two-entry position
+    # table at 0x4F8E00. The actual action id comes from the same read-only
+    # getter used later by the original caption renderer: getter(0x8000), then
+    # low-16 normalization via ANDI/XORI 0x8000 before indexing the 31 pointers.
+    # Preserve ra across the nested JAL and restore a0=2/a1=0x68 for the
+    # original group-2 bubble constructor after returning from this hook.
     words = (
-        _mips_i(0x21, 16, 2, 0x02D0),      # lh v0,0x2d0(s0)
+        _mips_i(0x09, 29, 29, -16),         # addiu sp,sp,-16
+        _mips_i(0x2B, 29, 31, 12),          # sw ra,12(sp)
+        _mips_i(0x0D, 0, 4, COMPANION_ACTION_ID_KEY),  # ori a0,zero,0x8000
+        _jal_word(COMPANION_ACTION_ID_GETTER_VA),       # jal action-id getter
+        0x00000000,                         # nop
+        _mips_i(0x0C, 2, 2, 0xFFFF),        # andi v0,v0,0xffff
+        _mips_i(0x0E, 2, 2, COMPANION_ACTION_ID_KEY),  # xori v0,v0,0x8000
         _mips_i(0x0B, 2, 3, len(COMPANION_ACTION_LAYOUTS)),  # sltiu v1,v0,31
         _mips_i(0x05, 3, 0, 2),            # bne v1,zero,valid
         0x00000000,                         # nop
@@ -212,6 +246,9 @@ def _runtime_hook_bytes(*, table_va: int, state_va: int) -> bytes:
         _mips_i(0x0F, 0, 9, state_hi),      # lui t1,hi(state)
         _mips_i(0x09, 9, 9, state_lo),      # addiu t1,t1,lo(state)
         _mips_i(0x2B, 9, 10, 0),            # sw t2,0(t1)
+        _mips_i(0x23, 29, 31, 12),          # lw ra,12(sp)
+        _mips_i(0x09, 29, 29, 16),          # addiu sp,sp,16
+        _mips_i(0x09, 0, 4, 2),             # li a0,2
         _mips_i(0x09, 0, 5, 0x0068),        # li a1,0x68
         _mips_r(31, 0, 0, 0, 0x08),         # jr ra
         0x00000000,                         # nop
@@ -293,7 +330,25 @@ def validate_companion_hud_source(raw: bytes) -> None:
 
 
 def patch_companion_action_layout(raw: bytes) -> bytes:
-    """Apply the static portion of the generic r36 companion-action layout."""
+    """Apply the static portion of the generic r37 companion-action layout."""
+
+    expected_slot_positions = tuple(
+        component for position in COMPANION_SLOT_POSITIONS for component in position
+    )
+    actual_slot_positions = struct.unpack_from("<ffff", raw, COMPANION_SLOT_POSITION_TABLE_OFFSET)
+    if actual_slot_positions != expected_slot_positions:
+        raise ValueError(
+            "companion slot position table drifted: "
+            f"expected {expected_slot_positions!r}, got {actual_slot_positions!r}"
+        )
+
+    for offset, expected in (*COMPANION_SLOT_INDEX_PREIMAGES, *COMPANION_ACTION_ID_REFERENCE_PREIMAGES):
+        actual = struct.unpack_from("<I", raw, offset)[0]
+        if actual != expected:
+            raise ValueError(
+                "companion slot/action-id owner drifted: "
+                f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
+            )
 
     bubble_metadata_va, bubble_record_count = struct.unpack_from(
         "<II", raw, COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET
@@ -359,7 +414,7 @@ def finalize_companion_action_runtime_layout(
     result: bytearray,
     installed: ExecutableTextResult,
 ) -> None:
-    """Bind the r36 per-action layout table and executable runtime hook."""
+    """Bind the r37 per-action layout table and executable runtime hook."""
 
     try:
         table_va = installed.target_vas[COMPANION_ACTION_LAYOUT_TABLE_KEY]

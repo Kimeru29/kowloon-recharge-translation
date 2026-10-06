@@ -32,9 +32,12 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
     COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+    COMPANION_ACTION_ID_REFERENCE_PREIMAGES,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
+    COMPANION_SLOT_INDEX_PREIMAGES,
+    COMPANION_SLOT_POSITION_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
 )
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
@@ -184,8 +187,11 @@ class StartupAcceptanceTests(unittest.TestCase):
         translated = build_early_ui_elf(RAW)
         offsets = [offset for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES]
         offsets.extend(COMPANION_ACTION_RUNTIME_PATCH_OFFSETS)
+        offsets.extend(offset for offset, _expected in COMPANION_SLOT_INDEX_PREIMAGES)
+        offsets.extend(offset for offset, _expected in COMPANION_ACTION_ID_REFERENCE_PREIMAGES)
         offsets.extend(
             (
+                COMPANION_SLOT_POSITION_TABLE_OFFSET,
                 COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
                 COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
                 COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,

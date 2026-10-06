@@ -14,10 +14,17 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
     COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+    COMPANION_ACTION_ID_GETTER_VA,
+    COMPANION_ACTION_ID_KEY,
+    COMPANION_ACTION_ID_REFERENCE_PREIMAGES,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUTS,
     COMPANION_ACTION_LAYOUT_PATCHES,
+    COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PREIMAGES,
+    COMPANION_SLOT_INDEX_PREIMAGES,
+    COMPANION_SLOT_POSITIONS,
+    COMPANION_SLOT_POSITION_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
     encode_companion_action,
     patch_companion_action_layout,
@@ -144,12 +151,27 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_action(COMPANION_ACTION_LABELS[24].english).count(b"\x0a"))
         self.assertNotIn(b"\x0a", encode_companion_action(COMPANION_ACTION_LABELS[25].english))
 
-    def test_r36_runtime_selector_is_installed_in_executable_translation_segment(self) -> None:
+    def test_r37_runtime_selector_uses_real_action_id_and_preserves_slot_positioning(self) -> None:
         result = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, p_flags, _align = struct.unpack_from(
             "<IIIIIIII", result, 0x54
         )
         self.assertEqual(7, p_flags)
+
+        # The game's original companion-slot positioning remains untouched.
+        expected_slot_positions = tuple(
+            component for position in COMPANION_SLOT_POSITIONS for component in position
+        )
+        self.assertEqual(
+            expected_slot_positions,
+            struct.unpack_from("<ffff", RAW, COMPANION_SLOT_POSITION_TABLE_OFFSET),
+        )
+        self.assertEqual(
+            RAW[COMPANION_SLOT_POSITION_TABLE_OFFSET:COMPANION_SLOT_POSITION_TABLE_OFFSET + 16],
+            result[COMPANION_SLOT_POSITION_TABLE_OFFSET:COMPANION_SLOT_POSITION_TABLE_OFFSET + 16],
+        )
+        for offset, expected in COMPANION_SLOT_INDEX_PREIMAGES:
+            self.assertEqual(expected, struct.unpack_from("<I", result, offset)[0])
 
         jal = struct.unpack_from("<I", result, 0x66724)[0]
         self.assertEqual(0x03, jal >> 26)
@@ -159,19 +181,39 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(0x24040002, struct.unpack_from("<I", result, 0x66728)[0])
 
         hook_file = p_offset + hook_va - p_vaddr
-        hook_words = struct.unpack_from("<24I", result, hook_file)
-        self.assertEqual(0x860202D0, hook_words[0])  # lh v0,0x2d0(s0)
-        self.assertEqual(0x2C43001F, hook_words[1])  # bounds-check 31 action ids
-        self.assertEqual(0x24050068, hook_words[-3]) # proven down-tail bubble
-        self.assertEqual(0x03E00008, hook_words[-2]) # jr ra
+        hook_words = struct.unpack_from(
+            f"<{COMPANION_ACTION_RUNTIME_HOOK_SIZE // 4}I", result, hook_file
+        )
+        self.assertEqual(0x27BDFFF0, hook_words[0])   # addiu sp,sp,-16
+        self.assertEqual(0xAFBF000C, hook_words[1])   # sw ra,12(sp)
+        self.assertEqual(0x34040000 | COMPANION_ACTION_ID_KEY, hook_words[2])
+        self.assertEqual(
+            0x0C000000 | ((COMPANION_ACTION_ID_GETTER_VA >> 2) & 0x03FFFFFF),
+            hook_words[3],
+        )
+        self.assertEqual(0, hook_words[4])            # jal delay slot
+        self.assertEqual(0x3042FFFF, hook_words[5])   # andi v0,v0,0xffff
+        self.assertEqual(0x38420000 | COMPANION_ACTION_ID_KEY, hook_words[6])
+        self.assertEqual(0x2C43001F, hook_words[7])   # bounds-check 31 action ids
+        self.assertNotIn(0x860202D0, hook_words)      # never treat slot index as action id
+        self.assertEqual(0x8FBF000C, hook_words[-6])  # lw ra,12(sp)
+        self.assertEqual(0x27BD0010, hook_words[-5])  # addiu sp,sp,16
+        self.assertEqual(0x24040002, hook_words[-4])  # restore group 2
+        self.assertEqual(0x24050068, hook_words[-3])  # proven down-tail bubble
+        self.assertEqual(0x03E00008, hook_words[-2])  # jr ra
         self.assertEqual(0, hook_words[-1])
+
+        # The original later action lookup remains byte-identical, independently
+        # proving the getter contract the hook reuses.
+        for offset, expected in COMPANION_ACTION_ID_REFERENCE_PREIMAGES:
+            self.assertEqual(expected, struct.unpack_from("<I", result, offset)[0])
 
         # Static owners that do not depend on action id stay frozen.
         for offset, _expected, replacement in COMPANION_ACTION_LAYOUT_PATCHES:
             self.assertEqual(replacement, struct.unpack_from("<I", result, offset)[0])
         self.assertEqual(0x46000800, struct.unpack_from("<I", result, 0x66828)[0])
 
-    def test_r36_layout_patch_fails_closed_on_all_pristine_owners(self) -> None:
+    def test_r37_layout_patch_fails_closed_on_all_pristine_owners(self) -> None:
         for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
             with self.subTest(static_offset=hex(offset)):
                 tampered = bytearray(RAW)
@@ -184,6 +226,18 @@ class CompanionHudTests(unittest.TestCase):
                 tampered = bytearray(RAW)
                 tampered[offset] ^= 1
                 with self.assertRaisesRegex(ValueError, "companion action runtime preimage mismatch"):
+                    patch_companion_action_layout(bytes(tampered))
+
+        tampered = bytearray(RAW)
+        tampered[COMPANION_SLOT_POSITION_TABLE_OFFSET] ^= 1
+        with self.assertRaisesRegex(ValueError, "companion slot position table drifted"):
+            patch_companion_action_layout(bytes(tampered))
+
+        for offset, _expected in (*COMPANION_SLOT_INDEX_PREIMAGES, *COMPANION_ACTION_ID_REFERENCE_PREIMAGES):
+            with self.subTest(slot_or_action_owner=hex(offset)):
+                tampered = bytearray(RAW)
+                tampered[offset] ^= 1
+                with self.assertRaisesRegex(ValueError, "companion slot/action-id owner drifted"):
                     patch_companion_action_layout(bytes(tampered))
 
         geometry_offsets = (

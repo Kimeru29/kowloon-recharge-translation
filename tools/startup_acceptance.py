@@ -41,11 +41,17 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
     COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+    COMPANION_ACTION_ID_GETTER_VA,
+    COMPANION_ACTION_ID_KEY,
+    COMPANION_ACTION_ID_REFERENCE_PREIMAGES,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUTS,
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
+    COMPANION_SLOT_INDEX_PREIMAGES,
+    COMPANION_SLOT_POSITIONS,
+    COMPANION_SLOT_POSITION_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
     encode_companion_action,
 )
@@ -344,6 +350,22 @@ def _verify_companion_hud_semantics(
 def _verify_companion_hud_layout(raw: bytes) -> bool:
     if COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET + 8 > len(raw):
         return False
+
+    # r37 preserves the pristine two-companion positioning path. HUD+0x2D0 is
+    # the 0/1 slot index and must continue to select (172,407) or (230,407).
+    if COMPANION_SLOT_POSITION_TABLE_OFFSET + 16 > len(raw):
+        return False
+    expected_slot_positions = tuple(
+        component for position in COMPANION_SLOT_POSITIONS for component in position
+    )
+    if struct.unpack_from("<ffff", raw, COMPANION_SLOT_POSITION_TABLE_OFFSET) != expected_slot_positions:
+        return False
+    if not all(
+        offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == expected
+        for offset, expected in (*COMPANION_SLOT_INDEX_PREIMAGES, *COMPANION_ACTION_ID_REFERENCE_PREIMAGES)
+    ):
+        return False
+
     bubble_metadata_va, bubble_record_count = struct.unpack_from(
         "<II", raw, COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET
     )
@@ -372,7 +394,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         return False
     p_offset, p_vaddr, p_filesz, _p_memsz = segment
 
-    # r36 executes its selector from the translation PT_LOAD.
+    # r37 executes its selector from the translation PT_LOAD.
     p_flags = struct.unpack_from("<I", raw, _SECOND_PH_OFFSET + 24)[0]
     if p_flags != 7:
         return False
@@ -388,10 +410,20 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     hook_words = struct.unpack_from(
         f"<{COMPANION_ACTION_RUNTIME_HOOK_SIZE // 4}I", raw, hook_file
     )
-    # lh v0,0x2d0(s0); sltiu v1,v0,31; ... ; li a1,0x68; jr ra; nop.
+    getter_jal = 0x0C000000 | ((COMPANION_ACTION_ID_GETTER_VA >> 2) & 0x03FFFFFF)
     if (
-        hook_words[0] != 0x860202D0
-        or hook_words[1] != 0x2C43001F
+        hook_words[0] != 0x27BDFFF0
+        or hook_words[1] != 0xAFBF000C
+        or hook_words[2] != (0x34040000 | COMPANION_ACTION_ID_KEY)
+        or hook_words[3] != getter_jal
+        or hook_words[4] != 0
+        or hook_words[5] != 0x3042FFFF
+        or hook_words[6] != (0x38420000 | COMPANION_ACTION_ID_KEY)
+        or hook_words[7] != 0x2C43001F
+        or 0x860202D0 in hook_words
+        or hook_words[-6] != 0x8FBF000C
+        or hook_words[-5] != 0x27BD0010
+        or hook_words[-4] != 0x24040002
         or hook_words[-3] != 0x24050068
         or hook_words[-2] != 0x03E00008
         or hook_words[-1] != 0
@@ -405,7 +437,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             lo -= 0x10000
         return ((hi << 16) + lo) & 0xFFFFFFFF
 
-    table_va = _materialized_va(hook_words[8], hook_words[9])
+    table_va = _materialized_va(hook_words[14], hook_words[15])
     table_rel = table_va - p_vaddr
     expected_table = b"".join(
         struct.pack("<fff", layout.height, layout.pivot_y, layout.text_y)
@@ -423,6 +455,9 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     if text_y_lwc1 & 0xFFFF0000 != 0xC4400000:
         return False
     state_va = _materialized_va(text_y_lui, text_y_lwc1)
+    hook_state_va = _materialized_va(hook_words[24], hook_words[25])
+    if hook_state_va != state_va:
+        return False
     state_rel = state_va - p_vaddr
     if state_rel < 0 or state_rel + 4 > p_filesz:
         return False
