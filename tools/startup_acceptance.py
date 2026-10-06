@@ -42,8 +42,12 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
+    COMPANION_ACTION_LAYOUTS,
     COMPANION_ACTION_LAYOUT_PATCHES,
+    COMPANION_ACTION_RUNTIME_HOOK_SIZE,
+    COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_COMMENT_LINES,
+    encode_companion_action,
 )
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.menu_ui import MENU_LABELS
@@ -322,9 +326,17 @@ def _verify_companion_hud_semantics(
             if target_va != source_va:
                 actions_ok = False
                 break
-        elif not _segment_has_wide_text(raw, segment, target_va, spec.english):
-            actions_ok = False
-            break
+        else:
+            p_offset, p_vaddr, p_filesz, _p_memsz = segment
+            relative = target_va - p_vaddr
+            payload = encode_companion_action(spec.english)
+            if relative < 0 or relative + len(payload) > p_filesz:
+                actions_ok = False
+                break
+            target_file = p_offset + relative
+            if raw[target_file:target_file + len(payload)] != payload:
+                actions_ok = False
+                break
 
     return comments_ok, actions_ok
 
@@ -349,10 +361,77 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     bubble_geometry = tuple(struct.unpack_from("<f", raw, offset)[0] for offset in bubble_offsets)
     if bubble_geometry != COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY:
         return False
-    return all(
+    if not all(
         offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
         for offset, _expected, replacement in COMPANION_ACTION_LAYOUT_PATCHES
+    ):
+        return False
+
+    segment = _translation_segment(raw)
+    if segment is None:
+        return False
+    p_offset, p_vaddr, p_filesz, _p_memsz = segment
+
+    # r36 executes its selector from the translation PT_LOAD.
+    p_flags = struct.unpack_from("<I", raw, _SECOND_PH_OFFSET + 24)[0]
+    if p_flags != 7:
+        return False
+
+    jal = struct.unpack_from("<I", raw, 0x66724)[0]
+    if jal >> 26 != 0x03 or struct.unpack_from("<I", raw, 0x66728)[0] != 0x24040002:
+        return False
+    hook_va = (jal & 0x03FFFFFF) << 2
+    hook_rel = hook_va - p_vaddr
+    if hook_rel < 0 or hook_rel + COMPANION_ACTION_RUNTIME_HOOK_SIZE > p_filesz:
+        return False
+    hook_file = p_offset + hook_rel
+    hook_words = struct.unpack_from(
+        f"<{COMPANION_ACTION_RUNTIME_HOOK_SIZE // 4}I", raw, hook_file
     )
+    # lh v0,0x2d0(s0); sltiu v1,v0,31; ... ; li a1,0x68; jr ra; nop.
+    if (
+        hook_words[0] != 0x860202D0
+        or hook_words[1] != 0x2C43001F
+        or hook_words[-3] != 0x24050068
+        or hook_words[-2] != 0x03E00008
+        or hook_words[-1] != 0
+    ):
+        return False
+
+    def _materialized_va(lui_word: int, low_word: int) -> int:
+        hi = lui_word & 0xFFFF
+        lo = low_word & 0xFFFF
+        if lo & 0x8000:
+            lo -= 0x10000
+        return ((hi << 16) + lo) & 0xFFFFFFFF
+
+    table_va = _materialized_va(hook_words[8], hook_words[9])
+    table_rel = table_va - p_vaddr
+    expected_table = b"".join(
+        struct.pack("<fff", layout.height, layout.pivot_y, layout.text_y)
+        for layout in COMPANION_ACTION_LAYOUTS
+    )
+    if table_rel < 0 or table_rel + len(expected_table) > p_filesz:
+        return False
+    if raw[p_offset + table_rel:p_offset + table_rel + len(expected_table)] != expected_table:
+        return False
+
+    text_y_lui = struct.unpack_from("<I", raw, 0x6681C)[0]
+    text_y_lwc1 = struct.unpack_from("<I", raw, 0x66820)[0]
+    if text_y_lui & 0xFFFF0000 != 0x3C020000:
+        return False
+    if text_y_lwc1 & 0xFFFF0000 != 0xC4400000:
+        return False
+    state_va = _materialized_va(text_y_lui, text_y_lwc1)
+    state_rel = state_va - p_vaddr
+    if state_rel < 0 or state_rel + 4 > p_filesz:
+        return False
+    if struct.unpack_from("<f", raw, p_offset + state_rel)[0] != COMPANION_ACTION_LAYOUTS[0].text_y:
+        return False
+    if struct.unpack_from("<I", raw, 0x66824)[0] != 0 or struct.unpack_from("<I", raw, 0x66828)[0] != 0x46000800:
+        return False
+
+    return True
 
 
 def _translation_segment(raw: bytes) -> tuple[int, int, int, int] | None:
@@ -366,7 +445,7 @@ def _translation_segment(raw: bytes) -> tuple[int, int, int, int] | None:
         or p_vaddr != _TRANSLATION_VADDR
         or p_filesz <= 0
         or p_memsz < p_filesz
-        or p_flags != 6
+        or p_flags not in (6, 7)
         or p_offset + p_filesz > len(raw)
     ):
         return None

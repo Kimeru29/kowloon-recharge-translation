@@ -12,6 +12,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
+    COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_COMMENT_LINES,
 )
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
@@ -175,6 +176,8 @@ class EarlyUiPatchTests(unittest.TestCase):
             if spec.english is not None:
                 allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
         for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
+            allowed.update(range(offset, offset + 4))
+        for offset in COMPANION_ACTION_RUNTIME_PATCH_OFFSETS:
             allowed.update(range(offset, offset + 4))
         for offset in (
             COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,

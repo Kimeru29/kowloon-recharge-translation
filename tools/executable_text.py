@@ -12,6 +12,7 @@ class RelocatedText:
     key: str
     encoded: bytes
     pointer_offsets: tuple[int, ...]
+    alignment: int = 2
 
 
 @dataclass(frozen=True)
@@ -34,13 +35,15 @@ def install_executable_text(
     raw: bytes,
     entries: Sequence[RelocatedText],
     reserve_size: int = 0x100000,
+    *,
+    executable_segment: bool = False,
 ) -> ExecutableTextResult:
     """Pack executable text once and repoint every declared external alias.
 
     The caller owns semantic/source-preimage validation. This layer owns only the
-    deterministic allocation contract: input sequence order, 2-byte entry
-    alignment, unique keys/pointer ownership, one translation PT_LOAD install,
-    and deterministic target-VA reporting.
+    deterministic allocation contract: input sequence order, declared power-
+    of-two entry alignment (2-byte by default), unique keys/pointer ownership,
+    one translation PT_LOAD install, and deterministic target-VA reporting.
     """
 
     ordered = tuple(entries)
@@ -54,6 +57,8 @@ def install_executable_text(
         keys.add(entry.key)
         if not isinstance(entry.encoded, bytes):
             raise TypeError(f"Relocated text payload must be bytes: {entry.key}")
+        if entry.alignment < 2 or entry.alignment & (entry.alignment - 1):
+            raise ValueError(f"Relocated text alignment must be a power of two >= 2: {entry.key}")
 
         for pointer_offset in entry.pointer_offsets:
             if pointer_offset < 0 or pointer_offset + 4 > len(raw):
@@ -69,7 +74,7 @@ def install_executable_text(
     payload = bytearray()
     payload_offsets: dict[str, int] = {}
     for entry in ordered:
-        if len(payload) & 1:
+        while len(payload) & (entry.alignment - 1):
             payload.append(0)
         payload_offsets[entry.key] = len(payload)
         payload.extend(entry.encoded)
@@ -77,7 +82,12 @@ def install_executable_text(
     if len(payload) > reserve_size:
         raise ValueError("Executable text payload exceeds translation reserve")
 
-    expanded, info = install_translation_segment(raw, bytes(payload), reserve_size=reserve_size)
+    expanded, info = install_translation_segment(
+        raw,
+        bytes(payload),
+        reserve_size=reserve_size,
+        executable=executable_segment,
+    )
     result = bytearray(expanded)
     target_vas = {
         key: info.segment_vaddr + payload_offset

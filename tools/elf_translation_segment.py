@@ -51,6 +51,7 @@ def install_translation_segment(
     payload: bytes,
     *,
     reserve_size: int = 0x100000,
+    executable: bool = False,
 ) -> tuple[bytes, TranslationSegmentInfo]:
     """Use Kowloon's dormant second PT_LOAD as an ELF translation-text segment.
 
@@ -118,7 +119,7 @@ def install_translation_segment(
         _TRANSLATION_VADDR,
         len(payload),
         reserve_size,
-        6,
+        7 if executable else 6,
         0x10,
     )
 

@@ -15,10 +15,14 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
+    COMPANION_ACTION_LAYOUTS,
     COMPANION_ACTION_LAYOUT_PATCHES,
+    COMPANION_ACTION_RUNTIME_PREIMAGES,
     COMPANION_COMMENT_LINES,
+    encode_companion_action,
     patch_companion_action_layout,
     validate_companion_hud_source,
+    wrap_companion_action_text,
 )
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.early_ui import build_early_ui_elf
@@ -88,52 +92,98 @@ class CompanionHudTests(unittest.TestCase):
             source = spec.source_text.encode("cp932") + b"\x00"
             self.assertEqual(source, result[spec.source_offset:spec.source_offset + len(source)])
 
-    def test_r35_companion_action_callout_is_compact_and_tail_anchored(self) -> None:
-        result = build_early_ui_elf(RAW)
-
-        # r34 proves group-2 index 0x68 is the live horizontal down-tail bubble.
-        # r35 keeps that resource and the tail-tip anchor, but compacts its
-        # rendered geometry to a one-line 12px caption: 224x48. This is slightly
-        # narrower than the measured ~230px span of the three lower HUD boxes.
-        expected_words = {
-            0x666F0: 0x3C024080,  # tail-tip X stays anchor + 4px
-            0x66708: 0x3C02C274,  # tail-tip Y stays anchor - 61px
-            0x66728: 0x24050068,  # proven group-2 down-tail bubble
-            0x66804: 0x3C02C210,  # text X: anchor - 36px
-            0x6681C: 0x3C02C2C6,  # text Y: anchor - 99px
-            0x6686C: 0x24050001,  # style 1 = 12x12
-        }
-        for offset, expected in expected_words.items():
-            with self.subTest(offset=hex(offset)):
-                self.assertEqual(expected, struct.unpack_from("<I", result, offset)[0])
-
-        metadata_va, record_count = struct.unpack_from(
-            "<II", result, COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET
+    def test_r36_companion_actions_wrap_generically_and_preserve_r35_short_layout(self) -> None:
+        self.assertEqual(("Throw a Rock",), wrap_companion_action_text("Throw a Rock"))
+        self.assertEqual(
+            ("Smoking an Aroma", "Stick"),
+            wrap_companion_action_text("Smoking an Aroma Stick"),
         )
-        self.assertEqual(COMPANION_ACTION_BUBBLE_METADATA_VA, metadata_va)
-        self.assertEqual(1, record_count)
+        self.assertEqual(
+            ("Secret Technique:", "Reverse Waterfall", "Blade"),
+            wrap_companion_action_text("Secret Technique: Reverse Waterfall Blade"),
+        )
 
+        self.assertEqual((48.0, 45.0, -99.0), (
+            COMPANION_ACTION_LAYOUTS[25].height,
+            COMPANION_ACTION_LAYOUTS[25].pivot_y,
+            COMPANION_ACTION_LAYOUTS[25].text_y,
+        ))
+        self.assertEqual((64.0, 61.0, -115.0), (
+            COMPANION_ACTION_LAYOUTS[2].height,
+            COMPANION_ACTION_LAYOUTS[2].pivot_y,
+            COMPANION_ACTION_LAYOUTS[2].text_y,
+        ))
+        self.assertEqual((80.0, 77.0, -131.0), (
+            COMPANION_ACTION_LAYOUTS[24].height,
+            COMPANION_ACTION_LAYOUTS[24].pivot_y,
+            COMPANION_ACTION_LAYOUTS[24].text_y,
+        ))
+        self.assertTrue(all(len(line) <= 17 for layout in COMPANION_ACTION_LAYOUTS for line in layout.lines))
+
+        result = build_early_ui_elf(RAW)
+        # The accepted one-line startup/default geometry remains exactly r35.
         bubble_offsets = (
             COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
             COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
             COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
             COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
         )
-        geometry = tuple(struct.unpack_from("<f", result, offset)[0] for offset in bubble_offsets)
-        self.assertEqual(COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY, geometry)
-        self.assertEqual((224.0, 48.0, 52.0, 45.0), geometry)
+        self.assertEqual(
+            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
+            tuple(struct.unpack_from("<f", result, offset)[0] for offset in bubble_offsets),
+        )
 
-        # Keep the tail tip at (+4,-61). The scaled body starts at X=-48 and
-        # Y=-106; the caption at (-36,-99) therefore retains 12px/7px padding.
-        self.assertEqual(12.0, -36.0 - (4.0 - 52.0))
-        self.assertEqual(7.0, -99.0 - (-61.0 - 45.0))
+        # Every owned action is encoded by the same wrapper. Long official PS4
+        # labels receive literal 0x0A line breaks; short labels remain unchanged.
+        for action_id in (2, 24, 25):
+            spec = COMPANION_ACTION_LABELS[action_id]
+            target_va = struct.unpack_from("<I", result, spec.pointer_offset)[0]
+            expected = encode_companion_action(spec.english)
+            self.assertEqual(expected, _read_at_va(result, target_va, len(expected)))
+        self.assertIn(b"\x0a", encode_companion_action(COMPANION_ACTION_LABELS[2].english))
+        self.assertEqual(2, encode_companion_action(COMPANION_ACTION_LABELS[24].english).count(b"\x0a"))
+        self.assertNotIn(b"\x0a", encode_companion_action(COMPANION_ACTION_LABELS[25].english))
 
-    def test_r35_layout_patch_fails_closed_on_each_pristine_owner(self) -> None:
+    def test_r36_runtime_selector_is_installed_in_executable_translation_segment(self) -> None:
+        result = build_early_ui_elf(RAW)
+        _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, p_flags, _align = struct.unpack_from(
+            "<IIIIIIII", result, 0x54
+        )
+        self.assertEqual(7, p_flags)
+
+        jal = struct.unpack_from("<I", result, 0x66724)[0]
+        self.assertEqual(0x03, jal >> 26)
+        hook_va = (jal & 0x03FFFFFF) << 2
+        self.assertGreaterEqual(hook_va, p_vaddr)
+        self.assertLess(hook_va, p_vaddr + p_filesz)
+        self.assertEqual(0x24040002, struct.unpack_from("<I", result, 0x66728)[0])
+
+        hook_file = p_offset + hook_va - p_vaddr
+        hook_words = struct.unpack_from("<24I", result, hook_file)
+        self.assertEqual(0x860202D0, hook_words[0])  # lh v0,0x2d0(s0)
+        self.assertEqual(0x2C43001F, hook_words[1])  # bounds-check 31 action ids
+        self.assertEqual(0x24050068, hook_words[-3]) # proven down-tail bubble
+        self.assertEqual(0x03E00008, hook_words[-2]) # jr ra
+        self.assertEqual(0, hook_words[-1])
+
+        # Static owners that do not depend on action id stay frozen.
+        for offset, _expected, replacement in COMPANION_ACTION_LAYOUT_PATCHES:
+            self.assertEqual(replacement, struct.unpack_from("<I", result, offset)[0])
+        self.assertEqual(0x46000800, struct.unpack_from("<I", result, 0x66828)[0])
+
+    def test_r36_layout_patch_fails_closed_on_all_pristine_owners(self) -> None:
         for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
-            with self.subTest(offset=hex(offset)):
+            with self.subTest(static_offset=hex(offset)):
                 tampered = bytearray(RAW)
                 tampered[offset] ^= 1
                 with self.assertRaisesRegex(ValueError, "companion action layout preimage mismatch"):
+                    patch_companion_action_layout(bytes(tampered))
+
+        for offset, _expected in COMPANION_ACTION_RUNTIME_PREIMAGES:
+            with self.subTest(runtime_offset=hex(offset)):
+                tampered = bytearray(RAW)
+                tampered[offset] ^= 1
+                with self.assertRaisesRegex(ValueError, "companion action runtime preimage mismatch"):
                     patch_companion_action_layout(bytes(tampered))
 
         geometry_offsets = (

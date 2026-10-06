@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import hashlib
 import struct
 
 from tools.elf_translation_segment import TranslationSegmentInfo
-from tools.executable_text import RelocatedCodeReference, RelocatedText, install_executable_text
+from tools.executable_text import ExecutableTextResult, RelocatedCodeReference, RelocatedText, install_executable_text
 from tools.hant_layout import HANT_LAYOUT_PROFILE, measured_hant_cells, wrap_hant_text
 from tools.hant_content_data import HANT_DICTIONARY_TAB_DATA, HANT_DICTIONARY_TERM_DATA, HANT_RINGTONE_DATA
 from tools.hant_dictionary_definitions import DICTIONARY_DEFINITION_MAX_CELLS, definition_source_fingerprint
@@ -1496,6 +1496,8 @@ def patch_hant_tutorial(
     reserve_size: int = 0x100000,
     extra_entries: Sequence[RelocatedText] = (),
     extra_code_references: Sequence[RelocatedCodeReference] = (),
+    executable_segment: bool = False,
+    post_install: Callable[[bytearray, ExecutableTextResult], None] | None = None,
 ) -> tuple[bytes, TranslationSegmentInfo]:
     """Install all proven shared executable text through one translation PT_LOAD.
 
@@ -1516,7 +1518,12 @@ def patch_hant_tutorial(
             raise ValueError(f"Relocated code ADDIU preimage mismatch: {ref.key}")
 
     entries = (*_base_relocated_entries(raw), *tuple(extra_entries))
-    installed = install_executable_text(raw, entries, reserve_size=reserve_size)
+    installed = install_executable_text(
+        raw,
+        entries,
+        reserve_size=reserve_size,
+        executable_segment=executable_segment,
+    )
 
     table_va = installed.target_vas["hant_table"]
     metadata_va = installed.target_vas["hant_controller_metadata"]
@@ -1591,5 +1598,8 @@ def patch_hant_tutorial(
             )
             struct.pack_into("<I", result, definition_table_file + row_index * 4, target_va)
         struct.pack_into("<I", result, definition_table_file + len(spec.english_rows) * 4, _HANT_EOF_VA)
+
+    if post_install is not None:
+        post_install(result, installed)
 
     return bytes(result), installed.info
