@@ -333,3 +333,12 @@ Pablo runtime-accepted r31's translated companion caption, 12px font, and vertic
 Translation policy remains PS4/remaster-first: exact owned PS4 strings must be reused before any authored translation. `Throw a Rock` is confirmed `official_exact` from CUSA27034 `English.bytes` (remaster offset 284809). Only Re:charge-exclusive text without an owned PS4 equivalent may receive context-aware authored English.
 
 Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r32.iso`, SHA-256 `acbc138a1c89ab0d81979e2d531dd5706c369df2cf49ef070311014ed833cb56`; final-image acceptance **154/154**; both complete suites execute **242 tests**; repeat ISO byte-identical. Do not launch PCSX2 automatically.
+
+
+### v11-r33 companion HUD horizontal down-tail bubble
+
+Pablo's r32 runtime screenshot proved the remaining problem was not translation or text size: the old group-2 `0x18` backing is a side-tail strip, so it can never visually match the PS4 horizontal speech balloon. r33 reuses an existing pristine PS2 asset instead of drawing or approximating one: group-2 `0xC5` is a 288x80 horizontal bubble with a downward tail. Its sprite record declares pivot `(67,77)`, and direct alpha inspection shows the bottom tail-tip pixels at y=77 / x=64..68, confirming that the pivot is the tail tip. The resource switch is at executable owner `0x66728`; the accepted r32 tail-tip anchor stays `X=+4, Y=-61`. Caption X/Y become `-47/-131`, which places the existing 12px text at local inset `(16,7)` inside the larger bubble. The old 160x32 side-tail asset remains pristine and unused by this caption.
+
+Translation policy remains unchanged: exact owned PS4/remaster text always wins. `Throw a Rock` remains `official_exact`; r33 changes presentation only. Regression coverage freezes the resource index, tail-tip anchor, caption placement/style, 0xC5 dimensions/pivot, and final-image acceptance semantics.
+
+Current candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r33.iso`, SHA-256 `c9e31bccfe87c8fe9356107be9e572c6764dd9ed303268bf04f70058f1f13d19`; pre/post-ROFS ELF `75c1bba7ef9331cc60919715e620acba4605ea44d88969cabf96ee7d9b8e1a6a` / `0345ed3f1ffece03384db78347b3369f62cfb0d817ce92e3e74bdeeb779fca5e`; final-image acceptance **154/154**; both complete suites execute **242 tests**; repeat ISO byte-identical. Do not launch PCSX2 automatically.

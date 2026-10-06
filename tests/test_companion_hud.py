@@ -80,29 +80,34 @@ class CompanionHudTests(unittest.TestCase):
             source = spec.source_text.encode("cp932") + b"\x00"
             self.assertEqual(source, result[spec.source_offset:spec.source_offset + len(source)])
 
-    def test_r32_companion_action_callout_matches_accepted_ps4_style_alignment(self) -> None:
+    def test_r33_companion_action_callout_uses_horizontal_down_tail_bubble(self) -> None:
         result = build_early_ui_elf(RAW)
 
-        # r31 proved the 12px English font and vertical clearance. Runtime then
-        # showed that the fixed 160x32 bubble's visible body/spike sat slightly
-        # to the right of the caption. r32 shifts only the backing 8px left and
-        # freezes the accepted text/font/Y owners.
+        # r32 proved the 12px English caption and clearance, but index 0x18 is
+        # intrinsically a side-tail strip. Group-2 index 0xC5 is the game's
+        # existing 288x80 horizontal speech bubble: its declared (67, 77) pivot
+        # sits at the downward tail tip. Keep the accepted tail-tip anchor and
+        # move text into the larger bubble with the same ~16px left / ~7px top
+        # inset used by r32.
         expected_words = {
-            0x666F0: 0x3C024080,  # backing X: anchor + 4px (r31 was +12)
-            0x66708: 0x3C02C274,  # backing Y: anchor - 61px
-            0x66804: 0x3C0241A0,  # text X: anchor + 20px
-            0x6681C: 0x3C02C258,  # text Y: anchor - 54px
+            0x666F0: 0x3C024080,  # tail-tip X stays anchor + 4px
+            0x66708: 0x3C02C274,  # tail-tip Y stays anchor - 61px
+            0x66728: 0x240500C5,  # group-2 index 0x18 -> down-tail bubble 0xC5
+            0x66804: 0x3C02C23C,  # text X: anchor - 47px
+            0x6681C: 0x3C02C303,  # text Y: anchor - 131px
             0x6686C: 0x24050001,  # style 1 = 12x12
         }
         for offset, expected in expected_words.items():
             with self.subTest(offset=hex(offset)):
                 self.assertEqual(expected, struct.unpack_from("<I", result, offset)[0])
 
-        # Group-2 index 0x18 remains the proven fixed 160x32 bubble resource.
-        self.assertEqual(160.0, struct.unpack_from("<f", result, 0x34EAD4)[0])
-        self.assertEqual(32.0, struct.unpack_from("<f", result, 0x34EAD8)[0])
+        # Index 0xC5 is a 288x80 bubble whose (67,77) pivot is the tail tip.
+        self.assertEqual(288.0, struct.unpack_from("<f", result, 0x350B44)[0])
+        self.assertEqual(80.0, struct.unpack_from("<f", result, 0x350B48)[0])
+        self.assertEqual(67.0, struct.unpack_from("<f", result, 0x350B4C)[0])
+        self.assertEqual(77.0, struct.unpack_from("<f", result, 0x350B50)[0])
 
-    def test_r32_layout_patch_fails_closed_on_each_pristine_owner(self) -> None:
+    def test_r33_layout_patch_fails_closed_on_each_pristine_owner(self) -> None:
         for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
             with self.subTest(offset=hex(offset)):
                 tampered = bytearray(RAW)

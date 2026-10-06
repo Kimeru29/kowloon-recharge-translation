@@ -34,8 +34,10 @@ from tools.hant_ui import (
 )
 from tools.localization import encode_ps2_english
 from tools.companion_hud import (
-    COMPANION_ACTION_BACKING_HEIGHT_OFFSET,
-    COMPANION_ACTION_BACKING_WIDTH_OFFSET,
+    COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+    COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+    COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+    COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_COMMENT_LINES,
@@ -325,11 +327,16 @@ def _verify_companion_hud_semantics(
 
 
 def _verify_companion_hud_layout(raw: bytes) -> bool:
-    if max(COMPANION_ACTION_BACKING_WIDTH_OFFSET, COMPANION_ACTION_BACKING_HEIGHT_OFFSET) + 4 > len(raw):
+    bubble_offsets = (
+        COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+        COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+        COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+        COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+    )
+    if max(bubble_offsets) + 4 > len(raw):
         return False
-    if struct.unpack_from("<f", raw, COMPANION_ACTION_BACKING_WIDTH_OFFSET)[0] != 160.0:
-        return False
-    if struct.unpack_from("<f", raw, COMPANION_ACTION_BACKING_HEIGHT_OFFSET)[0] != 32.0:
+    bubble_geometry = tuple(struct.unpack_from("<f", raw, offset)[0] for offset in bubble_offsets)
+    if bubble_geometry != (288.0, 80.0, 67.0, 77.0):
         return False
     return all(
         offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement

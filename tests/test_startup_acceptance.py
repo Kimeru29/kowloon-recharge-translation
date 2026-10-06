@@ -27,7 +27,10 @@ from tools.hant_ui import (
     HANT_TUTORIAL_ROW_SPACING_OFFSET,
 )
 from tools.companion_hud import (
-    COMPANION_ACTION_BACKING_WIDTH_OFFSET,
+    COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+    COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+    COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+    COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_COMMENT_LINES,
@@ -178,7 +181,14 @@ class StartupAcceptanceTests(unittest.TestCase):
     def test_companion_hud_layout_acceptance_fails_closed_on_each_owner(self) -> None:
         translated = build_early_ui_elf(RAW)
         offsets = [offset for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES]
-        offsets.append(COMPANION_ACTION_BACKING_WIDTH_OFFSET)
+        offsets.extend(
+            (
+                COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+                COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+            )
+        )
         for offset in offsets:
             with self.subTest(offset=hex(offset)):
                 tampered = bytearray(translated)
