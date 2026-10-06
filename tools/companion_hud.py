@@ -12,12 +12,13 @@ _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
 _MAX_STRING_BYTES = 512
 
-# r31-r37 presentation owners for the persistent companion action caption.
-# r35 proved the accepted one-line 224x48 down-tail presentation. r36 added
-# generic wrapping, while r37 corrects the runtime selector to use the game's
-# real action-id getter instead of misreading HUD+0x2D0 (the companion-slot
-# index). The original two-slot X/Y table remains pristine and still positions
-# the bubble independently for companion slot 1 or 2.
+# r31-r38 presentation owners for the persistent companion action caption.
+# r35 proved the accepted one-line 224x48 down-tail presentation, r36 made
+# height/wrapping generic, and r37 separated action id from HUD+0x2D0's 0/1
+# companion-slot index. r38 now uses the two pristine sibling speech bubbles:
+# group-2 0x68 points its tail at slot 1, while 0x69 has the same body/UVs with
+# the tail shifted right for slot 2. Their different pivots keep the body almost
+# stationary (13px shift) even though the companion anchors are 58px apart.
 COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET = 0x380E30
 COMPANION_ACTION_BUBBLE_METADATA_VA = 0x00450AC0
 COMPANION_ACTION_BUBBLE_WIDTH_OFFSET = 0x350B44
@@ -26,6 +27,16 @@ COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET = 0x350B4C
 COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET = 0x350B50
 COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY = (288.0, 80.0, 67.0, 77.0)
 COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY = (224.0, 48.0, 52.0, 45.0)
+COMPANION_ACTION_SLOT2_BUBBLE_TABLE_RECORD_OFFSET = 0x380E38
+COMPANION_ACTION_SLOT2_BUBBLE_METADATA_VA = 0x00450AF0
+COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET = 0x350B74
+COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET = 0x350B78
+COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET = 0x350B7C
+COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET = 0x350B80
+COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY = (288.0, 80.0, 125.0, 77.0)
+COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY = (224.0, 48.0, 97.0, 45.0)
+COMPANION_ACTION_SLOT_RESOURCES = (0x68, 0x69)
+COMPANION_ACTION_SLOT_TEXT_X = (-36.0, -81.0)
 COMPANION_SLOT_POSITION_TABLE_OFFSET = 0x3F8E80
 COMPANION_SLOT_POSITIONS = ((172.0, 407.0), (230.0, 407.0))
 COMPANION_ACTION_ID_GETTER_VA = 0x0012FEE0
@@ -34,9 +45,9 @@ COMPANION_ACTION_MAX_CELLS = 17
 COMPANION_ACTION_MAX_LINES = 4
 COMPANION_ACTION_LINE_STEP = 16.0
 COMPANION_ACTION_LAYOUT_TABLE_KEY = "companion_action_layout_table"
-COMPANION_ACTION_RUNTIME_STATE_KEY = "companion_action_runtime_text_y"
+COMPANION_ACTION_RUNTIME_STATE_KEY = "companion_action_runtime_text_xy"
 COMPANION_ACTION_RUNTIME_HOOK_KEY = "companion_action_layout_hook"
-COMPANION_ACTION_RUNTIME_HOOK_SIZE = 132
+COMPANION_ACTION_RUNTIME_HOOK_SIZE = 188
 
 # Static owners that are independent of the current action id. The resource
 # selection and text-Y load are patched after translation allocation because
@@ -44,12 +55,15 @@ COMPANION_ACTION_RUNTIME_HOOK_SIZE = 132
 COMPANION_ACTION_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x666F0, 0x3C024140, 0x3C024080),  # tail-tip X: +12.0 -> +4.0
     (0x66708, 0x3C02C1E8, 0x3C02C274),  # tail-tip Y: -29.0 -> -61.0
-    (0x66804, 0x3C024244, 0x3C02C210),  # text X: +49.0 -> -36.0
     (0x6686C, 0x0000282D, 0x24050001),  # style 0 (16px) -> style 1 (12px)
 )
 COMPANION_ACTION_RUNTIME_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x66724, 0x24040002),  # li a0,2
     (0x66728, 0x24050018),  # li a1,0x18
+    (0x66804, 0x3C024244),  # static text-X float immediate
+    (0x66808, 0x44820000),  # mtc1 v0,f0
+    (0x6680C, 0x00000000),
+    (0x66810, 0x46000800),  # add.s f0,f1,f0
     (0x6681C, 0x3C02C1B0),  # static text-Y float immediate
     (0x66820, 0x44820000),  # mtc1 v0,f0
     (0x66824, 0x00000000),
@@ -211,13 +225,11 @@ def _runtime_hook_bytes(*, table_va: int, state_va: int) -> bytes:
     table_hi, table_lo = _split_address(table_va)
     state_hi, state_lo = _split_address(state_va)
 
-    # The pristine renderer proves HUD+0x2D0 is only the 0/1 companion-slot
-    # index: it scales that value by eight and indexes the two-entry position
-    # table at 0x4F8E00. The actual action id comes from the same read-only
-    # getter used later by the original caption renderer: getter(0x8000), then
-    # low-16 normalization via ANDI/XORI 0x8000 before indexing the 31 pointers.
-    # Preserve ra across the nested JAL and restore a0=2/a1=0x68 for the
-    # original group-2 bubble constructor after returning from this hook.
+    # Action id and companion slot are independent. The action getter selects
+    # height/pivot-Y/text-Y from the 31-entry table. HUD+0x2D0 selects one of the
+    # two sibling down-tail bubbles and a matching text-X inset. Slot 2 therefore
+    # moves the body only 13px right while its tail moves 58px to the slot-2
+    # anchor. Invalid slot/action ids fail safely to zero.
     words = (
         _mips_i(0x09, 29, 29, -16),         # addiu sp,sp,-16
         _mips_i(0x2B, 29, 31, 12),          # sw ra,12(sp)
@@ -227,31 +239,45 @@ def _runtime_hook_bytes(*, table_va: int, state_va: int) -> bytes:
         _mips_i(0x0C, 2, 2, 0xFFFF),        # andi v0,v0,0xffff
         _mips_i(0x0E, 2, 2, COMPANION_ACTION_ID_KEY),  # xori v0,v0,0x8000
         _mips_i(0x0B, 2, 3, len(COMPANION_ACTION_LAYOUTS)),  # sltiu v1,v0,31
-        _mips_i(0x05, 3, 0, 2),            # bne v1,zero,valid
-        0x00000000,                         # nop
-        _mips_r(0, 0, 2, 0, 0x21),         # addu v0,zero,zero (fallback id 0)
-        _mips_r(0, 2, 3, 3, 0x00),         # sll v1,v0,3
-        _mips_r(0, 2, 8, 2, 0x00),         # sll t0,v0,2
-        _mips_r(3, 8, 3, 0, 0x21),         # addu v1,v1,t0 (id * 12)
-        _mips_i(0x0F, 0, 8, table_hi),      # lui t0,hi(table)
-        _mips_i(0x09, 8, 8, table_lo),      # addiu t0,t0,lo(table)
-        _mips_r(8, 3, 8, 0, 0x21),         # addu t0,t0,v1
-        _mips_i(0x0F, 0, 9, 0x0045),       # lui t1,0x45
-        _mips_i(0x09, 9, 9, 0x0AC8),       # addiu t1,t1,0xac8 (height)
-        _mips_i(0x23, 8, 10, 0),            # lw t2,0(t0) height
-        _mips_i(0x2B, 9, 10, 0),            # sw t2,0(t1)
-        _mips_i(0x23, 8, 10, 4),            # lw t2,4(t0) pivot_y
-        _mips_i(0x2B, 9, 10, 8),            # sw t2,8(t1)
-        _mips_i(0x23, 8, 10, 8),            # lw t2,8(t0) text_y
-        _mips_i(0x0F, 0, 9, state_hi),      # lui t1,hi(state)
-        _mips_i(0x09, 9, 9, state_lo),      # addiu t1,t1,lo(state)
-        _mips_i(0x2B, 9, 10, 0),            # sw t2,0(t1)
-        _mips_i(0x23, 29, 31, 12),          # lw ra,12(sp)
-        _mips_i(0x09, 29, 29, 16),          # addiu sp,sp,16
-        _mips_i(0x09, 0, 4, 2),             # li a0,2
-        _mips_i(0x09, 0, 5, 0x0068),        # li a1,0x68
-        _mips_r(31, 0, 0, 0, 0x08),         # jr ra
-        0x00000000,                         # nop
+        _mips_i(0x05, 3, 0, 2),             # bne v1,zero,action_valid
+        0x00000000,                          # nop
+        _mips_r(0, 0, 2, 0, 0x21),          # addu v0,zero,zero (fallback id 0)
+        _mips_r(0, 2, 3, 3, 0x00),          # sll v1,v0,3
+        _mips_r(0, 2, 8, 2, 0x00),          # sll t0,v0,2
+        _mips_r(3, 8, 3, 0, 0x21),          # addu v1,v1,t0 (id * 12)
+        _mips_i(0x0F, 0, 8, table_hi),       # lui t0,hi(action table)
+        _mips_i(0x09, 8, 8, table_lo),       # addiu t0,t0,lo(action table)
+        _mips_r(8, 3, 8, 0, 0x21),          # addu t0,t0,v1
+        _mips_i(0x23, 8, 10, 0),             # lw t2,0(t0) height
+        _mips_i(0x23, 8, 11, 4),             # lw t3,4(t0) pivot_y
+        _mips_i(0x23, 8, 12, 8),             # lw t4,8(t0) text_y
+        _mips_i(0x21, 16, 13, 0x02D0),       # lh t5,0x2d0(s0) slot
+        _mips_i(0x0B, 13, 14, 2),            # sltiu t6,t5,2
+        _mips_i(0x05, 14, 0, 2),             # bne t6,zero,slot_valid
+        0x00000000,                          # nop
+        _mips_r(0, 0, 13, 0, 0x21),         # addu t5,zero,zero (fallback slot 0)
+        _mips_r(0, 13, 14, 4, 0x00),         # sll t6,t5,4  (slot*16)
+        _mips_r(0, 13, 15, 5, 0x00),         # sll t7,t5,5  (slot*32)
+        _mips_r(14, 15, 14, 0, 0x21),        # addu t6,t6,t7 (slot*48)
+        _mips_i(0x0F, 0, 15, 0x0045),        # lui t7,0x45
+        _mips_i(0x09, 15, 15, 0x0AC8),       # addiu t7,t7,0xac8 (slot0 height)
+        _mips_r(15, 14, 15, 0, 0x21),        # addu t7,t7,t6
+        _mips_i(0x2B, 15, 10, 0),            # sw t2,0(t7) height
+        _mips_i(0x2B, 15, 11, 8),            # sw t3,8(t7) pivot_y
+        _mips_i(0x0F, 0, 15, state_hi),      # lui t7,hi(state)
+        _mips_i(0x09, 15, 15, state_lo),     # addiu t7,t7,lo(state)
+        _mips_i(0x0F, 0, 10, 0xC210),        # lui t2,0xc210 (-36.0 slot 0)
+        _mips_i(0x04, 13, 0, 2),             # beq t5,zero,text_x_ready
+        0x00000000,                          # nop
+        _mips_i(0x0F, 0, 10, 0xC2A2),        # lui t2,0xc2a2 (-81.0 slot 1)
+        _mips_i(0x2B, 15, 10, 0),            # sw t2,0(t7) text_x
+        _mips_i(0x2B, 15, 12, 4),            # sw t4,4(t7) text_y
+        _mips_i(0x09, 13, 5, 0x0068),        # addiu a1,t5,0x68 (0x68/0x69)
+        _mips_i(0x23, 29, 31, 12),           # lw ra,12(sp)
+        _mips_i(0x09, 29, 29, 16),           # addiu sp,sp,16
+        _mips_i(0x09, 0, 4, 2),              # li a0,2
+        _mips_r(31, 0, 0, 0, 0x08),          # jr ra
+        0x00000000,                          # nop
     )
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_RUNTIME_HOOK_SIZE:
@@ -330,7 +356,7 @@ def validate_companion_hud_source(raw: bytes) -> None:
 
 
 def patch_companion_action_layout(raw: bytes) -> bytes:
-    """Apply the static portion of the generic r37 companion-action layout."""
+    """Apply the static portion of the generic, slot-aware r38 companion-action layout."""
 
     expected_slot_positions = tuple(
         component for position in COMPANION_SLOT_POSITIONS for component in position
@@ -350,27 +376,44 @@ def patch_companion_action_layout(raw: bytes) -> bytes:
                 f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
             )
 
-    bubble_metadata_va, bubble_record_count = struct.unpack_from(
-        "<II", raw, COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET
+    bubble_specs = (
+        (
+            COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
+            COMPANION_ACTION_BUBBLE_METADATA_VA,
+            (
+                COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+                COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+            ),
+            COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
+        ),
+        (
+            COMPANION_ACTION_SLOT2_BUBBLE_TABLE_RECORD_OFFSET,
+            COMPANION_ACTION_SLOT2_BUBBLE_METADATA_VA,
+            (
+                COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
+            ),
+            COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY,
+        ),
     )
-    if (bubble_metadata_va, bubble_record_count) != (COMPANION_ACTION_BUBBLE_METADATA_VA, 1):
-        raise ValueError(
-            "companion action bubble resource-table drifted: "
-            f"expected ({COMPANION_ACTION_BUBBLE_METADATA_VA:#010x}, 1), "
-            f"got ({bubble_metadata_va:#010x}, {bubble_record_count})"
-        )
-
-    bubble_geometry = (
-        struct.unpack_from("<f", raw, COMPANION_ACTION_BUBBLE_WIDTH_OFFSET)[0],
-        struct.unpack_from("<f", raw, COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET)[0],
-        struct.unpack_from("<f", raw, COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET)[0],
-        struct.unpack_from("<f", raw, COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET)[0],
-    )
-    if bubble_geometry != COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY:
-        raise ValueError(
-            "companion action bubble geometry drifted: "
-            f"expected {COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY!r}, got {bubble_geometry!r}"
-        )
+    for record_offset, expected_metadata_va, geometry_offsets, expected_geometry in bubble_specs:
+        bubble_metadata_va, bubble_record_count = struct.unpack_from("<II", raw, record_offset)
+        if (bubble_metadata_va, bubble_record_count) != (expected_metadata_va, 1):
+            raise ValueError(
+                "companion action bubble resource-table drifted: "
+                f"{record_offset:#x}: expected ({expected_metadata_va:#010x}, 1), "
+                f"got ({bubble_metadata_va:#010x}, {bubble_record_count})"
+            )
+        bubble_geometry = tuple(struct.unpack_from("<f", raw, offset)[0] for offset in geometry_offsets)
+        if bubble_geometry != expected_geometry:
+            raise ValueError(
+                "companion action bubble geometry drifted: "
+                f"{record_offset:#x}: expected {expected_geometry!r}, got {bubble_geometry!r}"
+            )
 
     for offset, expected in COMPANION_ACTION_RUNTIME_PREIMAGES:
         if offset < 0 or offset + 4 > len(raw):
@@ -394,19 +437,31 @@ def patch_companion_action_layout(raw: bytes) -> bytes:
             )
         struct.pack_into("<I", out, offset, replacement)
 
-    # Install the accepted one-line geometry as the deterministic startup/default
-    # state. The runtime hook updates height and pivot-Y before every callout.
-    for offset, value in zip(
+    # Install the accepted one-line geometry as deterministic startup/default
+    # state for both sibling bubbles. The runtime hook updates height/pivot-Y
+    # for the active slot before every callout.
+    for offsets, geometry in (
         (
-            COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
-            COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
-            COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
-            COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+            (
+                COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+                COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+            ),
+            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
         ),
-        COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
-        strict=True,
+        (
+            (
+                COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
+            ),
+            COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
+        ),
     ):
-        struct.pack_into("<f", out, offset, value)
+        for offset, value in zip(offsets, geometry, strict=True):
+            struct.pack_into("<f", out, offset, value)
     return bytes(out)
 
 
@@ -450,13 +505,17 @@ def finalize_companion_action_runtime_layout(
     struct.pack_into("<I", result, 0x66724, _jal_word(hook_va))
     struct.pack_into("<I", result, 0x66728, 0x24040002)
 
-    # The selector stores the current per-action text-Y float in relocated RWX
-    # state. Replace the old immediate-float construction with a direct load.
+    # The selector stores slot-aware text-X and per-action text-Y floats in
+    # relocated RWX state. Replace both old immediate-float constructions with
+    # direct loads; the pristine add.s owners remain untouched.
     state_hi, state_lo = _split_address(state_va)
+    struct.pack_into("<I", result, 0x66804, _mips_i(0x0F, 0, 2, state_hi))
+    struct.pack_into("<I", result, 0x66808, _mips_i(0x31, 2, 0, state_lo))
+    struct.pack_into("<I", result, 0x6680C, 0x00000000)
     struct.pack_into("<I", result, 0x6681C, _mips_i(0x0F, 0, 2, state_hi))
-    struct.pack_into("<I", result, 0x66820, _mips_i(0x31, 2, 0, state_lo))
+    struct.pack_into("<I", result, 0x66820, _mips_i(0x31, 2, 0, state_lo + 4))
     struct.pack_into("<I", result, 0x66824, 0x00000000)
-    # 0x66828 remains the pristine add.s f0,f1,f0.
+    # 0x66810 and 0x66828 remain the pristine add.s f0,f1,f0.
 
 
 def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
@@ -499,7 +558,11 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             ),
             RelocatedText(
                 key=COMPANION_ACTION_RUNTIME_STATE_KEY,
-                encoded=struct.pack("<f", COMPANION_ACTION_LAYOUTS[0].text_y),
+                encoded=struct.pack(
+                    "<ff",
+                    COMPANION_ACTION_SLOT_TEXT_X[0],
+                    COMPANION_ACTION_LAYOUTS[0].text_y,
+                ),
                 pointer_offsets=(),
                 alignment=4,
             ),

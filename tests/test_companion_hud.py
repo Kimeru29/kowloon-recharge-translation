@@ -14,6 +14,16 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
     COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+    COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
+    COMPANION_ACTION_SLOT2_BUBBLE_METADATA_VA,
+    COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
+    COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
+    COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY,
+    COMPANION_ACTION_SLOT2_BUBBLE_TABLE_RECORD_OFFSET,
+    COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
+    COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
+    COMPANION_ACTION_SLOT_RESOURCES,
+    COMPANION_ACTION_SLOT_TEXT_X,
     COMPANION_ACTION_ID_GETTER_VA,
     COMPANION_ACTION_ID_KEY,
     COMPANION_ACTION_ID_REFERENCE_PREIMAGES,
@@ -151,14 +161,15 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_action(COMPANION_ACTION_LABELS[24].english).count(b"\x0a"))
         self.assertNotIn(b"\x0a", encode_companion_action(COMPANION_ACTION_LABELS[25].english))
 
-    def test_r37_runtime_selector_uses_real_action_id_and_preserves_slot_positioning(self) -> None:
+    def test_r38_runtime_selector_keeps_body_stable_and_points_tail_at_active_slot(self) -> None:
         result = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, p_flags, _align = struct.unpack_from(
             "<IIIIIIII", result, 0x54
         )
         self.assertEqual(7, p_flags)
 
-        # The game's original companion-slot positioning remains untouched.
+        # Keep the game's proven slot anchors.  r38 changes the bubble resource/
+        # pivot, not the companion positions themselves.
         expected_slot_positions = tuple(
             component for position in COMPANION_SLOT_POSITIONS for component in position
         )
@@ -184,36 +195,48 @@ class CompanionHudTests(unittest.TestCase):
         hook_words = struct.unpack_from(
             f"<{COMPANION_ACTION_RUNTIME_HOOK_SIZE // 4}I", result, hook_file
         )
-        self.assertEqual(0x27BDFFF0, hook_words[0])   # addiu sp,sp,-16
-        self.assertEqual(0xAFBF000C, hook_words[1])   # sw ra,12(sp)
+        self.assertEqual(0x27BDFFF0, hook_words[0])
+        self.assertEqual(0xAFBF000C, hook_words[1])
         self.assertEqual(0x34040000 | COMPANION_ACTION_ID_KEY, hook_words[2])
         self.assertEqual(
             0x0C000000 | ((COMPANION_ACTION_ID_GETTER_VA >> 2) & 0x03FFFFFF),
             hook_words[3],
         )
-        self.assertEqual(0, hook_words[4])            # jal delay slot
-        self.assertEqual(0x3042FFFF, hook_words[5])   # andi v0,v0,0xffff
+        self.assertEqual(0x3042FFFF, hook_words[5])
         self.assertEqual(0x38420000 | COMPANION_ACTION_ID_KEY, hook_words[6])
-        self.assertEqual(0x2C43001F, hook_words[7])   # bounds-check 31 action ids
-        self.assertNotIn(0x860202D0, hook_words)      # never treat slot index as action id
-        self.assertEqual(0x8FBF000C, hook_words[-6])  # lw ra,12(sp)
-        self.assertEqual(0x27BD0010, hook_words[-5])  # addiu sp,sp,16
-        self.assertEqual(0x24040002, hook_words[-4])  # restore group 2
-        self.assertEqual(0x24050068, hook_words[-3])  # proven down-tail bubble
-        self.assertEqual(0x03E00008, hook_words[-2])  # jr ra
+        self.assertEqual(0x2C43001F, hook_words[7])
+        self.assertIn(0x860D02D0, hook_words)         # lh t5,0x2d0(s0): slot 0/1
+        self.assertEqual(0x25A50068, hook_words[-6])  # a1 = slot + 0x68
+        self.assertEqual(0x8FBF000C, hook_words[-5])
+        self.assertEqual(0x27BD0010, hook_words[-4])
+        self.assertEqual(0x24040002, hook_words[-3])
+        self.assertEqual(0x03E00008, hook_words[-2])
         self.assertEqual(0, hook_words[-1])
 
-        # The original later action lookup remains byte-identical, independently
-        # proving the getter contract the hook reuses.
+        # The two sibling resources share a body but move the tail 58px.  After
+        # r38 scaling, body-left/text-left move only 13px right for slot 2.
+        self.assertEqual((0x68, 0x69), COMPANION_ACTION_SLOT_RESOURCES)
+        body_left = (
+            COMPANION_SLOT_POSITIONS[0][0] - COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY[2],
+            COMPANION_SLOT_POSITIONS[1][0] - COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY[2],
+        )
+        text_left = (
+            COMPANION_SLOT_POSITIONS[0][0] + COMPANION_ACTION_SLOT_TEXT_X[0],
+            COMPANION_SLOT_POSITIONS[1][0] + COMPANION_ACTION_SLOT_TEXT_X[1],
+        )
+        self.assertEqual(13.0, body_left[1] - body_left[0])
+        self.assertEqual(13.0, text_left[1] - text_left[0])
+        self.assertEqual(58.0, COMPANION_SLOT_POSITIONS[1][0] - COMPANION_SLOT_POSITIONS[0][0])
+
+        # The original later action lookup remains byte-identical.
         for offset, expected in COMPANION_ACTION_ID_REFERENCE_PREIMAGES:
             self.assertEqual(expected, struct.unpack_from("<I", result, offset)[0])
-
-        # Static owners that do not depend on action id stay frozen.
         for offset, _expected, replacement in COMPANION_ACTION_LAYOUT_PATCHES:
             self.assertEqual(replacement, struct.unpack_from("<I", result, offset)[0])
+        self.assertEqual(0x46000800, struct.unpack_from("<I", result, 0x66810)[0])
         self.assertEqual(0x46000800, struct.unpack_from("<I", result, 0x66828)[0])
 
-    def test_r37_layout_patch_fails_closed_on_all_pristine_owners(self) -> None:
+    def test_r38_layout_patch_fails_closed_on_all_pristine_owners(self) -> None:
         for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
             with self.subTest(static_offset=hex(offset)):
                 tampered = bytearray(RAW)
@@ -240,22 +263,46 @@ class CompanionHudTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "companion slot/action-id owner drifted"):
                     patch_companion_action_layout(bytes(tampered))
 
-        geometry_offsets = (
-            COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
-            COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
-            COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
-            COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+        bubble_specs = (
+            (
+                COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
+                COMPANION_ACTION_BUBBLE_METADATA_VA,
+                (
+                    COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+                    COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+                    COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+                    COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+                ),
+                COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
+            ),
+            (
+                COMPANION_ACTION_SLOT2_BUBBLE_TABLE_RECORD_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_METADATA_VA,
+                (
+                    COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
+                    COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
+                    COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
+                    COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
+                ),
+                COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY,
+            ),
         )
-        self.assertEqual(
-            COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
-            tuple(struct.unpack_from("<f", RAW, offset)[0] for offset in geometry_offsets),
-        )
-        for offset in geometry_offsets:
-            with self.subTest(metadata_offset=hex(offset)):
-                tampered = bytearray(RAW)
-                tampered[offset] ^= 1
-                with self.assertRaisesRegex(ValueError, "companion action bubble geometry drifted"):
-                    patch_companion_action_layout(bytes(tampered))
+        for record_offset, metadata_va, geometry_offsets, pristine_geometry in bubble_specs:
+            self.assertEqual((metadata_va, 1), struct.unpack_from("<II", RAW, record_offset))
+            self.assertEqual(
+                pristine_geometry,
+                tuple(struct.unpack_from("<f", RAW, offset)[0] for offset in geometry_offsets),
+            )
+            tampered = bytearray(RAW)
+            tampered[record_offset] ^= 1
+            with self.assertRaisesRegex(ValueError, "companion action bubble resource-table drifted"):
+                patch_companion_action_layout(bytes(tampered))
+            for offset in geometry_offsets:
+                with self.subTest(metadata_offset=hex(offset)):
+                    tampered = bytearray(RAW)
+                    tampered[offset] ^= 1
+                    with self.assertRaisesRegex(ValueError, "companion action bubble geometry drifted"):
+                        patch_companion_action_layout(bytes(tampered))
 
     def test_r30_keeps_accepted_r29_dungeon_owners_frozen(self) -> None:
         result = build_early_ui_elf(RAW)
