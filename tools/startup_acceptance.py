@@ -39,6 +39,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
     COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
     COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
+    COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
@@ -346,7 +347,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     if max(bubble_offsets) + 4 > len(raw):
         return False
     bubble_geometry = tuple(struct.unpack_from("<f", raw, offset)[0] for offset in bubble_offsets)
-    if bubble_geometry != (288.0, 80.0, 67.0, 77.0):
+    if bubble_geometry != COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY:
         return False
     return all(
         offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
@@ -625,7 +626,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         _check(
             "companion_hud_layout",
             _verify_companion_hud_layout(raw),
-            "companion action callout is not using the proven group-2 0x68 down-tail bubble geometry",
+            "companion action callout is not using the compact r35 group-2 0x68 bubble geometry",
         )
     )
     heap_break_ok = (

@@ -12,25 +12,27 @@ _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
 _MAX_STRING_BYTES = 512
 
-# r31-r34 presentation owners for the persistent companion action caption. r30
+# r31-r35 presentation owners for the persistent companion action caption. r30
 # translated the payload but left the Japanese-era style/geometry in place.
-# r31/r32 proved the 12px English presentation, but group-2 index 0x18 is
-# intrinsically a 160x32 side-tail strip. r33 correctly identified the existing
-# 288x80 down-tail bubble metadata but selected the wrong group-2 index (0xC5),
-# so the backing disappeared at runtime. Resource-table tracing proves that the
-# metadata at file 0x350B40 / VA 0x450AC0 belongs to group-2 index 0x68.
+# r31/r32 proved the 12px English presentation, r33/r34 proved group-2 index
+# 0x68 as the horizontal down-tail bubble, and r35 compacts that existing asset
+# for this one-line action-label path. Runtime measurement puts the three lower
+# HUD boxes at about 230 logical px combined, so 224px leaves deliberate right-
+# side clearance while 48px is the bounded one-line height for the 12px font.
 COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET = 0x380E30
 COMPANION_ACTION_BUBBLE_METADATA_VA = 0x00450AC0
 COMPANION_ACTION_BUBBLE_WIDTH_OFFSET = 0x350B44
 COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET = 0x350B48
 COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET = 0x350B4C
 COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET = 0x350B50
+COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY = (288.0, 80.0, 67.0, 77.0)
+COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY = (224.0, 48.0, 52.0, 45.0)
 COMPANION_ACTION_LAYOUT_PATCHES: tuple[tuple[int, int, int], ...] = (
     (0x666F0, 0x3C024140, 0x3C024080),  # tail-tip X: +12.0 -> +4.0
     (0x66708, 0x3C02C1E8, 0x3C02C274),  # tail-tip Y: -29.0 -> -61.0
     (0x66728, 0x24050018, 0x24050068),  # side-tail strip -> proven horizontal down-tail bubble
-    (0x66804, 0x3C024244, 0x3C02C23C),  # text X: +49.0 -> -47.0
-    (0x6681C, 0x3C02C1B0, 0x3C02C303),  # text Y: -22.0 -> -131.0
+    (0x66804, 0x3C024244, 0x3C02C210),  # text X: +49.0 -> -36.0 (12px left inset)
+    (0x6681C, 0x3C02C1B0, 0x3C02C2C6),  # text Y: -22.0 -> -99.0 (7px top inset)
     (0x6686C, 0x0000282D, 0x24050001),  # style 0 (16px) -> style 1 (12px)
 )
 
@@ -135,7 +137,7 @@ def validate_companion_hud_source(raw: bytes) -> None:
 
 
 def patch_companion_action_layout(raw: bytes) -> bytes:
-    """Apply the bounded r31-r34 companion-action callout presentation patch."""
+    """Apply the bounded r31-r35 companion-action callout presentation patch."""
 
     bubble_metadata_va, bubble_record_count = struct.unpack_from(
         "<II", raw, COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET
@@ -153,12 +155,10 @@ def patch_companion_action_layout(raw: bytes) -> bytes:
         struct.unpack_from("<f", raw, COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET)[0],
         struct.unpack_from("<f", raw, COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET)[0],
     )
-    if bubble_geometry != (288.0, 80.0, 67.0, 77.0):
+    if bubble_geometry != COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY:
         raise ValueError(
             "companion action bubble geometry drifted: "
-            f"expected 288x80 pivot (67,77), got "
-            f"{bubble_geometry[0]:g}x{bubble_geometry[1]:g} "
-            f"pivot ({bubble_geometry[2]:g},{bubble_geometry[3]:g})"
+            f"expected {COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY!r}, got {bubble_geometry!r}"
         )
 
     out = bytearray(raw)
@@ -172,6 +172,18 @@ def patch_companion_action_layout(raw: bytes) -> bytes:
                 f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
             )
         struct.pack_into("<I", out, offset, replacement)
+
+    for offset, value in zip(
+        (
+            COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+            COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+        ),
+        COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
+        strict=True,
+    ):
+        struct.pack_into("<f", out, offset, value)
     return bytes(out)
 
 

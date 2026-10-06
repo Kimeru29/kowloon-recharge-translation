@@ -6,6 +6,10 @@ from pathlib import Path
 
 from tools.adv_layout import ADV_DG_LAYOUT_PATCHES, ADV_SPEAKER_LAYOUT_PATCHES
 from tools.companion_hud import (
+    COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+    COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+    COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+    COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_COMMENT_LINES,
@@ -171,6 +175,13 @@ class EarlyUiPatchTests(unittest.TestCase):
             if spec.english is not None:
                 allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
         for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
+            allowed.update(range(offset, offset + 4))
+        for offset in (
+            COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+            COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+        ):
             allowed.update(range(offset, offset + 4))
         allowed.update(range(NAME_FLOW_STATE9_FLAG_OFFSET, NAME_FLOW_STATE9_FLAG_OFFSET + 4))
         # ELF program header / heap metadata used by the appended translation segment.

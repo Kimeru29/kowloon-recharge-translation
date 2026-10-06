@@ -6,8 +6,14 @@ from pathlib import Path
 
 from tests.local_fixtures import require_local_fixture
 from tools.companion_hud import (
+    COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
     COMPANION_ACTION_BUBBLE_METADATA_VA,
+    COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+    COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+    COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
     COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
+    COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
+    COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_COMMENT_LINES,
@@ -82,19 +88,19 @@ class CompanionHudTests(unittest.TestCase):
             source = spec.source_text.encode("cp932") + b"\x00"
             self.assertEqual(source, result[spec.source_offset:spec.source_offset + len(source)])
 
-    def test_r34_companion_action_callout_uses_proven_horizontal_down_tail_bubble(self) -> None:
+    def test_r35_companion_action_callout_is_compact_and_tail_anchored(self) -> None:
         result = build_early_ui_elf(RAW)
 
-        # r33 found the correct 288x80 down-tail metadata but mapped it to the
-        # wrong group-2 index (0xC5), making the backing disappear at runtime.
-        # The actual group-2 table maps index 0x68 to metadata VA 0x450AC0.
-        # Keep the r33 text/anchor geometry and correct only the resource owner.
+        # r34 proves group-2 index 0x68 is the live horizontal down-tail bubble.
+        # r35 keeps that resource and the tail-tip anchor, but compacts its
+        # rendered geometry to a one-line 12px caption: 224x48. This is slightly
+        # narrower than the measured ~230px span of the three lower HUD boxes.
         expected_words = {
             0x666F0: 0x3C024080,  # tail-tip X stays anchor + 4px
             0x66708: 0x3C02C274,  # tail-tip Y stays anchor - 61px
-            0x66728: 0x24050068,  # group-2 index 0x18 -> proven down-tail bubble 0x68
-            0x66804: 0x3C02C23C,  # text X: anchor - 47px
-            0x6681C: 0x3C02C303,  # text Y: anchor - 131px
+            0x66728: 0x24050068,  # proven group-2 down-tail bubble
+            0x66804: 0x3C02C210,  # text X: anchor - 36px
+            0x6681C: 0x3C02C2C6,  # text Y: anchor - 99px
             0x6686C: 0x24050001,  # style 1 = 12x12
         }
         for offset, expected in expected_words.items():
@@ -107,18 +113,44 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(COMPANION_ACTION_BUBBLE_METADATA_VA, metadata_va)
         self.assertEqual(1, record_count)
 
-        # Index 0x68 is a 288x80 bubble whose (67,77) pivot is the tail tip.
-        self.assertEqual(288.0, struct.unpack_from("<f", result, 0x350B44)[0])
-        self.assertEqual(80.0, struct.unpack_from("<f", result, 0x350B48)[0])
-        self.assertEqual(67.0, struct.unpack_from("<f", result, 0x350B4C)[0])
-        self.assertEqual(77.0, struct.unpack_from("<f", result, 0x350B50)[0])
+        bubble_offsets = (
+            COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+            COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+        )
+        geometry = tuple(struct.unpack_from("<f", result, offset)[0] for offset in bubble_offsets)
+        self.assertEqual(COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY, geometry)
+        self.assertEqual((224.0, 48.0, 52.0, 45.0), geometry)
 
-    def test_r34_layout_patch_fails_closed_on_each_pristine_owner(self) -> None:
+        # Keep the tail tip at (+4,-61). The scaled body starts at X=-48 and
+        # Y=-106; the caption at (-36,-99) therefore retains 12px/7px padding.
+        self.assertEqual(12.0, -36.0 - (4.0 - 52.0))
+        self.assertEqual(7.0, -99.0 - (-61.0 - 45.0))
+
+    def test_r35_layout_patch_fails_closed_on_each_pristine_owner(self) -> None:
         for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
             with self.subTest(offset=hex(offset)):
                 tampered = bytearray(RAW)
                 tampered[offset] ^= 1
                 with self.assertRaisesRegex(ValueError, "companion action layout preimage mismatch"):
+                    patch_companion_action_layout(bytes(tampered))
+
+        geometry_offsets = (
+            COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+            COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+        )
+        self.assertEqual(
+            COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
+            tuple(struct.unpack_from("<f", RAW, offset)[0] for offset in geometry_offsets),
+        )
+        for offset in geometry_offsets:
+            with self.subTest(metadata_offset=hex(offset)):
+                tampered = bytearray(RAW)
+                tampered[offset] ^= 1
+                with self.assertRaisesRegex(ValueError, "companion action bubble geometry drifted"):
                     patch_companion_action_layout(bytes(tampered))
 
     def test_r30_keeps_accepted_r29_dungeon_owners_frozen(self) -> None:
