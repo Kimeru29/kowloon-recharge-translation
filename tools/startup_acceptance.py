@@ -35,8 +35,10 @@ from tools.hant_ui import (
 from tools.localization import encode_ps2_english
 from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+    COMPANION_ACTION_BUBBLE_METADATA_VA,
     COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
     COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+    COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
@@ -327,6 +329,14 @@ def _verify_companion_hud_semantics(
 
 
 def _verify_companion_hud_layout(raw: bytes) -> bool:
+    if COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET + 8 > len(raw):
+        return False
+    bubble_metadata_va, bubble_record_count = struct.unpack_from(
+        "<II", raw, COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET
+    )
+    if (bubble_metadata_va, bubble_record_count) != (COMPANION_ACTION_BUBBLE_METADATA_VA, 1):
+        return False
+
     bubble_offsets = (
         COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
         COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
@@ -615,7 +625,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         _check(
             "companion_hud_layout",
             _verify_companion_hud_layout(raw),
-            "companion action callout is not using the compact 12px/non-overlapping r31 geometry",
+            "companion action callout is not using the proven group-2 0x68 down-tail bubble geometry",
         )
     )
     heap_break_ok = (
