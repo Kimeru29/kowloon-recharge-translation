@@ -39,17 +39,25 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
     COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
     COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
+    COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
     COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
+    COMPANION_ACTION_BUBBLE_METADATA_SIZE,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
     COMPANION_ACTION_SLOT2_BUBBLE_METADATA_VA,
     COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
     COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
     COMPANION_ACTION_SLOT2_BUBBLE_TABLE_RECORD_OFFSET,
+    COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY,
     COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
     COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_SLOT_RESOURCES,
     COMPANION_ACTION_SLOT_TEXT_X,
+    COMPANION_GROUP2_NEXT_TABLE_POINTER_OFFSET,
+    COMPANION_GROUP2_NEXT_TABLE_VA,
+    COMPANION_GROUP2_RESOURCE_COUNT,
+    COMPANION_GROUP2_TABLE_POINTER_OFFSET,
+    COMPANION_GROUP2_TABLE_VA,
     COMPANION_ACTION_ID_GETTER_VA,
     COMPANION_ACTION_ID_KEY,
     COMPANION_ACTION_ID_REFERENCE_PREIMAGES,
@@ -62,6 +70,7 @@ from tools.companion_hud import (
     COMPANION_SLOT_POSITIONS,
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
+    companion_comment_pointer_offsets,
     encode_companion_action,
 )
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
@@ -103,6 +112,7 @@ _RUNTIME_HEAP_BREAK_OFFSET = 0x650014
 _EXPECTED_RUNTIME_HEAP_START = 0x00A02F00
 _VISIBLE_PROMPT_INDICES = tuple(range(len(NAME_PROMPT_TEXTS)))
 _HANT_POINTER_TABLE_SHA256 = "2282baed9b810c5dc9de2ea6a57bb7e8308154279f2efe9b57ea5b3d761205a0"
+_COMPANION_GROUP2_TABLE_SHA256 = "4f3a0e381ff265255d77767994af454e341d3ee3669aa1f5971d32d483799ef6"
 _HANT_BLANK_VA = 0x00795FB8
 _HANT_EOF_VA = 0x00795FBC
 # Task-6 unresolved H.A.N.T. candidates. 0x3BC7E8 is cross-owned by the
@@ -307,7 +317,11 @@ def _verify_companion_hud_semantics(
     raw: bytes,
     segment: tuple[int, int, int, int] | None,
 ) -> tuple[bool, bool]:
-    comments_ok = segment is not None and len(COMPANION_COMMENT_LINES) == 1650
+    comments_ok = (
+        segment is not None
+        and len(COMPANION_COMMENT_LINES) == 1650
+        and sum(len(companion_comment_pointer_offsets(spec)) for spec in COMPANION_COMMENT_LINES) == 1794
+    )
     for spec in COMPANION_COMMENT_LINES:
         if not comments_ok:
             break
@@ -315,7 +329,7 @@ def _verify_companion_hud_semantics(
         if raw[spec.source_offset:spec.source_offset + len(source)] != source:
             comments_ok = False
             break
-        for pointer_offset in spec.pointer_offsets:
+        for pointer_offset in companion_comment_pointer_offsets(spec):
             if pointer_offset + 4 > len(raw):
                 comments_ok = False
                 break
@@ -357,9 +371,9 @@ def _verify_companion_hud_semantics(
 
 
 def _verify_companion_hud_layout(raw: bytes) -> bool:
-    # r38 keeps the game's pristine 0/1 companion anchors but uses sibling
-    # group-2 speech bubbles whose pivots place the body almost stationary while
-    # the tail tracks the active slot.
+    # r40 preserves the game's shared 0x68/0x69 bubbles for passive/AFK
+    # chatter and moves the accepted compact action bubbles to private appended
+    # group-2 ids 0xA4/0xA5.
     if COMPANION_SLOT_POSITION_TABLE_OFFSET + 16 > len(raw):
         return False
     expected_slot_positions = tuple(
@@ -373,6 +387,8 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     ):
         return False
 
+    # The shared resources must be completely restored to their pristine
+    # geometry; AFK chatter uses these exact resource ids.
     bubble_specs = (
         (
             COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
@@ -383,7 +399,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
                 COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
                 COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
             ),
-            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
+            COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
         ),
         (
             COMPANION_ACTION_SLOT2_BUBBLE_TABLE_RECORD_OFFSET,
@@ -394,7 +410,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
                 COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
                 COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
             ),
-            COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
+            COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY,
         ),
     )
     for record_offset, metadata_va, offsets, geometry in bubble_specs:
@@ -404,21 +420,6 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             return False
         if tuple(struct.unpack_from("<f", raw, offset)[0] for offset in offsets) != geometry:
             return False
-
-    # Both resources are the proven sibling pair and produce only a 13px body
-    # shift while the companion anchors themselves remain 58px apart.
-    if COMPANION_ACTION_SLOT_RESOURCES != (0x68, 0x69):
-        return False
-    slot_body_left = (
-        COMPANION_SLOT_POSITIONS[0][0] - COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY[2],
-        COMPANION_SLOT_POSITIONS[1][0] - COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY[2],
-    )
-    slot_text_left = (
-        COMPANION_SLOT_POSITIONS[0][0] + COMPANION_ACTION_SLOT_TEXT_X[0],
-        COMPANION_SLOT_POSITIONS[1][0] + COMPANION_ACTION_SLOT_TEXT_X[1],
-    )
-    if slot_body_left[1] - slot_body_left[0] != 13.0 or slot_text_left[1] - slot_text_left[0] != 13.0:
-        return False
 
     if not all(
         offset + 4 <= len(raw) and struct.unpack_from("<I", raw, offset)[0] == replacement
@@ -432,6 +433,77 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     p_offset, p_vaddr, p_filesz, _p_memsz = segment
     p_flags = struct.unpack_from("<I", raw, _SECOND_PH_OFFSET + 24)[0]
     if p_flags != 7:
+        return False
+
+    def _materialized_va(lui_word: int, low_word: int) -> int:
+        hi = lui_word & 0xFFFF
+        lo = low_word & 0xFFFF
+        if lo & 0x8000:
+            lo -= 0x10000
+        return ((hi << 16) + lo) & 0xFFFFFFFF
+
+    # Group 2 originally owns exactly 0xA4 records. Its relocated prefix must
+    # be byte-identical, then the two private action records are appended.
+    if COMPANION_ACTION_SLOT_RESOURCES != (0xA4, 0xA5):
+        return False
+    if COMPANION_GROUP2_RESOURCE_COUNT != 0xA4:
+        return False
+    if (
+        struct.unpack_from("<I", raw, COMPANION_GROUP2_NEXT_TABLE_POINTER_OFFSET)[0]
+        != COMPANION_GROUP2_NEXT_TABLE_VA
+    ):
+        return False
+    resource_table_va = struct.unpack_from("<I", raw, COMPANION_GROUP2_TABLE_POINTER_OFFSET)[0]
+    if resource_table_va == COMPANION_GROUP2_TABLE_VA:
+        return False
+    resource_table_rel = resource_table_va - p_vaddr
+    resource_table_size = (COMPANION_GROUP2_RESOURCE_COUNT + 2) * 8
+    if resource_table_rel < 0 or resource_table_rel + resource_table_size > p_filesz:
+        return False
+    resource_table_file = p_offset + resource_table_rel
+    original_table = raw[
+        resource_table_file:
+        resource_table_file + COMPANION_GROUP2_RESOURCE_COUNT * 8
+    ]
+    if sha256(original_table).hexdigest() != _COMPANION_GROUP2_TABLE_SHA256:
+        return False
+
+    private_geometries = (
+        COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
+        COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
+    )
+    metadata_vas: list[int] = []
+    for resource_id, expected_geometry in zip(
+        COMPANION_ACTION_SLOT_RESOURCES, private_geometries, strict=True
+    ):
+        metadata_va, record_count = struct.unpack_from(
+            "<II", raw, resource_table_file + resource_id * 8
+        )
+        if record_count != 1:
+            return False
+        metadata_rel = metadata_va - p_vaddr
+        if (
+            metadata_rel < 0
+            or metadata_rel + COMPANION_ACTION_BUBBLE_METADATA_SIZE > p_filesz
+        ):
+            return False
+        metadata_file = p_offset + metadata_rel
+        if struct.unpack_from("<ffff", raw, metadata_file + 4) != expected_geometry:
+            return False
+        metadata_vas.append(metadata_va)
+    if metadata_vas[1] - metadata_vas[0] != COMPANION_ACTION_BUBBLE_METADATA_SIZE:
+        return False
+
+    # Private resources preserve r38's slot/body relationship.
+    slot_body_left = (
+        COMPANION_SLOT_POSITIONS[0][0] - COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY[2],
+        COMPANION_SLOT_POSITIONS[1][0] - COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY[2],
+    )
+    slot_text_left = (
+        COMPANION_SLOT_POSITIONS[0][0] + COMPANION_ACTION_SLOT_TEXT_X[0],
+        COMPANION_SLOT_POSITIONS[1][0] + COMPANION_ACTION_SLOT_TEXT_X[1],
+    )
+    if slot_body_left[1] - slot_body_left[0] != 13.0 or slot_text_left[1] - slot_text_left[0] != 13.0:
         return False
 
     jal = struct.unpack_from("<I", raw, 0x66724)[0]
@@ -456,7 +528,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         or hook_words[6] != (0x38420000 | COMPANION_ACTION_ID_KEY)
         or hook_words[7] != 0x2C43001F
         or 0x860D02D0 not in hook_words
-        or hook_words[-6] != 0x25A50068
+        or hook_words[-6] != (0x25A50000 | COMPANION_ACTION_SLOT_RESOURCES[0])
         or hook_words[-5] != 0x8FBF000C
         or hook_words[-4] != 0x27BD0010
         or hook_words[-3] != 0x24040002
@@ -465,12 +537,9 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     ):
         return False
 
-    def _materialized_va(lui_word: int, low_word: int) -> int:
-        hi = lui_word & 0xFFFF
-        lo = low_word & 0xFFFF
-        if lo & 0x8000:
-            lo -= 0x10000
-        return ((hi << 16) + lo) & 0xFFFFFFFF
+    hook_metadata_height_va = _materialized_va(hook_words[28], hook_words[29])
+    if hook_metadata_height_va != metadata_vas[0] + 8:
+        return False
 
     table_va = _materialized_va(hook_words[14], hook_words[15])
     table_rel = table_va - p_vaddr
@@ -483,7 +552,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     if raw[p_offset + table_rel:p_offset + table_rel + len(expected_table)] != expected_table:
         return False
 
-    # r38 state is two floats: slot-aware text X, then per-action text Y.
+    # Runtime state remains two floats: slot-aware text X, then per-action text Y.
     text_x_lui = struct.unpack_from("<I", raw, 0x66804)[0]
     text_x_lwc1 = struct.unpack_from("<I", raw, 0x66808)[0]
     text_y_lui = struct.unpack_from("<I", raw, 0x6681C)[0]

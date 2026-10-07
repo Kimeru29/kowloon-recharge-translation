@@ -16,8 +16,10 @@ from tools.companion_hud import (
     COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
+    COMPANION_GROUP2_TABLE_POINTER_OFFSET,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_COMMENT_LINES,
+    companion_comment_pointer_offsets,
 )
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
@@ -174,7 +176,7 @@ class EarlyUiPatchTests(unittest.TestCase):
         for spec in DUNGEON_ITEM_NAMES:
             allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
         for spec in COMPANION_COMMENT_LINES:
-            for pointer_offset in spec.pointer_offsets:
+            for pointer_offset in companion_comment_pointer_offsets(spec):
                 allowed.update(range(pointer_offset, pointer_offset + 4))
         for spec in COMPANION_ACTION_LABELS:
             if spec.english is not None:
@@ -183,17 +185,9 @@ class EarlyUiPatchTests(unittest.TestCase):
             allowed.update(range(offset, offset + 4))
         for offset in COMPANION_ACTION_RUNTIME_PATCH_OFFSETS:
             allowed.update(range(offset, offset + 4))
-        for offset in (
-            COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
-            COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
-            COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
-            COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
-            COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
-            COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
-            COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
-            COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
-        ):
-            allowed.update(range(offset, offset + 4))
+        # r40 relocates the group-2 resource-table base so active-action bubbles
+        # can use private compact clones while shared AFK resources stay pristine.
+        allowed.update(range(COMPANION_GROUP2_TABLE_POINTER_OFFSET, COMPANION_GROUP2_TABLE_POINTER_OFFSET + 4))
         allowed.update(range(NAME_FLOW_STATE9_FLAG_OFFSET, NAME_FLOW_STATE9_FLAG_OFFSET + 4))
         # ELF program header / heap metadata used by the appended translation segment.
         allowed.update(range(0x54, 0x54 + 32))
