@@ -105,7 +105,47 @@ COMPANION_ACTION_RUNTIME_HOOK_KEY = "companion_action_layout_hook"
 COMPANION_ACTION_RUNTIME_HOOK_SIZE = 188
 COMPANION_ACTION_VISIBILITY_HOOK_KEY = "companion_action_afk_visibility_hook"
 COMPANION_ACTION_VISIBILITY_HOOK_SIZE = 76
+# r47 appends all new payloads after the r46 visibility hook so every existing
+# translated VA remains stable.
+COMPANION_ACTION_GEOMETRY_EXTENSION_KEY = "companion_action_geometry_extension"
+COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE = 72
+COMPANION_AFK_SCALE_TABLE_KEY = "companion_afk_text_scale_table"
+COMPANION_AFK_SCALE_HOOK_KEY = "companion_afk_text_scale_hook"
+COMPANION_AFK_SCALE_HOOK_SIZE = 64
+COMPANION_AFK_GEOMETRY_HOOK_KEY = "companion_afk_native_geometry_hook"
+COMPANION_AFK_GEOMETRY_HOOK_SIZE = 112
 COMPANION_AFK_FIRST_RECORD_INDEX = 0x259
+COMPANION_AFK_TEXT_STYLE_CELL_WIDTH = 16.0
+COMPANION_AFK_TEXT_BODY_WIDTH = 288.0
+COMPANION_AFK_TEXT_LEFT_INSET = 12.0
+COMPANION_AFK_TEXT_RIGHT_INSET = 12.0
+COMPANION_AFK_TEXT_SAFE_WIDTH = (
+    COMPANION_AFK_TEXT_BODY_WIDTH
+    - COMPANION_AFK_TEXT_LEFT_INSET
+    - COMPANION_AFK_TEXT_RIGHT_INSET
+)
+COMPANION_AFK_TEXT_SAFE_CELLS = (
+    COMPANION_AFK_TEXT_SAFE_WIDTH / COMPANION_AFK_TEXT_STYLE_CELL_WIDTH
+)
+# The AFK task restores shared 0x68/0x69 to native geometry before constructing
+# free-talk. The normal action renderer re-applies compact geometry every draw.
+COMPANION_AFK_GEOMETRY_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x66050, 0x86020004),  # lh v0,4(s0): current talk record
+    (0x66054, 0x000219C0),  # sll v1,v0,7 (kept as JAL delay slot)
+)
+COMPANION_AFK_SCALE_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x6625C, 0x3C023F80),  # line 1 AFK f16=1.0
+    (0x66260, 0x44828000),
+    (0x6632C, 0x3C023F80),  # line 2 AFK f16=1.0
+    (0x66330, 0x44828000),
+)
+COMPANION_AFK_RUNTIME_PATCH_OFFSETS = (
+    0x66050,
+    0x6625C,
+    0x66260,
+    0x6632C,
+    0x66330,
+)
 # Existing H_TalkBuddyTask owner that skips the complete L1 callout when zero.
 # r44 introduced the relocated predicate; r45 refined it to native AFK states
 # 11..13. r46 preserves that hook byte-for-byte and only restores native 0x6A.
@@ -272,6 +312,30 @@ def _layout_table_bytes() -> bytes:
     )
 
 
+def companion_afk_text_scale(lines: tuple[str, str]) -> float:
+    """Return the record-wide X scale that keeps both AFK rows inside 288px."""
+
+    longest_cells = max((len(line) for line in lines if line), default=0)
+    if longest_cells <= 0:
+        return 1.0
+    return min(
+        1.0,
+        COMPANION_AFK_TEXT_SAFE_CELLS / float(longest_cells),
+    )
+
+
+COMPANION_AFK_TEXT_SCALES: tuple[float, ...] = tuple(
+    companion_afk_text_scale(lines) for lines in COMPANION_AFK_TRANSLATIONS
+)
+
+
+def _afk_scale_table_bytes() -> bytes:
+    return struct.pack(
+        f"<{len(COMPANION_AFK_TEXT_SCALES)}f",
+        *COMPANION_AFK_TEXT_SCALES,
+    )
+
+
 def _split_address(value: int) -> tuple[int, int]:
     return ((value + 0x8000) >> 16) & 0xFFFF, value & 0xFFFF
 
@@ -290,7 +354,123 @@ def _mips_r(rs: int, rt: int, rd: int, shamt: int, funct: int) -> int:
     )
 
 
-def _runtime_hook_bytes(*, table_va: int, state_va: int) -> bytes:
+def _mips_mtc1(rt: int, fs: int) -> int:
+    return (
+        (0x11 << 26)
+        | (0x04 << 21)
+        | ((rt & 0x1F) << 16)
+        | ((fs & 0x1F) << 11)
+    )
+
+
+def _j_word(target_va: int) -> int:
+    if target_va & 3:
+        raise ValueError(f"companion runtime target is not word-aligned: {target_va:#x}")
+    return 0x08000000 | ((target_va >> 2) & 0x03FFFFFF)
+
+
+def _action_geometry_extension_bytes() -> bytes:
+    """Write complete compact 0x68/0x69 body geometry for the normal L1 callout."""
+
+    words = (
+        _mips_r(0, 13, 14, 4, 0x00),        # sll t6,t5,4
+        _mips_r(0, 13, 15, 5, 0x00),        # sll t7,t5,5
+        _mips_r(14, 15, 14, 0, 0x21),       # addu t6,t6,t7 = slot*48
+        _mips_i(0x0F, 0, 15, 0x0045),       # lui t7,0x45
+        _mips_i(0x09, 15, 15, 0x0AC4),      # addiu t7,t7,0xac4 (slot0 width)
+        _mips_r(15, 14, 15, 0, 0x21),       # addu t7,t7,t6
+        _mips_i(0x0F, 0, 14, 0x4360),       # lui t6,224.0
+        _mips_i(0x2B, 15, 14, 0),            # sw t6,0(t7) width
+        _mips_i(0x0F, 0, 14, 0x4250),       # lui t6,52.0 slot0 pivot-X
+        _mips_i(0x04, 13, 0, 2),            # beq t5,zero,pivot_ready
+        0x00000000,                          # nop
+        _mips_i(0x0F, 0, 14, 0x42C2),       # lui t6,97.0 slot1 pivot-X
+        _mips_i(0x2B, 15, 14, 8),            # sw t6,8(t7) pivot-X
+        _mips_i(0x23, 29, 31, 12),           # lw ra,12(sp)
+        _mips_i(0x09, 29, 29, 16),           # addiu sp,sp,16
+        _mips_i(0x09, 0, 4, 2),              # li a0,2
+        _mips_r(31, 0, 0, 0, 0x08),         # jr ra
+        0x00000000,                          # nop
+    )
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE:
+        raise AssertionError(f"companion action geometry extension drifted: {len(code)}")
+    return code
+
+
+def _afk_scale_hook_bytes(*, table_va: int) -> bytes:
+    """Load a record-wide horizontal AFK text scale into f16."""
+
+    table_hi, table_lo = _split_address(table_va)
+    words = (
+        _mips_i(0x21, 16, 8, 0x0004),       # lh t0,4(s0) record index
+        _mips_i(0x09, 8, 8, -COMPANION_AFK_FIRST_RECORD_INDEX),
+        _mips_i(0x0B, 8, 9, COMPANION_AFK_RECORD_COUNT),  # sltiu t1,t0,600
+        _mips_i(0x04, 9, 0, 8),             # beq t1,zero,fallback
+        0x00000000,                          # nop
+        _mips_r(0, 8, 9, 2, 0x00),          # sll t1,t0,2
+        _mips_i(0x0F, 0, 10, table_hi),      # lui t2,hi(scale table)
+        _mips_i(0x09, 10, 10, table_lo),     # addiu t2,t2,lo(scale table)
+        _mips_r(10, 9, 10, 0, 0x21),        # addu t2,t2,t1
+        _mips_i(0x31, 10, 16, 0),            # lwc1 f16,0(t2)
+        _mips_r(31, 0, 0, 0, 0x08),         # jr ra
+        0x00000000,                          # nop
+        _mips_i(0x0F, 0, 8, 0x3F80),        # fallback: lui t0,1.0
+        _mips_mtc1(8, 16),                   # mtc1 t0,f16
+        _mips_r(31, 0, 0, 0, 0x08),         # jr ra
+        0x00000000,                          # nop
+    )
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_AFK_SCALE_HOOK_SIZE:
+        raise AssertionError(f"companion AFK scale hook drifted: {len(code)}")
+    return code
+
+
+def _afk_geometry_hook_bytes() -> bytes:
+    """Restore native 288x80 0x68/0x69 geometry for the selected AFK slot."""
+
+    words = (
+        _mips_i(0x21, 16, 2, 0x0004),       # lh v0,4(s0), preserve owner result
+        _mips_i(0x0B, 2, 9, COMPANION_AFK_FIRST_RECORD_INDEX),
+        _mips_i(0x05, 9, 0, 22),            # bne t1,zero,return
+        0x00000000,                          # nop
+        _mips_i(0x21, 16, 8, 0x02F8),       # lh t0,0x2f8(s0) AFK slot
+        _mips_i(0x0B, 8, 9, 2),             # sltiu t1,t0,2
+        _mips_i(0x04, 9, 0, 18),            # beq t1,zero,return
+        0x00000000,                          # nop
+        _mips_r(0, 8, 9, 4, 0x00),          # sll t1,t0,4
+        _mips_r(0, 8, 10, 5, 0x00),         # sll t2,t0,5
+        _mips_r(9, 10, 9, 0, 0x21),         # addu t1,t1,t2 = slot*48
+        _mips_i(0x0F, 0, 10, 0x0045),       # lui t2,0x45
+        _mips_i(0x09, 10, 10, 0x0AC4),      # addiu t2,t2,0xac4 width field
+        _mips_r(10, 9, 10, 0, 0x21),        # addu t2,t2,t1
+        _mips_i(0x0F, 0, 9, 0x4390),        # 288.0
+        _mips_i(0x2B, 10, 9, 0),             # width
+        _mips_i(0x0F, 0, 9, 0x42A0),        # 80.0
+        _mips_i(0x2B, 10, 9, 4),             # height
+        _mips_i(0x0F, 0, 9, 0x429A),        # 77.0
+        _mips_i(0x2B, 10, 9, 12),            # pivot-Y
+        _mips_i(0x0F, 0, 9, 0x4286),        # 67.0 slot0 pivot-X
+        _mips_i(0x04, 8, 0, 2),             # beq t0,zero,pivot_ready
+        0x00000000,                          # nop
+        _mips_i(0x0F, 0, 9, 0x42FA),        # 125.0 slot1 pivot-X
+        _mips_i(0x2B, 10, 9, 8),             # pivot-X
+        _mips_r(0, 2, 3, 7, 0x00),          # return: sll v1,v0,7
+        _mips_r(31, 0, 0, 0, 0x08),         # jr ra
+        0x00000000,                          # nop
+    )
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_AFK_GEOMETRY_HOOK_SIZE:
+        raise AssertionError(f"companion AFK geometry hook drifted: {len(code)}")
+    return code
+
+
+def _runtime_hook_bytes(
+    *,
+    table_va: int,
+    state_va: int,
+    geometry_extension_va: int,
+) -> bytes:
     table_hi, table_lo = _split_address(table_va)
     state_hi, state_lo = _split_address(state_va)
 
@@ -342,11 +522,11 @@ def _runtime_hook_bytes(*, table_va: int, state_va: int) -> bytes:
         _mips_i(0x2B, 15, 10, 0),            # sw t2,0(t7) text_x
         _mips_i(0x2B, 15, 12, 4),            # sw t4,4(t7) text_y
         _mips_i(0x09, 13, 5, 0x0068),        # addiu a1,t5,0x68 (0x68/0x69)
-        _mips_i(0x23, 29, 31, 12),           # lw ra,12(sp)
-        _mips_i(0x09, 29, 29, 16),           # addiu sp,sp,16
-        _mips_i(0x09, 0, 4, 2),              # li a0,2
-        _mips_r(31, 0, 0, 0, 0x08),          # jr ra
+        _j_word(geometry_extension_va),       # tail-jump: complete compact geometry
         0x00000000,                          # nop
+        0x00000000,                          # keep 188-byte owner stable
+        0x00000000,
+        0x00000000,
     )
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_RUNTIME_HOOK_SIZE:
@@ -788,31 +968,10 @@ def patch_companion_action_layout(raw: bytes) -> bytes:
             )
         struct.pack_into("<I", out, offset, replacement)
 
-    # Install the accepted one-line geometry as deterministic startup/default
-    # state for both sibling bubbles. The runtime hook updates height/pivot-Y
-    # for the active slot before every callout.
-    for offsets, geometry in (
-        (
-            (
-                COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
-                COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
-                COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
-                COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
-            ),
-            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
-        ),
-        (
-            (
-                COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
-                COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
-                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
-                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
-            ),
-            COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
-        ),
-    ):
-        for offset, value in zip(offsets, geometry, strict=True):
-            struct.pack_into("<f", out, offset, value)
+    # r47 leaves the shared 0x68/0x69 metadata pristine in the static ELF.
+    # AFK therefore starts from its native 288x80 outer bubble. The normal L1
+    # runtime selector writes its complete compact geometry immediately before
+    # constructing an action callout, eliminating the global-resource conflict.
     return bytes(out)
 
 
@@ -827,17 +986,36 @@ def finalize_companion_action_runtime_layout(
         state_va = installed.target_vas[COMPANION_ACTION_RUNTIME_STATE_KEY]
         hook_va = installed.target_vas[COMPANION_ACTION_RUNTIME_HOOK_KEY]
         visibility_hook_va = installed.target_vas[COMPANION_ACTION_VISIBILITY_HOOK_KEY]
+        scale_table_va = installed.target_vas[COMPANION_AFK_SCALE_TABLE_KEY]
+        scale_hook_va = installed.target_vas[COMPANION_AFK_SCALE_HOOK_KEY]
+        afk_geometry_hook_va = installed.target_vas[COMPANION_AFK_GEOMETRY_HOOK_KEY]
+        action_geometry_extension_va = installed.target_vas[
+            COMPANION_ACTION_GEOMETRY_EXTENSION_KEY
+        ]
     except KeyError as exc:
         raise ValueError(f"companion action runtime payload is missing: {exc.args[0]}") from exc
 
-    if table_va & 3 or state_va & 3 or hook_va & 3 or visibility_hook_va & 3:
+    runtime_vas = (
+        table_va,
+        state_va,
+        hook_va,
+        visibility_hook_va,
+        scale_table_va,
+        scale_hook_va,
+        afk_geometry_hook_va,
+        action_geometry_extension_va,
+    )
+    if any(value & 3 for value in runtime_vas):
         raise ValueError(
-            "companion action runtime payload lost word alignment: "
-            f"table={table_va:#x} state={state_va:#x} hook={hook_va:#x} "
-            f"visibility={visibility_hook_va:#x}"
+            "companion runtime payload lost word alignment: "
+            + ", ".join(f"{value:#x}" for value in runtime_vas)
         )
 
-    hook = _runtime_hook_bytes(table_va=table_va, state_va=state_va)
+    hook = _runtime_hook_bytes(
+        table_va=table_va,
+        state_va=state_va,
+        geometry_extension_va=action_geometry_extension_va,
+    )
     hook_file = installed.info.file_offset + (hook_va - installed.info.segment_vaddr)
     if hook_file < 0 or hook_file + len(hook) > len(result):
         raise ValueError("companion action runtime hook is outside translated executable")
@@ -861,9 +1039,38 @@ def finalize_companion_action_runtime_layout(
         raise ValueError("companion action visibility hook placeholder drifted")
     result[visibility_hook_file:visibility_hook_file + len(visibility_hook)] = visibility_hook
 
+    runtime_payloads = (
+        (
+            action_geometry_extension_va,
+            _action_geometry_extension_bytes(),
+            "companion action geometry extension",
+        ),
+        (
+            scale_hook_va,
+            _afk_scale_hook_bytes(table_va=scale_table_va),
+            "companion AFK scale hook",
+        ),
+        (
+            afk_geometry_hook_va,
+            _afk_geometry_hook_bytes(),
+            "companion AFK native-geometry hook",
+        ),
+    )
+    for payload_va, payload, owner in runtime_payloads:
+        payload_file = installed.info.file_offset + (
+            payload_va - installed.info.segment_vaddr
+        )
+        if payload_file < 0 or payload_file + len(payload) > len(result):
+            raise ValueError(f"{owner} is outside translated executable")
+        if result[payload_file:payload_file + len(payload)] != b"\x00" * len(payload):
+            raise ValueError(f"{owner} placeholder drifted")
+        result[payload_file:payload_file + len(payload)] = payload
+
     for owner, preimages in (
         ("runtime", COMPANION_ACTION_RUNTIME_PREIMAGES),
         ("visibility", COMPANION_ACTION_VISIBILITY_PREIMAGES),
+        ("AFK geometry", COMPANION_AFK_GEOMETRY_PREIMAGES),
+        ("AFK scale", COMPANION_AFK_SCALE_PREIMAGES),
     ):
         for offset, expected in preimages:
             actual = struct.unpack_from("<I", result, offset)[0]
@@ -872,6 +1079,18 @@ def finalize_companion_action_runtime_layout(
                     f"companion action {owner} finalizer preimage mismatch: "
                     f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
                 )
+
+    # Restore native shared 0x68/0x69 geometry before AFK constructs its
+    # green outer bubble. Preserve the original sll v1,v0,7 as the JAL delay
+    # slot; the helper recomputes v0/v1 before returning.
+    struct.pack_into("<I", result, 0x66050, _jal_word(afk_geometry_hook_va))
+
+    # Replace only the Re:charge/free-talk f16=1.0 setup. The original h_buddy
+    # text path at 0x6621C/0x66220 and 0x662EC/0x662F0 remains pristine.
+    struct.pack_into("<I", result, 0x6625C, _jal_word(scale_hook_va))
+    struct.pack_into("<I", result, 0x66260, 0x00000000)
+    struct.pack_into("<I", result, 0x6632C, _jal_word(scale_hook_va))
+    struct.pack_into("<I", result, 0x66330, 0x00000000)
 
     # Use the existing "skip complete L1 callout" branch, but compute its guard
     # from H_TalkBuddyTask's own state. The JAL occupies the old guard load,
@@ -964,6 +1183,36 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             encoded=b"\x00" * COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
             pointer_offsets=(),
             alignment=4,
+        )
+    )
+    # r47 extras append strictly after every r46 owner so all prior translated
+    # addresses remain stable.
+    entries.extend(
+        (
+            RelocatedText(
+                key=COMPANION_AFK_SCALE_TABLE_KEY,
+                encoded=_afk_scale_table_bytes(),
+                pointer_offsets=(),
+                alignment=4,
+            ),
+            RelocatedText(
+                key=COMPANION_AFK_SCALE_HOOK_KEY,
+                encoded=b"\x00" * COMPANION_AFK_SCALE_HOOK_SIZE,
+                pointer_offsets=(),
+                alignment=4,
+            ),
+            RelocatedText(
+                key=COMPANION_AFK_GEOMETRY_HOOK_KEY,
+                encoded=b"\x00" * COMPANION_AFK_GEOMETRY_HOOK_SIZE,
+                pointer_offsets=(),
+                alignment=4,
+            ),
+            RelocatedText(
+                key=COMPANION_ACTION_GEOMETRY_EXTENSION_KEY,
+                encoded=b"\x00" * COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE,
+                pointer_offsets=(),
+                alignment=4,
+            ),
         )
     )
     return tuple(entries)
