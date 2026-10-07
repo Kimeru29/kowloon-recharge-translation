@@ -16,7 +16,6 @@ from tools.companion_hud import (
     COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
-    COMPANION_GROUP2_TABLE_POINTER_OFFSET,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_COMMENT_LINES,
     companion_comment_pointer_offsets,
@@ -185,9 +184,17 @@ class EarlyUiPatchTests(unittest.TestCase):
             allowed.update(range(offset, offset + 4))
         for offset in COMPANION_ACTION_RUNTIME_PATCH_OFFSETS:
             allowed.update(range(offset, offset + 4))
-        # r40 relocates the group-2 resource-table base so active-action bubbles
-        # can use private compact clones while shared AFK resources stay pristine.
-        allowed.update(range(COMPANION_GROUP2_TABLE_POINTER_OFFSET, COMPANION_GROUP2_TABLE_POINTER_OFFSET + 4))
+        for offset in (
+            COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+            COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+            COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+            COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
+            COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
+            COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
+            COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
+        ):
+            allowed.update(range(offset, offset + 4))
         allowed.update(range(NAME_FLOW_STATE9_FLAG_OFFSET, NAME_FLOW_STATE9_FLAG_OFFSET + 4))
         # ELF program header / heap metadata used by the appended translation segment.
         allowed.update(range(0x54, 0x54 + 32))

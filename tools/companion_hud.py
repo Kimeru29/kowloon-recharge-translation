@@ -15,13 +15,12 @@ _MAX_STRING_BYTES = 512
 # r31-r38 presentation owners for the persistent companion action caption.
 # r35 proved the accepted one-line 224x48 down-tail presentation, r36 made
 # height/wrapping generic, and r37 separated action id from HUD+0x2D0's 0/1
-# companion-slot index. r38 compacted the game's shared 0x68/0x69 resources,
-# which runtime later proved are also used by passive/AFK buddy chatter. r40
-# therefore keeps the shared records byte-identical and gives the active-action
-# renderer private compact clones at appended group-2 ids 0xA4/0xA5.
+# companion-slot index. r38 now uses the two pristine sibling speech bubbles:
+# group-2 0x68 points its tail at slot 1, while 0x69 has the same body/UVs with
+# the tail shifted right for slot 2. Their different pivots keep the body almost
+# stationary (13px shift) even though the companion anchors are 58px apart.
 COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET = 0x380E30
 COMPANION_ACTION_BUBBLE_METADATA_VA = 0x00450AC0
-COMPANION_ACTION_BUBBLE_METADATA_OFFSET = 0x350B40
 COMPANION_ACTION_BUBBLE_WIDTH_OFFSET = 0x350B44
 COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET = 0x350B48
 COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET = 0x350B4C
@@ -30,24 +29,14 @@ COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY = (288.0, 80.0, 67.0, 77.0)
 COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY = (224.0, 48.0, 52.0, 45.0)
 COMPANION_ACTION_SLOT2_BUBBLE_TABLE_RECORD_OFFSET = 0x380E38
 COMPANION_ACTION_SLOT2_BUBBLE_METADATA_VA = 0x00450AF0
-COMPANION_ACTION_SLOT2_BUBBLE_METADATA_OFFSET = 0x350B70
 COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET = 0x350B74
 COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET = 0x350B78
 COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET = 0x350B7C
 COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET = 0x350B80
 COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY = (288.0, 80.0, 125.0, 77.0)
 COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY = (224.0, 48.0, 97.0, 45.0)
-COMPANION_ACTION_BUBBLE_METADATA_SIZE = 0x30
-COMPANION_GROUP2_TABLE_POINTER_OFFSET = 0x3852C8
-COMPANION_GROUP2_NEXT_TABLE_POINTER_OFFSET = 0x3852CC
-COMPANION_GROUP2_TABLE_OFFSET = 0x380AF0
-COMPANION_GROUP2_TABLE_VA = 0x00480A70
-COMPANION_GROUP2_NEXT_TABLE_VA = 0x00480F90
-COMPANION_GROUP2_RESOURCE_COUNT = (COMPANION_GROUP2_NEXT_TABLE_VA - COMPANION_GROUP2_TABLE_VA) // 8
-COMPANION_ACTION_SLOT_RESOURCES = (COMPANION_GROUP2_RESOURCE_COUNT, COMPANION_GROUP2_RESOURCE_COUNT + 1)
+COMPANION_ACTION_SLOT_RESOURCES = (0x68, 0x69)
 COMPANION_ACTION_SLOT_TEXT_X = (-36.0, -81.0)
-COMPANION_ACTION_EXTENDED_RESOURCE_TABLE_KEY = "companion_action_group2_resource_table"
-COMPANION_ACTION_PRIVATE_METADATA_KEY = "companion_action_private_bubble_metadata"
 COMPANION_SLOT_POSITION_TABLE_OFFSET = 0x3F8E80
 COMPANION_SLOT_POSITIONS = ((172.0, 407.0), (230.0, 407.0))
 COMPANION_ACTION_ID_GETTER_VA = 0x0012FEE0
@@ -132,12 +121,11 @@ COMPANION_COMMENT_LINES: tuple[CompanionCommentLine, ...] = tuple(
     CompanionCommentLine(*record) for record in COMPANION_COMMENT_DATA
 )
 
-# r30 generated the complete 601-event h_buddy table, but a whole-ELF pointer
-# scan after r38 runtime testing found ten additional direct aliases to nine of
-# those same Japanese source strings. These owners sit outside the event table
-# and therefore were never repointed by r30, allowing some passive/AFK chatter
-# to bypass the PS4-exact relocated text. Keep this owner class explicit rather
-# than changing the generated corpus/provenance.
+# r41 is deliberately text-only relative to the known-good r38 runtime layout.
+# r30 generated all 1,784 pointers inside the 601-event h_buddy table, but a
+# whole-ELF scan later found ten additional direct aliases to nine of those same
+# Japanese source strings. Own only those pointer words; do not alter any bubble
+# resource tables, geometry, hooks, or other runtime structures.
 COMPANION_COMMENT_EXTRA_POINTER_ALIASES: dict[int, tuple[int, ...]] = {
     0x3C46E8: (0x3E6728, 0x3F3BA8),
     0x3C8C10: (0x3F452C,),
@@ -238,31 +226,6 @@ def _layout_table_bytes() -> bytes:
     )
 
 
-def _private_bubble_metadata_bytes(raw: bytes) -> bytes:
-    records = bytearray()
-    for source_offset, geometry in (
-        (COMPANION_ACTION_BUBBLE_METADATA_OFFSET, COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY),
-        (COMPANION_ACTION_SLOT2_BUBBLE_METADATA_OFFSET, COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY),
-    ):
-        end = source_offset + COMPANION_ACTION_BUBBLE_METADATA_SIZE
-        if source_offset < 0 or end > len(raw):
-            raise ValueError("companion action bubble metadata source is outside executable")
-        record = bytearray(raw[source_offset:end])
-        for relative_offset, value in zip((4, 8, 12, 16), geometry, strict=True):
-            struct.pack_into("<f", record, relative_offset, value)
-        records.extend(record)
-    return bytes(records)
-
-
-def _extended_group2_resource_table_bytes(raw: bytes) -> bytes:
-    table_size = COMPANION_GROUP2_RESOURCE_COUNT * 8
-    end = COMPANION_GROUP2_TABLE_OFFSET + table_size
-    if COMPANION_GROUP2_TABLE_OFFSET < 0 or end > len(raw):
-        raise ValueError("companion group-2 resource table is outside executable")
-    # The two appended records are bound to relocated metadata after allocation.
-    return raw[COMPANION_GROUP2_TABLE_OFFSET:end] + struct.pack("<IIII", 0, 1, 0, 1)
-
-
 def _split_address(value: int) -> tuple[int, int]:
     return ((value + 0x8000) >> 16) & 0xFFFF, value & 0xFFFF
 
@@ -281,10 +244,9 @@ def _mips_r(rs: int, rt: int, rd: int, shamt: int, funct: int) -> int:
     )
 
 
-def _runtime_hook_bytes(*, table_va: int, state_va: int, metadata_va: int) -> bytes:
+def _runtime_hook_bytes(*, table_va: int, state_va: int) -> bytes:
     table_hi, table_lo = _split_address(table_va)
     state_hi, state_lo = _split_address(state_va)
-    metadata_height_hi, metadata_height_lo = _split_address(metadata_va + 8)
 
     # Action id and companion slot are independent. The action getter selects
     # height/pivot-Y/text-Y from the 31-entry table. HUD+0x2D0 selects one of the
@@ -320,8 +282,8 @@ def _runtime_hook_bytes(*, table_va: int, state_va: int, metadata_va: int) -> by
         _mips_r(0, 13, 14, 4, 0x00),         # sll t6,t5,4  (slot*16)
         _mips_r(0, 13, 15, 5, 0x00),         # sll t7,t5,5  (slot*32)
         _mips_r(14, 15, 14, 0, 0x21),        # addu t6,t6,t7 (slot*48)
-        _mips_i(0x0F, 0, 15, metadata_height_hi),  # lui t7,hi(private slot0 height)
-        _mips_i(0x09, 15, 15, metadata_height_lo), # addiu t7,t7,lo(private slot0 height)
+        _mips_i(0x0F, 0, 15, 0x0045),        # lui t7,0x45
+        _mips_i(0x09, 15, 15, 0x0AC8),       # addiu t7,t7,0xac8 (slot0 height)
         _mips_r(15, 14, 15, 0, 0x21),        # addu t7,t7,t6
         _mips_i(0x2B, 15, 10, 0),            # sw t2,0(t7) height
         _mips_i(0x2B, 15, 11, 8),            # sw t3,8(t7) pivot_y
@@ -333,7 +295,7 @@ def _runtime_hook_bytes(*, table_va: int, state_va: int, metadata_va: int) -> by
         _mips_i(0x0F, 0, 10, 0xC2A2),        # lui t2,0xc2a2 (-81.0 slot 1)
         _mips_i(0x2B, 15, 10, 0),            # sw t2,0(t7) text_x
         _mips_i(0x2B, 15, 12, 4),            # sw t4,4(t7) text_y
-        _mips_i(0x09, 13, 5, COMPANION_ACTION_SLOT_RESOURCES[0]),  # private 0xA4/0xA5
+        _mips_i(0x09, 13, 5, 0x0068),        # addiu a1,t5,0x68 (0x68/0x69)
         _mips_i(0x23, 29, 31, 12),           # lw ra,12(sp)
         _mips_i(0x09, 29, 29, 16),           # addiu sp,sp,16
         _mips_i(0x09, 0, 4, 2),              # li a0,2
@@ -435,16 +397,6 @@ def patch_companion_action_layout(raw: bytes) -> bytes:
             f"expected {expected_slot_positions!r}, got {actual_slot_positions!r}"
         )
 
-    group2_pointers = struct.unpack_from("<II", raw, COMPANION_GROUP2_TABLE_POINTER_OFFSET)
-    expected_group2_pointers = (COMPANION_GROUP2_TABLE_VA, COMPANION_GROUP2_NEXT_TABLE_VA)
-    if group2_pointers != expected_group2_pointers:
-        raise ValueError(
-            "companion group-2 table owner drifted: "
-            f"expected {expected_group2_pointers!r}, got {group2_pointers!r}"
-        )
-    if COMPANION_GROUP2_RESOURCE_COUNT != 0xA4:
-        raise ValueError(f"companion group-2 resource count drifted: {COMPANION_GROUP2_RESOURCE_COUNT}")
-
     for offset, expected in (*COMPANION_SLOT_INDEX_PREIMAGES, *COMPANION_ACTION_ID_REFERENCE_PREIMAGES):
         actual = struct.unpack_from("<I", raw, offset)[0]
         if actual != expected:
@@ -514,9 +466,31 @@ def patch_companion_action_layout(raw: bytes) -> bytes:
             )
         struct.pack_into("<I", out, offset, replacement)
 
-    # Do not mutate shared 0x68/0x69 metadata here. Passive/AFK buddy chatter
-    # uses those pristine resources. The active action gets private compact
-    # metadata and appended resource ids in the relocated translation segment.
+    # Install the accepted one-line geometry as deterministic startup/default
+    # state for both sibling bubbles. The runtime hook updates height/pivot-Y
+    # for the active slot before every callout.
+    for offsets, geometry in (
+        (
+            (
+                COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+                COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+            ),
+            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
+        ),
+        (
+            (
+                COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
+            ),
+            COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
+        ),
+    ):
+        for offset, value in zip(offsets, geometry, strict=True):
+            struct.pack_into("<f", out, offset, value)
     return bytes(out)
 
 
@@ -524,72 +498,28 @@ def finalize_companion_action_runtime_layout(
     result: bytearray,
     installed: ExecutableTextResult,
 ) -> None:
-    """Bind the generic action layout plus private r40 bubble resources."""
+    """Bind the r37 per-action layout table and executable runtime hook."""
 
     try:
         table_va = installed.target_vas[COMPANION_ACTION_LAYOUT_TABLE_KEY]
         state_va = installed.target_vas[COMPANION_ACTION_RUNTIME_STATE_KEY]
         hook_va = installed.target_vas[COMPANION_ACTION_RUNTIME_HOOK_KEY]
-        resource_table_va = installed.target_vas[COMPANION_ACTION_EXTENDED_RESOURCE_TABLE_KEY]
-        private_metadata_va = installed.target_vas[COMPANION_ACTION_PRIVATE_METADATA_KEY]
     except KeyError as exc:
         raise ValueError(f"companion action runtime payload is missing: {exc.args[0]}") from exc
 
-    if any(value & 3 for value in (table_va, state_va, hook_va, resource_table_va, private_metadata_va)):
+    if table_va & 3 or state_va & 3 or hook_va & 3:
         raise ValueError(
             "companion action runtime payload lost word alignment: "
-            f"table={table_va:#x} state={state_va:#x} hook={hook_va:#x} "
-            f"resources={resource_table_va:#x} metadata={private_metadata_va:#x}"
+            f"table={table_va:#x} state={state_va:#x} hook={hook_va:#x}"
         )
 
-    hook = _runtime_hook_bytes(
-        table_va=table_va,
-        state_va=state_va,
-        metadata_va=private_metadata_va,
-    )
+    hook = _runtime_hook_bytes(table_va=table_va, state_va=state_va)
     hook_file = installed.info.file_offset + (hook_va - installed.info.segment_vaddr)
     if hook_file < 0 or hook_file + len(hook) > len(result):
         raise ValueError("companion action runtime hook is outside translated executable")
     if result[hook_file:hook_file + len(hook)] != b"\x00" * len(hook):
         raise ValueError("companion action runtime hook placeholder drifted")
     result[hook_file:hook_file + len(hook)] = hook
-
-    resource_table_file = installed.info.file_offset + (
-        resource_table_va - installed.info.segment_vaddr
-    )
-    private_metadata_file = installed.info.file_offset + (
-        private_metadata_va - installed.info.segment_vaddr
-    )
-    resource_table_size = (COMPANION_GROUP2_RESOURCE_COUNT + 2) * 8
-    private_metadata_size = 2 * COMPANION_ACTION_BUBBLE_METADATA_SIZE
-    if (
-        resource_table_file < 0
-        or resource_table_file + resource_table_size > len(result)
-        or private_metadata_file < 0
-        or private_metadata_file + private_metadata_size > len(result)
-    ):
-        raise ValueError("companion action private bubble payload is outside translated executable")
-
-    appended = resource_table_file + COMPANION_GROUP2_RESOURCE_COUNT * 8
-    if struct.unpack_from("<IIII", result, appended) != (0, 1, 0, 1):
-        raise ValueError("companion action private resource placeholders drifted")
-    struct.pack_into("<II", result, appended, private_metadata_va, 1)
-    struct.pack_into(
-        "<II",
-        result,
-        appended + 8,
-        private_metadata_va + COMPANION_ACTION_BUBBLE_METADATA_SIZE,
-        1,
-    )
-
-    if struct.unpack_from("<I", result, COMPANION_GROUP2_TABLE_POINTER_OFFSET)[0] != COMPANION_GROUP2_TABLE_VA:
-        raise ValueError("companion group-2 table pointer preimage mismatch")
-    if (
-        struct.unpack_from("<I", result, COMPANION_GROUP2_NEXT_TABLE_POINTER_OFFSET)[0]
-        != COMPANION_GROUP2_NEXT_TABLE_VA
-    ):
-        raise ValueError("companion group-2 next-table pointer preimage mismatch")
-    struct.pack_into("<I", result, COMPANION_GROUP2_TABLE_POINTER_OFFSET, resource_table_va)
 
     for offset, expected in COMPANION_ACTION_RUNTIME_PREIMAGES:
         actual = struct.unpack_from("<I", result, offset)[0]
@@ -662,18 +592,6 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
                     COMPANION_ACTION_SLOT_TEXT_X[0],
                     COMPANION_ACTION_LAYOUTS[0].text_y,
                 ),
-                pointer_offsets=(),
-                alignment=4,
-            ),
-            RelocatedText(
-                key=COMPANION_ACTION_EXTENDED_RESOURCE_TABLE_KEY,
-                encoded=_extended_group2_resource_table_bytes(raw),
-                pointer_offsets=(),
-                alignment=4,
-            ),
-            RelocatedText(
-                key=COMPANION_ACTION_PRIVATE_METADATA_KEY,
-                encoded=_private_bubble_metadata_bytes(raw),
                 pointer_offsets=(),
                 alignment=4,
             ),

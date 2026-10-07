@@ -24,12 +24,6 @@ from tools.companion_hud import (
     COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_SLOT_RESOURCES,
     COMPANION_ACTION_SLOT_TEXT_X,
-    COMPANION_ACTION_BUBBLE_METADATA_SIZE,
-    COMPANION_GROUP2_NEXT_TABLE_POINTER_OFFSET,
-    COMPANION_GROUP2_NEXT_TABLE_VA,
-    COMPANION_GROUP2_RESOURCE_COUNT,
-    COMPANION_GROUP2_TABLE_OFFSET,
-    COMPANION_GROUP2_TABLE_POINTER_OFFSET,
     COMPANION_ACTION_ID_GETTER_VA,
     COMPANION_ACTION_ID_KEY,
     COMPANION_ACTION_ID_REFERENCE_PREIMAGES,
@@ -102,7 +96,7 @@ class CompanionHudTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "companion comment pointer preimage mismatch"):
             validate_companion_hud_source(bytes(tampered))
 
-    def test_r40_comment_alias_inventory_covers_every_direct_source_pointer(self) -> None:
+    def test_r41_comment_alias_inventory_covers_every_direct_source_pointer(self) -> None:
         source_vas = {
             _ELF_MAIN_VADDR + spec.source_offset - _ELF_MAIN_FILE_OFFSET
             for spec in COMPANION_COMMENT_LINES
@@ -184,8 +178,7 @@ class CompanionHudTests(unittest.TestCase):
         self.assertTrue(all(len(line) <= 17 for layout in COMPANION_ACTION_LAYOUTS for line in layout.lines))
 
         result = build_early_ui_elf(RAW)
-        # r40 restores the shared 0x68/0x69 metadata for passive/AFK chatter.
-        # The accepted r35 compact geometry lives only in private action clones.
+        # The accepted one-line startup/default geometry remains exactly r35.
         bubble_offsets = (
             COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
             COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
@@ -193,7 +186,7 @@ class CompanionHudTests(unittest.TestCase):
             COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
         )
         self.assertEqual(
-            COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
+            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
             tuple(struct.unpack_from("<f", result, offset)[0] for offset in bubble_offsets),
         )
 
@@ -253,61 +246,16 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(0x38420000 | COMPANION_ACTION_ID_KEY, hook_words[6])
         self.assertEqual(0x2C43001F, hook_words[7])
         self.assertIn(0x860D02D0, hook_words)         # lh t5,0x2d0(s0): slot 0/1
-        self.assertEqual(
-            0x25A50000 | COMPANION_ACTION_SLOT_RESOURCES[0],
-            hook_words[-6],
-        )
+        self.assertEqual(0x25A50068, hook_words[-6])  # a1 = slot + 0x68
         self.assertEqual(0x8FBF000C, hook_words[-5])
         self.assertEqual(0x27BD0010, hook_words[-4])
         self.assertEqual(0x24040002, hook_words[-3])
         self.assertEqual(0x03E00008, hook_words[-2])
         self.assertEqual(0, hook_words[-1])
 
-        # r40 extends group 2 instead of mutating shared 0x68/0x69. The first
-        # 164 records are byte-identical and private 0xA4/0xA5 point at compact
-        # relocated clones, preserving the accepted r38 active-action geometry.
-        self.assertEqual((0xA4, 0xA5), COMPANION_ACTION_SLOT_RESOURCES)
-        resource_table_va = struct.unpack_from("<I", result, COMPANION_GROUP2_TABLE_POINTER_OFFSET)[0]
-        self.assertNotEqual(COMPANION_GROUP2_NEXT_TABLE_VA, resource_table_va)
-        self.assertEqual(
-            COMPANION_GROUP2_NEXT_TABLE_VA,
-            struct.unpack_from("<I", result, COMPANION_GROUP2_NEXT_TABLE_POINTER_OFFSET)[0],
-        )
-        resource_table_file = p_offset + resource_table_va - p_vaddr
-        source_table = RAW[
-            COMPANION_GROUP2_TABLE_OFFSET:
-            COMPANION_GROUP2_TABLE_OFFSET + COMPANION_GROUP2_RESOURCE_COUNT * 8
-        ]
-        self.assertEqual(
-            source_table,
-            result[
-                resource_table_file:
-                resource_table_file + COMPANION_GROUP2_RESOURCE_COUNT * 8
-            ],
-        )
-        private_geometries = (
-            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
-            COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
-        )
-        for slot, (resource_id, expected_geometry) in enumerate(
-            zip(COMPANION_ACTION_SLOT_RESOURCES, private_geometries, strict=True)
-        ):
-            metadata_va, record_count = struct.unpack_from(
-                "<II", result, resource_table_file + resource_id * 8
-            )
-            self.assertEqual(1, record_count)
-            metadata_file = p_offset + metadata_va - p_vaddr
-            self.assertEqual(
-                expected_geometry,
-                struct.unpack_from("<ffff", result, metadata_file + 4),
-            )
-            if slot == 1:
-                self.assertEqual(
-                    COMPANION_ACTION_BUBBLE_METADATA_SIZE,
-                    metadata_va - previous_metadata_va,
-                )
-            previous_metadata_va = metadata_va
-
+        # The two sibling resources share a body but move the tail 58px.  After
+        # r38 scaling, body-left/text-left move only 13px right for slot 2.
+        self.assertEqual((0x68, 0x69), COMPANION_ACTION_SLOT_RESOURCES)
         body_left = (
             COMPANION_SLOT_POSITIONS[0][0] - COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY[2],
             COMPANION_SLOT_POSITIONS[1][0] - COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY[2],
@@ -346,11 +294,6 @@ class CompanionHudTests(unittest.TestCase):
         tampered = bytearray(RAW)
         tampered[COMPANION_SLOT_POSITION_TABLE_OFFSET] ^= 1
         with self.assertRaisesRegex(ValueError, "companion slot position table drifted"):
-            patch_companion_action_layout(bytes(tampered))
-
-        tampered = bytearray(RAW)
-        tampered[COMPANION_GROUP2_TABLE_POINTER_OFFSET] ^= 1
-        with self.assertRaisesRegex(ValueError, "companion group-2 table owner drifted"):
             patch_companion_action_layout(bytes(tampered))
 
         for offset, _expected in (*COMPANION_SLOT_INDEX_PREIMAGES, *COMPANION_ACTION_ID_REFERENCE_PREIMAGES):
