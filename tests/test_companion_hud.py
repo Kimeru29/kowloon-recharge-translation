@@ -33,6 +33,8 @@ from tools.companion_hud import (
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PREIMAGES,
+    COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
+    COMPANION_ACTION_VISIBILITY_PREIMAGES,
     COMPANION_AFK_EMPTY_VA,
     COMPANION_AFK_EXPECTED_LIVE_FIELDS,
     COMPANION_AFK_MAX_CHARS,
@@ -258,6 +260,43 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_action(COMPANION_ACTION_LABELS[24].english).count(b"\x0a"))
         self.assertNotIn(b"\x0a", encode_companion_action(COMPANION_ACTION_LABELS[25].english))
 
+    def test_r44_visibility_hook_suppresses_only_live_afk_callouts(self) -> None:
+        result = build_early_ui_elf(RAW)
+        _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, _flags, _align = struct.unpack_from(
+            "<IIIIIIII", result, 0x54
+        )
+
+        visibility_jal = struct.unpack_from("<I", result, 0x666BC)[0]
+        self.assertEqual(0x03, visibility_jal >> 26)
+        visibility_va = (visibility_jal & 0x03FFFFFF) << 2
+        self.assertGreaterEqual(visibility_va, p_vaddr)
+        self.assertLess(visibility_va + COMPANION_ACTION_VISIBILITY_HOOK_SIZE, p_vaddr + p_filesz + 1)
+        self.assertEqual(0x00000000, struct.unpack_from("<I", result, 0x666C0)[0])
+        self.assertEqual(0x10400073, struct.unpack_from("<I", result, 0x666C4)[0])
+
+        visibility_file = p_offset + visibility_va - p_vaddr
+        words = struct.unpack_from(
+            f"<{COMPANION_ACTION_VISIBILITY_HOOK_SIZE // 4}I",
+            result,
+            visibility_file,
+        )
+        self.assertEqual(
+            (
+                0x8E0202C8,  # original s0+0x2c8 L1 visibility guard
+                0x1040000F, 0x00000000,
+                0x86080004,  # current talk-record index
+                0x2D090259,  # AFK/free-talk starts at record 601
+                0x1520000B, 0x00000000,
+                0x8E080020, 0x8E090024, 0x01094025,
+                0x8E090028, 0x01094025,
+                0x8E09002C, 0x01094025,  # four live speech render handles
+                0x11000002, 0x00000000,
+                0x00001021,  # v0=0 only for a live AFK callout
+                0x03E00008, 0x00000000,
+            ),
+            words,
+        )
+
     def test_r38_runtime_selector_keeps_body_stable_and_points_tail_at_active_slot(self) -> None:
         result = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, p_flags, _align = struct.unpack_from(
@@ -346,6 +385,13 @@ class CompanionHudTests(unittest.TestCase):
                 tampered = bytearray(RAW)
                 tampered[offset] ^= 1
                 with self.assertRaisesRegex(ValueError, "companion action runtime preimage mismatch"):
+                    patch_companion_action_layout(bytes(tampered))
+
+        for offset, _expected in COMPANION_ACTION_VISIBILITY_PREIMAGES:
+            with self.subTest(visibility_offset=hex(offset)):
+                tampered = bytearray(RAW)
+                tampered[offset] ^= 1
+                with self.assertRaisesRegex(ValueError, "companion action visibility preimage mismatch"):
                     patch_companion_action_layout(bytes(tampered))
 
         tampered = bytearray(RAW)

@@ -66,6 +66,20 @@ COMPANION_ACTION_LAYOUT_TABLE_KEY = "companion_action_layout_table"
 COMPANION_ACTION_RUNTIME_STATE_KEY = "companion_action_runtime_text_xy"
 COMPANION_ACTION_RUNTIME_HOOK_KEY = "companion_action_layout_hook"
 COMPANION_ACTION_RUNTIME_HOOK_SIZE = 188
+COMPANION_ACTION_VISIBILITY_HOOK_KEY = "companion_action_afk_visibility_hook"
+COMPANION_ACTION_VISIBILITY_HOOK_SIZE = 76
+COMPANION_AFK_FIRST_RECORD_INDEX = 0x259
+# Existing H_TalkBuddyTask owner that skips the complete L1 callout when zero.
+# r44 replaces only the guard load with a side-effect-free predicate hook and
+# keeps the branch destination/path intact.
+COMPANION_ACTION_VISIBILITY_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x666BC, 0x8E0202C8),  # lw v0,0x2c8(s0): original action-callout guard
+    (0x666C0, 0x10400074),  # beq v0,zero,0x166814
+    (0x666C4, 0x00000000),  # nop
+)
+COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS = tuple(
+    offset for offset, _expected in COMPANION_ACTION_VISIBILITY_PREIMAGES
+)
 
 # Static owners that are independent of the current action id. The resource
 # selection and text-Y load are patched after translation allocation because
@@ -300,6 +314,42 @@ def _runtime_hook_bytes(*, table_va: int, state_va: int) -> bytes:
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_RUNTIME_HOOK_SIZE:
         raise AssertionError(f"companion runtime hook size drifted: {len(code)}")
+    return code
+
+
+def _visibility_hook_bytes() -> bytes:
+    """Return the r44 L1-callout visibility predicate.
+
+    The existing callsite treats v0==0 as "skip the entire L1 callout". Preserve
+    its original s0+0x2C8 guard first. Only suppress an otherwise-visible action
+    callout when H_TalkBuddyTask is on a Re:charge free-talk record (index >=
+    0x259) and at least one of its four speech render handles is live.
+    """
+
+    words = (
+        _mips_i(0x23, 16, 2, 0x02C8),       # lw v0,0x2c8(s0): original guard
+        _mips_i(0x04, 2, 0, 15),            # beq v0,zero,return
+        0x00000000,                          # nop
+        _mips_i(0x21, 16, 8, 0x0004),       # lh t0,4(s0): current record index
+        _mips_i(0x0B, 8, 9, COMPANION_AFK_FIRST_RECORD_INDEX),  # sltiu t1,t0,0x259
+        _mips_i(0x05, 9, 0, 11),            # bne t1,zero,return (normal h_buddy)
+        0x00000000,                          # nop
+        _mips_i(0x23, 16, 8, 0x0020),       # lw t0,0x20(s0)
+        _mips_i(0x23, 16, 9, 0x0024),       # lw t1,0x24(s0)
+        _mips_r(8, 9, 8, 0, 0x25),          # or t0,t0,t1
+        _mips_i(0x23, 16, 9, 0x0028),       # lw t1,0x28(s0)
+        _mips_r(8, 9, 8, 0, 0x25),          # or t0,t0,t1
+        _mips_i(0x23, 16, 9, 0x002C),       # lw t1,0x2c(s0)
+        _mips_r(8, 9, 8, 0, 0x25),          # or t0,t0,t1
+        _mips_i(0x04, 8, 0, 2),             # beq t0,zero,return
+        0x00000000,                          # nop
+        _mips_r(0, 0, 2, 0, 0x21),          # addu v0,zero,zero: hide L1 callout
+        _mips_r(31, 0, 0, 0, 0x08),         # jr ra
+        0x00000000,                          # nop
+    )
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_ACTION_VISIBILITY_HOOK_SIZE:
+        raise AssertionError(f"companion visibility hook size drifted: {len(code)}")
     return code
 
 
@@ -605,15 +655,21 @@ def patch_companion_action_layout(raw: bytes) -> bytes:
                 f"{record_offset:#x}: expected {expected_geometry!r}, got {bubble_geometry!r}"
             )
 
-    for offset, expected in COMPANION_ACTION_RUNTIME_PREIMAGES:
-        if offset < 0 or offset + 4 > len(raw):
-            raise ValueError(f"companion action runtime owner is outside executable: {offset:#x}")
-        actual = struct.unpack_from("<I", raw, offset)[0]
-        if actual != expected:
-            raise ValueError(
-                "companion action runtime preimage mismatch: "
-                f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
-            )
+    for owner, preimages in (
+        ("runtime", COMPANION_ACTION_RUNTIME_PREIMAGES),
+        ("visibility", COMPANION_ACTION_VISIBILITY_PREIMAGES),
+    ):
+        for offset, expected in preimages:
+            if offset < 0 or offset + 4 > len(raw):
+                raise ValueError(
+                    f"companion action {owner} owner is outside executable: {offset:#x}"
+                )
+            actual = struct.unpack_from("<I", raw, offset)[0]
+            if actual != expected:
+                raise ValueError(
+                    f"companion action {owner} preimage mismatch: "
+                    f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
+                )
 
     out = bytearray(raw)
     for offset, expected, replacement in COMPANION_ACTION_LAYOUT_PATCHES:
@@ -665,13 +721,15 @@ def finalize_companion_action_runtime_layout(
         table_va = installed.target_vas[COMPANION_ACTION_LAYOUT_TABLE_KEY]
         state_va = installed.target_vas[COMPANION_ACTION_RUNTIME_STATE_KEY]
         hook_va = installed.target_vas[COMPANION_ACTION_RUNTIME_HOOK_KEY]
+        visibility_hook_va = installed.target_vas[COMPANION_ACTION_VISIBILITY_HOOK_KEY]
     except KeyError as exc:
         raise ValueError(f"companion action runtime payload is missing: {exc.args[0]}") from exc
 
-    if table_va & 3 or state_va & 3 or hook_va & 3:
+    if table_va & 3 or state_va & 3 or hook_va & 3 or visibility_hook_va & 3:
         raise ValueError(
             "companion action runtime payload lost word alignment: "
-            f"table={table_va:#x} state={state_va:#x} hook={hook_va:#x}"
+            f"table={table_va:#x} state={state_va:#x} hook={hook_va:#x} "
+            f"visibility={visibility_hook_va:#x}"
         )
 
     hook = _runtime_hook_bytes(table_va=table_va, state_va=state_va)
@@ -682,13 +740,41 @@ def finalize_companion_action_runtime_layout(
         raise ValueError("companion action runtime hook placeholder drifted")
     result[hook_file:hook_file + len(hook)] = hook
 
-    for offset, expected in COMPANION_ACTION_RUNTIME_PREIMAGES:
-        actual = struct.unpack_from("<I", result, offset)[0]
-        if actual != expected:
-            raise ValueError(
-                "companion action runtime finalizer preimage mismatch: "
-                f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
-            )
+    visibility_hook = _visibility_hook_bytes()
+    visibility_hook_file = installed.info.file_offset + (
+        visibility_hook_va - installed.info.segment_vaddr
+    )
+    if (
+        visibility_hook_file < 0
+        or visibility_hook_file + len(visibility_hook) > len(result)
+    ):
+        raise ValueError("companion action visibility hook is outside translated executable")
+    if (
+        result[visibility_hook_file:visibility_hook_file + len(visibility_hook)]
+        != b"\x00" * len(visibility_hook)
+    ):
+        raise ValueError("companion action visibility hook placeholder drifted")
+    result[visibility_hook_file:visibility_hook_file + len(visibility_hook)] = visibility_hook
+
+    for owner, preimages in (
+        ("runtime", COMPANION_ACTION_RUNTIME_PREIMAGES),
+        ("visibility", COMPANION_ACTION_VISIBILITY_PREIMAGES),
+    ):
+        for offset, expected in preimages:
+            actual = struct.unpack_from("<I", result, offset)[0]
+            if actual != expected:
+                raise ValueError(
+                    f"companion action {owner} finalizer preimage mismatch: "
+                    f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
+                )
+
+    # Use the existing "skip complete L1 callout" branch, but compute its guard
+    # from H_TalkBuddyTask's own state. The JAL occupies the old guard load,
+    # 0x666C0 is its delay-slot NOP, and the original branch moves one word
+    # later while preserving the same 0x166814 target.
+    struct.pack_into("<I", result, 0x666BC, _jal_word(visibility_hook_va))
+    struct.pack_into("<I", result, 0x666C0, 0x00000000)
+    struct.pack_into("<I", result, 0x666C4, _mips_i(0x04, 2, 0, 0x73))
 
     # Replace the fixed group-2 resource selection with a call into the generic
     # layout selector. Keep li a0,2 in the JAL delay slot.
@@ -764,7 +850,15 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             ),
         )
     )
-    # Append Re:charge-only AFK strings last so every pre-r43 translated VA,
-    # including the accepted action-layout code/data owners, remains stable.
+    # Keep all r43 translation payload VAs stable: append the Re:charge-only
+    # AFK strings first, then add the r44-only visibility predicate at the end.
     entries.extend(_relocated_companion_afk_entries(raw))
+    entries.append(
+        RelocatedText(
+            key=COMPANION_ACTION_VISIBILITY_HOOK_KEY,
+            encoded=b"\x00" * COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
+            pointer_offsets=(),
+            alignment=4,
+        )
+    )
     return tuple(entries)

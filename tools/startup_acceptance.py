@@ -59,6 +59,8 @@ from tools.companion_hud import (
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
+    COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
+    COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS,
     COMPANION_AFK_EMPTY_VA,
     COMPANION_AFK_EXPECTED_LIVE_FIELDS,
     COMPANION_AFK_RECORD_COUNT,
@@ -511,6 +513,52 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         or hook_words[-3] != 0x24040002
         or hook_words[-2] != 0x03E00008
         or hook_words[-1] != 0
+    ):
+        return False
+
+    # r44 keeps the original skip target but evaluates the guard in a tiny
+    # side-effect-free predicate: preserve s0+0x2c8, then suppress only when
+    # record index >= 601 and one of the four speech render handles is live.
+    visibility_jal = struct.unpack_from("<I", raw, 0x666BC)[0]
+    if (
+        visibility_jal >> 26 != 0x03
+        or struct.unpack_from("<I", raw, 0x666C0)[0] != 0
+        or struct.unpack_from("<I", raw, 0x666C4)[0] != 0x10400073
+    ):
+        return False
+    visibility_va = (visibility_jal & 0x03FFFFFF) << 2
+    visibility_rel = visibility_va - p_vaddr
+    if (
+        visibility_rel < 0
+        or visibility_rel + COMPANION_ACTION_VISIBILITY_HOOK_SIZE > p_filesz
+    ):
+        return False
+    visibility_file = p_offset + visibility_rel
+    visibility_words = struct.unpack_from(
+        f"<{COMPANION_ACTION_VISIBILITY_HOOK_SIZE // 4}I",
+        raw,
+        visibility_file,
+    )
+    if visibility_words != (
+        0x8E0202C8,
+        0x1040000F,
+        0x00000000,
+        0x86080004,
+        0x2D090259,
+        0x1520000B,
+        0x00000000,
+        0x8E080020,
+        0x8E090024,
+        0x01094025,
+        0x8E090028,
+        0x01094025,
+        0x8E09002C,
+        0x01094025,
+        0x11000002,
+        0x00000000,
+        0x00001021,
+        0x03E00008,
+        0x00000000,
     ):
         return False
 
