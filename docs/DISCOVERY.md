@@ -688,3 +688,20 @@ r48 keeps `0x6625C=0x3C023F80; 0x66260=0x44828000` and `0x6632C=0x3C023F80; 0x66
 The existing 64-byte scale-hook allocation is sufficient and remains at VA `0x00949824` / file `0x849A74`. It preserves the returned text object in t3, derives the zero-based AFK record index, loads the existing r47 table word, writes it to `0x48(t3)`, and distinguishes the two continuation contracts from RA. This introduces no nested calls and touches only caller-saved registers.
 
 Compatibility proof: r47→r48 changes no segment sizes and no relocated VAs. Scale table VA `0x00948EC4` is identical and its complete 2,400 bytes are identical. All 999 AFK pointer owners and all r47 geometry/resource/runtime helpers except the 64-byte scale-hook body are byte-identical. Do not reintroduce pre-constructor f16 scaling; f16 is now a protected alpha owner for this path.
+
+
+## r49 trace: native newline + vertical AFK ownership
+
+r48 runtime disproves horizontal scaling as the final solution: text is visible, but long English can still extend beyond the 288px bubble. The correct generic primitive is already in the game's text converter. At VA `0x00195A84` the converter compares the raw source byte to `0x0A`; on match, `0x00195A90` materializes `0xFF0E` and `0x00195A94` stores it as the internal command. This proves literal 0x0A is native multiline input for the same constructor used by AFK free-talk.
+
+The AFK style-0 horizontal advance is 16px. Native text X=117 and body-left X=105 leave 12px on the left; keeping a symmetric safety margin gives 264px. r49 chooses 16 cells = 256px, leaving 8px additional horizontal slack. Wrapping is generic word wrapping plus hard splitting for a token >16 cells, so no source word can defeat the width bound.
+
+Native line-1/line-2 Y coordinates are 313/331, proving 18px row spacing. The generic text object stores X/Y at +0x14/+0x18 and scale at +0x48/+0x4C. r49 leaves X and vertical scale native, forces horizontal scale +0x48 back to 1.0, and changes only object +0x18 Y after construction.
+
+The speech resources can be extended upward without moving their lower anchors by increasing height and pivot-Y by the same delta. For green resources 0x68/0x69, native (height,pivot-Y)=(80,77), so height-pivot=3 remains constant. For blue 0x6A frames the native pairs are (56,74/75/76); each frame's height-pivot difference remains constant when both values receive the same delta. Width, pivot-X and placement X are untouched. Slot selection still comes from s0+0x2F8 and therefore the existing 67/125 green X pivots continue to identify the speaking companion.
+
+The r49 geometry hook at the AFK pre-construction owner 0x66050 reads a 32-byte record from a 600-record table and writes only runtime height/pivot-Y plus the already-proven native width/X-pivot values for the selected green slot. It updates all three blue animation frames immediately before the AFK resource construction; static 0x6A bytes remain pristine. This differs materially from the rejected r45 experiment, which statically reshaped 0x6A including width/X geometry.
+
+The current 600-record corpus produces 1..6 total rows. Maximum delta is 72px, but the algorithm has no row-count constant. Its real upper bound is the game's own 0x1950A0 source-buffer guard: converted source length must remain below 0x1FE bytes. The encoder therefore fail-closes at 0x1FD source bytes rather than pretending to support infinite text.
+
+Compatibility trace: current English contains no token >16 cells, so every inserted line break replaces an existing space. Padding after the first NUL preserves every r48 relocation allocation size, which in turn preserves all 999 AFK pointer values and every older payload VA. The only newly appended runtime area is 19,496 bytes at the end of the prior translation payload: layout table VA `0x0094991C`, geometry-hook VA `0x0094E41C`, text-hook VA `0x0094E4D4`.

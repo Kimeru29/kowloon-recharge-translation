@@ -233,6 +233,41 @@ class StartupAcceptanceTests(unittest.TestCase):
                 )
                 self.assertFalse(check["ok"])
 
+    def test_r49_companion_wrap_payloads_fail_closed(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        _ptype, p_offset, p_vaddr, _paddr, _p_filesz, _memsz, _flags, _align = struct.unpack_from(
+            "<IIIIIIII", translated, 0x54
+        )
+
+        geometry_jal = struct.unpack_from("<I", translated, 0x66050)[0]
+        text_jal = struct.unpack_from("<I", translated, 0x66284)[0]
+        geometry_va = (geometry_jal & 0x03FFFFFF) << 2
+        text_va = (text_jal & 0x03FFFFFF) << 2
+        geometry_file = p_offset + geometry_va - p_vaddr
+        text_file = p_offset + text_va - p_vaddr
+
+        geometry_words = struct.unpack_from("<46I", translated, geometry_file)
+        hi = geometry_words[10] & 0xFFFF
+        lo = geometry_words[11] & 0xFFFF
+        if lo & 0x8000:
+            lo -= 0x10000
+        table_va = ((hi << 16) + lo) & 0xFFFFFFFF
+        table_file = p_offset + table_va - p_vaddr
+
+        for owner, offset in (
+            ("geometry_hook", geometry_file),
+            ("text_hook", text_file),
+            ("layout_table", table_file),
+        ):
+            with self.subTest(owner=owner):
+                tampered = bytearray(translated)
+                tampered[offset] ^= 1
+                check = next(
+                    check for check in verify_startup_elf(bytes(tampered))
+                    if check["name"] == "companion_hud_layout"
+                )
+                self.assertFalse(check["ok"])
+
     def test_hant_runtime_layout_acceptance_fails_closed_on_style_or_chrome_drift(self) -> None:
         translated = build_early_ui_elf(RAW)
         cases = (

@@ -78,6 +78,16 @@ from tools.companion_hud import (
     COMPANION_AFK_SCALE_HOOK_SIZE,
     COMPANION_AFK_TEXT_SAFE_CELLS,
     COMPANION_AFK_TEXT_SCALES,
+    COMPANION_AFK_LAYOUTS,
+    COMPANION_AFK_WRAP_CELLS,
+    COMPANION_AFK_LINE_STEP,
+    COMPANION_AFK_GREEN_BASE_HEIGHT,
+    COMPANION_AFK_GREEN_BASE_PIVOT_Y,
+    COMPANION_AFK_BLUE_BASE_HEIGHT,
+    COMPANION_AFK_BLUE_BASE_PIVOT_Y,
+    COMPANION_AFK_TEXT1_BASE_Y,
+    COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE,
+    COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_RECORDS_PER_COMPANION,
@@ -87,6 +97,8 @@ from tools.companion_hud import (
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
     encode_companion_action,
+    encode_companion_afk_text,
+    wrap_companion_afk_text,
 )
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.menu_ui import MENU_LABELS
@@ -416,7 +428,13 @@ def _verify_companion_afk_semantics(
             if target_va == COMPANION_AFK_EMPTY_VA:
                 return False
             live_fields += 1
-            if not _segment_has_wide_text(raw, segment, target_va, english):
+            p_offset, p_vaddr, p_filesz, _p_memsz = segment
+            payload = encode_companion_afk_text(english)
+            relative = target_va - p_vaddr
+            if relative < 0 or relative + len(payload) > p_filesz:
+                return False
+            target_file = p_offset + relative
+            if raw[target_file:target_file + len(payload)] != payload:
                 return False
 
     return live_fields == COMPANION_AFK_EXPECTED_LIVE_FIELDS
@@ -634,8 +652,10 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             lo -= 0x10000
         return ((hi << 16) + lo) & 0xFFFFFFFF
 
-    # r47 AFK restores the selected shared green resource to native geometry
-    # before constructing free-talk, while leaving blue 0x6A pristine.
+    # r49 keeps AFK width fixed at 288 and derives all vertical geometry from
+    # a 600-record wrapped-row table. Both green slot resources and all three
+    # blue animation frames grow upward by increasing height and pivot-Y
+    # together; X pivots and bottom/tail relationships stay native.
     afk_geometry_jal = struct.unpack_from("<I", raw, 0x66050)[0]
     if (
         afk_geometry_jal >> 26 != 0x03
@@ -646,29 +666,62 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     afk_geometry_rel = afk_geometry_va - p_vaddr
     if (
         afk_geometry_rel < 0
-        or afk_geometry_rel + COMPANION_AFK_GEOMETRY_HOOK_SIZE > p_filesz
+        or afk_geometry_rel + COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE > p_filesz
     ):
         return False
-    if struct.unpack_from(
-        f"<{COMPANION_AFK_GEOMETRY_HOOK_SIZE // 4}I",
+    geometry_words = struct.unpack_from(
+        f"<{COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE // 4}I",
         raw,
         p_offset + afk_geometry_rel,
-    ) != (
-        0x86020004, 0x2C490259, 0x15200016, 0x00000000,
-        0x860802F8, 0x2D090002, 0x11200012, 0x00000000,
-        0x00084900, 0x00085140, 0x012A4821,
-        0x3C0A0045, 0x254A0AC4, 0x01495021,
-        0x3C094390, 0xAD490000,
-        0x3C0942A0, 0xAD490004,
-        0x3C09429A, 0xAD49000C,
-        0x3C094286, 0x11000002, 0x00000000,
-        0x3C0942FA, 0xAD490008,
-        0x000219C0, 0x03E00008, 0x00000000,
+    )
+    if (
+        geometry_words[:10] != (
+            0x86020004, 0x2448FDA7, 0x2D090258, 0x11200026, 0,
+            0x860A02F8, 0x2D490002, 0x11200022, 0, 0x00085940,
+        )
+        or geometry_words[10] & 0xFFFF0000 != 0x3C0C0000
+        or geometry_words[11] & 0xFFFF0000 != 0x258C0000
+        or geometry_words[12:] != (
+            0x018B6021, 0x000A6900, 0x000A7140, 0x01AE6821,
+            0x3C0E0045, 0x25CE0AC4, 0x01CD7021,
+            0x3C0F4390, 0xADCF0000,
+            0x8D8F0000, 0xADCF0004,
+            0x8D8F0004, 0xADCF000C,
+            0x3C0F4286, 0x11400002, 0, 0x3C0F42FA, 0xADCF0008,
+            0x3C0E0045, 0x25CE0B28,
+            0x8D8F0008, 0xADCF0000, 0xADCF0030, 0xADCF0060,
+            0x8D8F000C, 0xADCF0008,
+            0x8D8F0010, 0xADCF0038,
+            0x8D8F0014, 0xADCF0068,
+            0x86020004, 0x000219C0, 0x03E00008, 0,
+        )
+    ):
+        return False
+    afk_layout_table_va = _materialized_va(geometry_words[10], geometry_words[11])
+    afk_layout_table_rel = afk_layout_table_va - p_vaddr
+    expected_afk_layout_table = b"".join(
+        struct.pack(
+            "<8f",
+            layout.green_height,
+            layout.green_pivot_y,
+            layout.blue_height,
+            *layout.blue_pivot_y,
+            layout.text1_y,
+            layout.text2_y,
+        )
+        for layout in COMPANION_AFK_LAYOUTS
+    )
+    if (
+        afk_layout_table_rel < 0
+        or afk_layout_table_rel + len(expected_afk_layout_table) > p_filesz
+        or raw[
+            p_offset + afk_layout_table_rel:
+            p_offset + afk_layout_table_rel + len(expected_afk_layout_table)
+        ] != expected_afk_layout_table
     ):
         return False
 
-    # r48 keeps the constructor's fourth RGBA component (f16/alpha) at
-    # full native opacity for both h_buddy and Re:charge free-talk.
+    # Constructor f16 is alpha, proven at runtime in r48; it remains exactly 1.0.
     for lui_offset, mtc1_offset in (
         (0x6621C, 0x66220),
         (0x6625C, 0x66260),
@@ -681,69 +734,77 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         ):
             return False
 
-    # Horizontal fit is applied after object construction to text-object +0x48.
-    scale_jal_1 = struct.unpack_from("<I", raw, 0x66284)[0]
-    scale_jal_2 = struct.unpack_from("<I", raw, 0x66354)[0]
+    # r49 text is never horizontally squeezed. The post-construction hook writes
+    # 1.0 to object +0x48 and uses only object +0x18 for record-specific Y.
+    text_jal_1 = struct.unpack_from("<I", raw, 0x66284)[0]
+    text_jal_2 = struct.unpack_from("<I", raw, 0x66354)[0]
     if (
-        scale_jal_1 != scale_jal_2
-        or scale_jal_1 >> 26 != 0x03
+        text_jal_1 != text_jal_2
+        or text_jal_1 >> 26 != 0x03
         or struct.unpack_from("<I", raw, 0x66288)[0] != 0xAE020028
         or struct.unpack_from("<I", raw, 0x6628C)[0] != 0x00022900
         or struct.unpack_from("<I", raw, 0x66358)[0] != 0xAE02002C
         or struct.unpack_from("<I", raw, 0x6635C)[0] != 0xA6020008
     ):
         return False
-    scale_hook_va = (scale_jal_1 & 0x03FFFFFF) << 2
-    scale_hook_rel = scale_hook_va - p_vaddr
-    if (
-        scale_hook_rel < 0
-        or scale_hook_rel + COMPANION_AFK_SCALE_HOOK_SIZE > p_filesz
-    ):
+    text_hook_va = (text_jal_1 & 0x03FFFFFF) << 2
+    text_hook_rel = text_hook_va - p_vaddr
+    if text_hook_rel < 0 or text_hook_rel + COMPANION_AFK_WRAP_TEXT_HOOK_SIZE > p_filesz:
         return False
-    scale_words = struct.unpack_from(
-        f"<{COMPANION_AFK_SCALE_HOOK_SIZE // 4}I",
+    text_words = struct.unpack_from(
+        f"<{COMPANION_AFK_WRAP_TEXT_HOOK_SIZE // 4}I",
         raw,
-        p_offset + scale_hook_rel,
+        p_offset + text_hook_rel,
     )
     if (
-        scale_words[:4]
-        != (0x00405821, 0x86080004, 0x2508FDA7, 0x00084080)
-        or scale_words[4] & 0xFFFF0000 != 0x3C090000
-        or scale_words[5] != 0x01284821
-        or scale_words[6] & 0xFFFF0000 != 0x8D280000
-        or scale_words[7] != 0xAD680048
-        or scale_words[8:]
-        != (
-            0x3C080016, 0x3508620C, 0x17E80002, 0x24020078,
-            0x8602000A, 0x03E00008, 0, 0,
+        text_words[:11] != (
+            0x00405821, 0x3C0F3F80, 0xAD6F0048,
+            0x3C0E0016, 0x35CE620C,
+            0x86080004, 0x2508FDA7, 0x2D090258, 0x1120000C, 0, 0x00084140,
         )
+        or text_words[11] & 0xFFFF0000 != 0x3C090000
+        or text_words[12] & 0xFFFF0000 != 0x25290000
+        or text_words[13:] != (
+            0x01284821, 0x17EE0004, 0,
+            0x8D2A0018, 0x10000002, 0, 0x8D2A001C, 0xAD6A0018,
+            0x17EE0004, 0x24020078, 0x8602000A, 0x03E00008, 0,
+            0x03E00008, 0,
+        )
+        or _materialized_va(text_words[11], text_words[12]) != afk_layout_table_va
     ):
         return False
-    scale_table_va = _materialized_va(scale_words[4], scale_words[6])
-    scale_table_rel = scale_table_va - p_vaddr
-    expected_scales = struct.pack(
-        f"<{len(COMPANION_AFK_TEXT_SCALES)}f",
-        *COMPANION_AFK_TEXT_SCALES,
-    )
-    if (
-        scale_table_rel < 0
-        or scale_table_rel + len(expected_scales) > p_filesz
-        or raw[
-            p_offset + scale_table_rel:
-            p_offset + scale_table_rel + len(expected_scales)
-        ] != expected_scales
-    ):
+
+    # Complete-corpus generic invariant: every wrapped visual row is <=16 cells,
+    # width never grows, and vertical growth preserves the native bottom anchors.
+    if len(COMPANION_AFK_LAYOUTS) != COMPANION_AFK_RECORD_COUNT:
         return False
-    for lines, scale in zip(
-        COMPANION_AFK_TRANSLATIONS,
-        COMPANION_AFK_TEXT_SCALES,
-        strict=True,
+    for source_lines, layout in zip(
+        COMPANION_AFK_TRANSLATIONS, COMPANION_AFK_LAYOUTS, strict=True
     ):
-        if any(
-            line and len(line) * scale > COMPANION_AFK_TEXT_SAFE_CELLS + 1e-6
-            for line in lines
+        rows = (*layout.line1_rows, *layout.line2_rows)
+        if not rows or any(len(row) > COMPANION_AFK_WRAP_CELLS for row in rows):
+            return False
+        total_rows = len(rows)
+        delta = COMPANION_AFK_LINE_STEP * max(0, total_rows - 2)
+        if (
+            layout.green_height != COMPANION_AFK_GREEN_BASE_HEIGHT + delta
+            or layout.green_pivot_y != COMPANION_AFK_GREEN_BASE_PIVOT_Y + delta
+            or layout.blue_height != COMPANION_AFK_BLUE_BASE_HEIGHT + delta
+            or layout.text1_y != COMPANION_AFK_TEXT1_BASE_Y - delta
+            or layout.green_height - layout.green_pivot_y != 3.0
         ):
             return False
+        for base, pivot in zip(
+            COMPANION_AFK_BLUE_BASE_PIVOT_Y, layout.blue_pivot_y, strict=True
+        ):
+            if (
+                pivot != base + delta
+                or layout.blue_height - pivot != COMPANION_AFK_BLUE_BASE_HEIGHT - base
+            ):
+                return False
+        for source in source_lines:
+            if source and wrap_companion_afk_text(source) == ():
+                return False
 
     table_va = _materialized_va(hook_words[14], hook_words[15])
     table_rel = table_va - p_vaddr
@@ -1068,7 +1129,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         _check(
             "companion_hud_layout",
             _verify_companion_hud_layout(raw),
-            "companion action/AFK shared bubble is not using the r47 consumer-specific geometry and text-fit runtime",
+            "companion action/AFK shared bubble is not using the r49 fixed-width multiline and upward-growth runtime",
         )
     )
     heap_break_ok = (
