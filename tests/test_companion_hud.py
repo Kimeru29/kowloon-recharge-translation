@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from tests.local_fixtures import require_local_fixture
+from tools.companion_afk_data import COMPANION_AFK_OFFICIAL_FIELDS, COMPANION_AFK_TRANSLATIONS
 from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
     COMPANION_ACTION_BUBBLE_METADATA_VA,
@@ -32,12 +33,20 @@ from tools.companion_hud import (
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PREIMAGES,
+    COMPANION_AFK_EMPTY_VA,
+    COMPANION_AFK_EXPECTED_LIVE_FIELDS,
+    COMPANION_AFK_MAX_CHARS,
+    COMPANION_AFK_RECORD_COUNT,
+    COMPANION_AFK_RECORD_STRIDE,
+    COMPANION_AFK_TABLE_OFFSET,
     COMPANION_SLOT_INDEX_PREIMAGES,
     COMPANION_SLOT_POSITIONS,
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
     encode_companion_action,
     patch_companion_action_layout,
+    relocated_companion_entries,
+    validate_companion_afk_source,
     validate_companion_hud_source,
     wrap_companion_action_text,
 )
@@ -66,6 +75,94 @@ def _read_at_va(raw: bytes, va: int, size: int) -> bytes:
 
 
 class CompanionHudTests(unittest.TestCase):
+    def test_r43_afk_inventory_is_bounded_contextual_and_fail_closed(self) -> None:
+        self.assertEqual(COMPANION_AFK_RECORD_COUNT, len(COMPANION_AFK_TRANSLATIONS))
+        self.assertEqual(
+            {(1, 15, 1), (13, 2, 1), (23, 0, 1), (23, 19, 2)},
+            set(COMPANION_AFK_OFFICIAL_FIELDS),
+        )
+        self.assertEqual("Be careful.", COMPANION_AFK_TRANSLATIONS[15][0])
+        self.assertEqual("Hello.", COMPANION_AFK_TRANSLATIONS[(13 - 1) * 20 + 2][0])
+        self.assertEqual("Be careful.", COMPANION_AFK_TRANSLATIONS[(23 - 1) * 20][0])
+        self.assertEqual(
+            "I'm going to do my best!",
+            COMPANION_AFK_TRANSLATIONS[(23 - 1) * 20 + 19][1],
+        )
+        self.assertEqual(
+            ("Hm? Lost your way?", ""),
+            COMPANION_AFK_TRANSLATIONS[(25 - 1) * 20 + 1],
+        )
+
+        live_fields = 0
+        english_by_source_va: dict[int, str] = {}
+        for record_index, (english_line1, english_line2) in enumerate(COMPANION_AFK_TRANSLATIONS):
+            record_offset = COMPANION_AFK_TABLE_OFFSET + record_index * COMPANION_AFK_RECORD_STRIDE
+            _enabled, _companion_id, line1_va, line2_va = struct.unpack_from(
+                "<IIII", RAW, record_offset
+            )
+            for source_va, english in ((line1_va, english_line1), (line2_va, english_line2)):
+                if source_va == COMPANION_AFK_EMPTY_VA:
+                    self.assertEqual("", english)
+                    continue
+                live_fields += 1
+                self.assertTrue(english)
+                self.assertLessEqual(len(english), COMPANION_AFK_MAX_CHARS)
+                previous_english = english_by_source_va.setdefault(source_va, english)
+                self.assertEqual(previous_english, english)
+                encode_ps2_english(english, collapse_spaces=False)
+        self.assertEqual(COMPANION_AFK_EXPECTED_LIVE_FIELDS, live_fields)
+        validate_companion_afk_source(RAW)
+
+        table_tampered = bytearray(RAW)
+        table_tampered[COMPANION_AFK_TABLE_OFFSET + 0x20] ^= 1
+        with self.assertRaisesRegex(ValueError, "companion AFK table preimage drifted"):
+            validate_companion_afk_source(bytes(table_tampered))
+
+        source_tampered = bytearray(RAW)
+        source_tampered[0x3D20D0] ^= 1  # Salah 25:01: む？迷ったかの？
+        with self.assertRaisesRegex(ValueError, "companion AFK source"):
+            validate_companion_afk_source(bytes(source_tampered))
+
+    def test_r43_build_relocates_only_structural_afk_pointer_fields(self) -> None:
+        entries = tuple(
+            entry
+            for entry in relocated_companion_entries(RAW)
+            if entry.key.startswith("companion_afk_")
+        )
+        self.assertEqual(COMPANION_AFK_EXPECTED_LIVE_FIELDS, len(entries))
+
+        expected_pointer_offsets: set[int] = set()
+        for record_index in range(COMPANION_AFK_RECORD_COUNT):
+            record_offset = COMPANION_AFK_TABLE_OFFSET + record_index * COMPANION_AFK_RECORD_STRIDE
+            _enabled, _companion_id, line1_va, line2_va = struct.unpack_from(
+                "<IIII", RAW, record_offset
+            )
+            if line1_va != COMPANION_AFK_EMPTY_VA:
+                expected_pointer_offsets.add(record_offset + 8)
+            if line2_va != COMPANION_AFK_EMPTY_VA:
+                expected_pointer_offsets.add(record_offset + 12)
+
+        actual_pointer_offsets = {
+            pointer_offset
+            for entry in entries
+            for pointer_offset in entry.pointer_offsets
+        }
+        self.assertEqual(expected_pointer_offsets, actual_pointer_offsets)
+        self.assertEqual(COMPANION_AFK_EXPECTED_LIVE_FIELDS, len(actual_pointer_offsets))
+
+        salah = next(entry for entry in entries if entry.key == "companion_afk_25_01_1")
+        self.assertEqual((0x3F5028,), salah.pointer_offsets)
+        self.assertEqual(
+            encode_ps2_english("Hm? Lost your way?", collapse_spaces=False) + b"\x00",
+            salah.encoded,
+        )
+
+        result = build_early_ui_elf(RAW)
+        target_va = struct.unpack_from("<I", result, 0x3F5028)[0]
+        self.assertEqual(salah.encoded, _read_at_va(result, target_va, len(salah.encoded)))
+        source = "む？迷ったかの？".encode("cp932") + b"\x00"
+        self.assertEqual(source, result[0x3D20D0:0x3D20D0 + len(source)])
+
     def test_r30_comment_inventory_is_complete_ps4_exact_and_fail_closed(self) -> None:
         self.assertEqual(1650, len(COMPANION_COMMENT_LINES))
         self.assertEqual(1784, sum(len(spec.pointer_offsets) for spec in COMPANION_COMMENT_LINES))

@@ -33,6 +33,7 @@ from tools.hant_ui import (
     HANT_WRAPPED_LINES,
 )
 from tools.localization import encode_ps2_english
+from tools.companion_afk_data import COMPANION_AFK_TRANSLATIONS
 from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
     COMPANION_ACTION_BUBBLE_METADATA_VA,
@@ -58,6 +59,12 @@ from tools.companion_hud import (
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
+    COMPANION_AFK_EMPTY_VA,
+    COMPANION_AFK_EXPECTED_LIVE_FIELDS,
+    COMPANION_AFK_RECORD_COUNT,
+    COMPANION_AFK_RECORD_STRIDE,
+    COMPANION_AFK_RECORDS_PER_COMPANION,
+    COMPANION_AFK_TABLE_OFFSET,
     COMPANION_SLOT_INDEX_PREIMAGES,
     COMPANION_SLOT_POSITIONS,
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
@@ -354,6 +361,48 @@ def _verify_companion_hud_semantics(
                 break
 
     return comments_ok, actions_ok
+
+
+def _verify_companion_afk_semantics(
+    raw: bytes,
+    segment: tuple[int, int, int, int] | None,
+) -> bool:
+    """Verify every translated Re:charge free-talk owner in the final ELF."""
+
+    if segment is None or len(COMPANION_AFK_TRANSLATIONS) != COMPANION_AFK_RECORD_COUNT:
+        return False
+
+    live_fields = 0
+    for record_index, (english_line1, english_line2) in enumerate(COMPANION_AFK_TRANSLATIONS):
+        record_offset = COMPANION_AFK_TABLE_OFFSET + (
+            record_index * COMPANION_AFK_RECORD_STRIDE
+        )
+        if record_offset + 16 > len(raw):
+            return False
+        enabled, companion_id, line1_va, line2_va = struct.unpack_from(
+            "<IIII", raw, record_offset
+        )
+        expected_companion_id = (
+            record_index // COMPANION_AFK_RECORDS_PER_COMPANION
+        ) + 1
+        if (enabled, companion_id) != (1, expected_companion_id):
+            return False
+
+        for target_va, english in (
+            (line1_va, english_line1),
+            (line2_va, english_line2),
+        ):
+            if not english:
+                if target_va != COMPANION_AFK_EMPTY_VA:
+                    return False
+                continue
+            if target_va == COMPANION_AFK_EMPTY_VA:
+                return False
+            live_fields += 1
+            if not _segment_has_wide_text(raw, segment, target_va, english):
+                return False
+
+    return live_fields == COMPANION_AFK_EXPECTED_LIVE_FIELDS
 
 
 def _verify_companion_hud_layout(raw: bytes) -> bool:
@@ -782,6 +831,13 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
             "companion_hud_actions",
             companion_actions_ok,
             "one or more companion HUD action labels drifted from their translated/pristine owner",
+        )
+    )
+    checks.append(
+        _check(
+            "companion_afk_free_talk",
+            _verify_companion_afk_semantics(raw, segment),
+            "one or more Re:charge free-talk owners do not resolve through the bounded 30x20 AFK table",
         )
     )
     checks.append(

@@ -17,6 +17,10 @@ from tools.companion_hud import (
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
+    COMPANION_AFK_EMPTY_VA,
+    COMPANION_AFK_RECORD_COUNT,
+    COMPANION_AFK_RECORD_STRIDE,
+    COMPANION_AFK_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
 )
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
@@ -176,6 +180,13 @@ class EarlyUiPatchTests(unittest.TestCase):
         for spec in COMPANION_COMMENT_LINES:
             for pointer_offset in spec.pointer_offsets:
                 allowed.update(range(pointer_offset, pointer_offset + 4))
+        for record_index in range(COMPANION_AFK_RECORD_COUNT):
+            record_offset = COMPANION_AFK_TABLE_OFFSET + record_index * COMPANION_AFK_RECORD_STRIDE
+            _enabled, _companion_id, line1_va, line2_va = struct.unpack_from("<IIII", RAW, record_offset)
+            if line1_va != COMPANION_AFK_EMPTY_VA:
+                allowed.update(range(record_offset + 8, record_offset + 12))
+            if line2_va != COMPANION_AFK_EMPTY_VA:
+                allowed.update(range(record_offset + 12, record_offset + 16))
         for spec in COMPANION_ACTION_LABELS:
             if spec.english is not None:
                 allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))

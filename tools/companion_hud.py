@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import struct
 
+from tools.companion_afk_data import COMPANION_AFK_TRANSLATIONS
 from tools.companion_hud_data import COMPANION_ACTION_DATA, COMPANION_COMMENT_DATA
 from tools.executable_text import ExecutableTextResult, RelocatedText
 from tools.localization import encode_ps2_english
@@ -11,6 +13,22 @@ from tools.localization import encode_ps2_english
 _ELF_MAIN_FILE_OFFSET = 0x80
 _ELF_MAIN_VADDR = 0x00100000
 _MAX_STRING_BYTES = 512
+
+# Re:charge-only free-talk / AFK corpus. This is a structurally bounded table
+# immediately following h_buddy: 30 companions x 20 records, 0x80 bytes each.
+# Only the live +8/+0xC text-pointer fields are translation owners. In
+# particular, empty +0xC fields keep the shared 0x00794150 sentinel untouched.
+COMPANION_AFK_TABLE_OFFSET = 0x3E5FA0
+COMPANION_AFK_RECORDS_PER_COMPANION = 20
+COMPANION_AFK_COMPANION_COUNT = 30
+COMPANION_AFK_RECORD_COUNT = COMPANION_AFK_COMPANION_COUNT * COMPANION_AFK_RECORDS_PER_COMPANION
+COMPANION_AFK_RECORD_STRIDE = 0x80
+COMPANION_AFK_EMPTY_VA = 0x00794150
+COMPANION_AFK_EXPECTED_LIVE_FIELDS = 999
+COMPANION_AFK_EXPECTED_UNIQUE_SOURCE_POINTERS = 952
+COMPANION_AFK_MAX_CHARS = 38
+COMPANION_AFK_TABLE_SHA256 = "5c1f0c9348502012fd0f51d0160f5fe9a903006c317519b20ad75af60369020a"
+COMPANION_AFK_SOURCE_SHA256 = "eaeb3bd7b6dab806aaa894f5458d13b1f0a29e7221ba0d5f4b9dc04f846d0641"
 
 # r31-r38 presentation owners for the persistent companion action caption.
 # r35 proved the accepted one-line 224x48 down-tail presentation, r36 made
@@ -303,6 +321,176 @@ def _validate_source_text(raw: bytes, *, owner: str, source_offset: int, source_
         raise ValueError(f"{owner} source preimage mismatch: {source_offset:#x}")
 
 
+def validate_companion_afk_source(raw: bytes) -> None:
+    """Validate the exact Re:charge free-talk owner table and source strings."""
+
+    if len(COMPANION_AFK_TRANSLATIONS) != COMPANION_AFK_RECORD_COUNT:
+        raise ValueError(
+            "companion AFK translation corpus size drifted: "
+            f"{len(COMPANION_AFK_TRANSLATIONS)}"
+        )
+
+    table_end = COMPANION_AFK_TABLE_OFFSET + (
+        COMPANION_AFK_RECORD_COUNT * COMPANION_AFK_RECORD_STRIDE
+    )
+    if table_end > len(raw):
+        raise ValueError("companion AFK table is outside executable")
+    table_digest = hashlib.sha256(raw[COMPANION_AFK_TABLE_OFFSET:table_end]).hexdigest()
+    if table_digest != COMPANION_AFK_TABLE_SHA256:
+        raise ValueError(
+            "companion AFK table preimage drifted: "
+            f"expected {COMPANION_AFK_TABLE_SHA256}, got {table_digest}"
+        )
+
+    source_digest = hashlib.sha256()
+    live_fields = 0
+    unique_source_pointers: set[int] = set()
+    english_by_source_va: dict[int, str] = {}
+
+    for record_index, (english_line1, english_line2) in enumerate(COMPANION_AFK_TRANSLATIONS):
+        companion_id = (record_index // COMPANION_AFK_RECORDS_PER_COMPANION) + 1
+        record_offset = COMPANION_AFK_TABLE_OFFSET + (
+            record_index * COMPANION_AFK_RECORD_STRIDE
+        )
+        enabled, actual_companion_id, line1_va, line2_va = struct.unpack_from(
+            "<IIII", raw, record_offset
+        )
+        if (enabled, actual_companion_id) != (1, companion_id):
+            raise ValueError(
+                "companion AFK record owner drifted: "
+                f"{record_offset:#x}: expected (1, {companion_id}), "
+                f"got ({enabled}, {actual_companion_id})"
+            )
+
+        source_digest.update(
+            struct.pack(
+                "<IIIII",
+                record_index,
+                record_offset,
+                enabled,
+                actual_companion_id,
+                line1_va,
+            )
+        )
+        source_digest.update(struct.pack("<I", line2_va))
+
+        for line_number, (source_va, english) in enumerate(
+            ((line1_va, english_line1), (line2_va, english_line2)),
+            start=1,
+        ):
+            if source_va == COMPANION_AFK_EMPTY_VA:
+                source_digest.update(b"<EMPTY>")
+                if english:
+                    raise ValueError(
+                        "companion AFK translation adds text to a pristine empty field: "
+                        f"id={companion_id} index={record_index % 20} line={line_number}"
+                    )
+                continue
+
+            if not english:
+                raise ValueError(
+                    "companion AFK translation is missing for a live field: "
+                    f"id={companion_id} index={record_index % 20} line={line_number}"
+                )
+            if len(english) > COMPANION_AFK_MAX_CHARS:
+                raise ValueError(
+                    "companion AFK English exceeds the safe field budget: "
+                    f"id={companion_id} index={record_index % 20} "
+                    f"line={line_number} chars={len(english)}"
+                )
+            # A reused Japanese source pointer must keep one English rendering.
+            # This mirrors the game's own string sharing and prevents context-only
+            # rewrites from silently diverging for the same source text.
+            previous_english = english_by_source_va.setdefault(source_va, english)
+            if previous_english != english:
+                raise ValueError(
+                    "companion AFK reused source has conflicting English: "
+                    f"{source_va:#x}: {previous_english!r} != {english!r}"
+                )
+
+            # Reject unsupported glyphs before allocation.
+            encode_ps2_english(english, collapse_spaces=False)
+
+            source_offset = _ELF_MAIN_FILE_OFFSET + source_va - _ELF_MAIN_VADDR
+            if source_offset < 0 or source_offset >= len(raw):
+                raise ValueError(
+                    "companion AFK source pointer is outside executable: "
+                    f"{source_va:#x}"
+                )
+            terminator = raw.find(
+                b"\x00",
+                source_offset,
+                min(len(raw), source_offset + _MAX_STRING_BYTES),
+            )
+            if terminator < 0:
+                raise ValueError(
+                    f"companion AFK source is unterminated: {source_offset:#x}"
+                )
+            source_bytes = raw[source_offset:terminator]
+            try:
+                source_bytes.decode("cp932")
+            except UnicodeDecodeError as exc:
+                raise ValueError(
+                    f"companion AFK source is not CP932 text: {source_offset:#x}"
+                ) from exc
+
+            live_fields += 1
+            unique_source_pointers.add(source_va)
+            source_digest.update(struct.pack("<I", source_va))
+            source_digest.update(source_bytes)
+            source_digest.update(b"\x00")
+
+    if live_fields != COMPANION_AFK_EXPECTED_LIVE_FIELDS:
+        raise ValueError(
+            "companion AFK live-field count drifted: "
+            f"expected {COMPANION_AFK_EXPECTED_LIVE_FIELDS}, got {live_fields}"
+        )
+    if len(unique_source_pointers) != COMPANION_AFK_EXPECTED_UNIQUE_SOURCE_POINTERS:
+        raise ValueError(
+            "companion AFK unique-source count drifted: "
+            f"expected {COMPANION_AFK_EXPECTED_UNIQUE_SOURCE_POINTERS}, "
+            f"got {len(unique_source_pointers)}"
+        )
+    actual_source_digest = source_digest.hexdigest()
+    if actual_source_digest != COMPANION_AFK_SOURCE_SHA256:
+        raise ValueError(
+            "companion AFK source corpus drifted: "
+            f"expected {COMPANION_AFK_SOURCE_SHA256}, got {actual_source_digest}"
+        )
+
+
+def _relocated_companion_afk_entries(raw: bytes) -> tuple[RelocatedText, ...]:
+    entries: list[RelocatedText] = []
+    for record_index, (english_line1, english_line2) in enumerate(COMPANION_AFK_TRANSLATIONS):
+        companion_id = (record_index // COMPANION_AFK_RECORDS_PER_COMPANION) + 1
+        companion_line = record_index % COMPANION_AFK_RECORDS_PER_COMPANION
+        record_offset = COMPANION_AFK_TABLE_OFFSET + (
+            record_index * COMPANION_AFK_RECORD_STRIDE
+        )
+        _, _, line1_va, line2_va = struct.unpack_from("<IIII", raw, record_offset)
+        for line_number, source_va, english, pointer_offset in (
+            (1, line1_va, english_line1, record_offset + 8),
+            (2, line2_va, english_line2, record_offset + 12),
+        ):
+            if source_va == COMPANION_AFK_EMPTY_VA:
+                continue
+            entries.append(
+                RelocatedText(
+                    key=(
+                        f"companion_afk_{companion_id:02d}_"
+                        f"{companion_line:02d}_{line_number}"
+                    ),
+                    encoded=encode_ps2_english(
+                        english,
+                        collapse_spaces=False,
+                    )
+                    + b"\x00",
+                    pointer_offsets=(pointer_offset,),
+                )
+            )
+    return tuple(entries)
+
+
 def validate_companion_hud_source(raw: bytes) -> None:
     if len(COMPANION_COMMENT_LINES) != 1650:
         raise ValueError(f"companion comment corpus size drifted: {len(COMPANION_COMMENT_LINES)}")
@@ -310,6 +498,8 @@ def validate_companion_hud_source(raw: bytes) -> None:
         raise ValueError("companion comment pointer-alias count drifted")
     if len(COMPANION_ACTION_LABELS) != 31:
         raise ValueError(f"companion action corpus size drifted: {len(COMPANION_ACTION_LABELS)}")
+
+    validate_companion_afk_source(raw)
 
     owned_pointers: set[int] = set()
     for spec in COMPANION_COMMENT_LINES:
@@ -574,4 +764,7 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             ),
         )
     )
+    # Append Re:charge-only AFK strings last so every pre-r43 translated VA,
+    # including the accepted action-layout code/data owners, remains stable.
+    entries.extend(_relocated_companion_afk_entries(raw))
     return tuple(entries)

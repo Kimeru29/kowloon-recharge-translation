@@ -36,6 +36,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_LABELS,
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
+    COMPANION_AFK_TABLE_OFFSET,
     COMPANION_SLOT_INDEX_PREIMAGES,
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
@@ -94,6 +95,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("dungeon_item_names", names)
         self.assertIn("companion_hud_comments", names)
         self.assertIn("companion_hud_actions", names)
+        self.assertIn("companion_afk_free_talk", names)
         self.assertIn("companion_hud_layout", names)
 
     def test_pristine_elf_fails_translated_renderer_checks(self) -> None:
@@ -128,6 +130,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("dungeon_item_names", failed_names)
         self.assertIn("companion_hud_comments", failed_names)
         self.assertIn("companion_hud_actions", failed_names)
+        self.assertIn("companion_afk_free_talk", failed_names)
         self.assertIn("companion_hud_layout", failed_names)
 
     def test_menu_acceptance_fails_closed_per_semantic_storage_class(self) -> None:
@@ -182,6 +185,17 @@ class StartupAcceptanceTests(unittest.TestCase):
                 tampered[offset] ^= 1
                 check = next(check for check in verify_startup_elf(bytes(tampered)) if check["name"] == name)
                 self.assertFalse(check["ok"])
+
+    def test_companion_afk_acceptance_fails_closed_on_structural_pointer_owner(self) -> None:
+        translated = build_early_ui_elf(RAW)
+        tampered = bytearray(translated)
+        tampered[COMPANION_AFK_TABLE_OFFSET + 8] ^= 1
+        check = next(
+            check
+            for check in verify_startup_elf(bytes(tampered))
+            if check["name"] == "companion_afk_free_talk"
+        )
+        self.assertFalse(check["ok"])
 
     def test_companion_hud_layout_acceptance_fails_closed_on_each_owner(self) -> None:
         translated = build_early_ui_elf(RAW)
