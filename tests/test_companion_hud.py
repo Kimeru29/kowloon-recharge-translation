@@ -33,6 +33,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PREIMAGES,
+    COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE,
     COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
     COMPANION_ACTION_VISIBILITY_PREIMAGES,
     COMPANION_AFK_PANEL_FRAME_COUNT,
@@ -48,6 +49,10 @@ from tools.companion_hud import (
     COMPANION_AFK_EMPTY_VA,
     COMPANION_AFK_EXPECTED_LIVE_FIELDS,
     COMPANION_AFK_MAX_CHARS,
+    COMPANION_AFK_GEOMETRY_HOOK_SIZE,
+    COMPANION_AFK_SCALE_HOOK_SIZE,
+    COMPANION_AFK_TEXT_SAFE_CELLS,
+    COMPANION_AFK_TEXT_SCALES,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_TABLE_OFFSET,
@@ -140,7 +145,7 @@ class CompanionHudTests(unittest.TestCase):
         entries = tuple(
             entry
             for entry in relocated_companion_entries(RAW)
-            if entry.key.startswith("companion_afk_")
+            if entry.key.startswith("companion_afk_") and entry.pointer_offsets
         )
         self.assertEqual(COMPANION_AFK_EXPECTED_LIVE_FIELDS, len(entries))
 
@@ -248,7 +253,9 @@ class CompanionHudTests(unittest.TestCase):
         self.assertTrue(all(len(line) <= 17 for layout in COMPANION_ACTION_LAYOUTS for line in layout.lines))
 
         result = build_early_ui_elf(RAW)
-        # The accepted one-line startup/default geometry remains exactly r35.
+        # r47 no longer bakes compact L1 geometry into the shared resource.
+        # Static 0x68/0x69 stay native for AFK; the action hook applies the
+        # accepted compact body immediately before each normal L1 callout.
         bubble_offsets = (
             COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
             COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
@@ -256,7 +263,7 @@ class CompanionHudTests(unittest.TestCase):
             COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
         )
         self.assertEqual(
-            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
+            COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
             tuple(struct.unpack_from("<f", result, offset)[0] for offset in bubble_offsets),
         )
 
@@ -366,6 +373,139 @@ class CompanionHudTests(unittest.TestCase):
             words,
         )
 
+    def test_r47_afk_runtime_restores_native_outer_geometry_and_scales_every_record(self) -> None:
+        result = build_early_ui_elf(RAW)
+        _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, _flags, _align = struct.unpack_from(
+            "<IIIIIIII", result, 0x54
+        )
+
+        # Shared 0x68/0x69 are pristine at rest; runtime consumers now own
+        # their temporary geometry instead of fighting over global metadata.
+        self.assertEqual(
+            COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
+            tuple(
+                struct.unpack_from("<f", result, offset)[0]
+                for offset in (
+                    COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+                    COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+                    COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+                    COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+                )
+            ),
+        )
+        self.assertEqual(
+            COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY,
+            tuple(
+                struct.unpack_from("<f", result, offset)[0]
+                for offset in (
+                    COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
+                    COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
+                    COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
+                    COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
+                )
+            ),
+        )
+
+        geometry_jal = struct.unpack_from("<I", result, 0x66050)[0]
+        self.assertEqual(0x03, geometry_jal >> 26)
+        self.assertEqual(0x000219C0, struct.unpack_from("<I", result, 0x66054)[0])
+        geometry_va = (geometry_jal & 0x03FFFFFF) << 2
+        geometry_file = p_offset + geometry_va - p_vaddr
+        geometry_words = struct.unpack_from(
+            f"<{COMPANION_AFK_GEOMETRY_HOOK_SIZE // 4}I",
+            result,
+            geometry_file,
+        )
+        self.assertEqual(
+            (
+                0x86020004, 0x2C490259, 0x15200016, 0x00000000,
+                0x860802F8, 0x2D090002, 0x11200012, 0x00000000,
+                0x00084900, 0x00085140, 0x012A4821,
+                0x3C0A0045, 0x254A0AC4, 0x01495021,
+                0x3C094390, 0xAD490000,       # width 288
+                0x3C0942A0, 0xAD490004,       # height 80
+                0x3C09429A, 0xAD49000C,       # pivot-Y 77
+                0x3C094286, 0x11000002, 0x00000000,
+                0x3C0942FA, 0xAD490008,       # pivot-X 67 / 125
+                0x000219C0, 0x03E00008, 0x00000000,
+            ),
+            geometry_words,
+        )
+
+        scale_jal_1 = struct.unpack_from("<I", result, 0x6625C)[0]
+        scale_jal_2 = struct.unpack_from("<I", result, 0x6632C)[0]
+        self.assertEqual(scale_jal_1, scale_jal_2)
+        self.assertEqual(0x03, scale_jal_1 >> 26)
+        self.assertEqual(0, struct.unpack_from("<I", result, 0x66260)[0])
+        self.assertEqual(0, struct.unpack_from("<I", result, 0x66330)[0])
+        # Original/non-Re:charge h_buddy text keeps f16=1.0.
+        self.assertEqual(0x3C023F80, struct.unpack_from("<I", result, 0x6621C)[0])
+        self.assertEqual(0x44828000, struct.unpack_from("<I", result, 0x66220)[0])
+        self.assertEqual(0x3C023F80, struct.unpack_from("<I", result, 0x662EC)[0])
+        self.assertEqual(0x44828000, struct.unpack_from("<I", result, 0x662F0)[0])
+
+        scale_va = (scale_jal_1 & 0x03FFFFFF) << 2
+        scale_file = p_offset + scale_va - p_vaddr
+        scale_words = struct.unpack_from(
+            f"<{COMPANION_AFK_SCALE_HOOK_SIZE // 4}I",
+            result,
+            scale_file,
+        )
+        self.assertEqual(
+            (
+                0x86080004, 0x2508FDA7, 0x2D090258, 0x11200008,
+                0x00000000, 0x00084880,
+            ),
+            scale_words[:6],
+        )
+        self.assertEqual(
+            (
+                0x01495021, 0xC5500000, 0x03E00008, 0x00000000,
+                0x3C083F80, 0x44888000, 0x03E00008, 0x00000000,
+            ),
+            scale_words[8:],
+        )
+
+        hi = scale_words[6] & 0xFFFF
+        lo = scale_words[7] & 0xFFFF
+        if lo & 0x8000:
+            lo -= 0x10000
+        scale_table_va = ((hi << 16) + lo) & 0xFFFFFFFF
+        scale_table_file = p_offset + scale_table_va - p_vaddr
+        self.assertGreaterEqual(scale_table_va, p_vaddr)
+        self.assertLessEqual(
+            scale_table_va + len(COMPANION_AFK_TEXT_SCALES) * 4,
+            p_vaddr + p_filesz,
+        )
+        self.assertEqual(
+            struct.pack(
+                f"<{len(COMPANION_AFK_TEXT_SCALES)}f",
+                *COMPANION_AFK_TEXT_SCALES,
+            ),
+            result[
+                scale_table_file:
+                scale_table_file + len(COMPANION_AFK_TEXT_SCALES) * 4
+            ],
+        )
+
+        self.assertEqual(COMPANION_AFK_RECORD_COUNT, len(COMPANION_AFK_TEXT_SCALES))
+        for record_index, (lines, scale) in enumerate(
+            zip(COMPANION_AFK_TRANSLATIONS, COMPANION_AFK_TEXT_SCALES, strict=True)
+        ):
+            longest = max((len(line) for line in lines if line), default=0)
+            expected = 1.0 if longest == 0 else min(
+                1.0,
+                COMPANION_AFK_TEXT_SAFE_CELLS / longest,
+            )
+            with self.subTest(record=record_index):
+                self.assertAlmostEqual(expected, scale)
+                for line in lines:
+                    if line:
+                        self.assertLessEqual(
+                            len(line) * scale,
+                            COMPANION_AFK_TEXT_SAFE_CELLS + 1e-6,
+                        )
+
     def test_r38_runtime_selector_keeps_body_stable_and_points_tail_at_active_slot(self) -> None:
         result = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, p_flags, _align = struct.unpack_from(
@@ -412,11 +552,28 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(0x2C43001F, hook_words[7])
         self.assertIn(0x860D02D0, hook_words)         # lh t5,0x2d0(s0): slot 0/1
         self.assertEqual(0x25A50068, hook_words[-6])  # a1 = slot + 0x68
-        self.assertEqual(0x8FBF000C, hook_words[-5])
-        self.assertEqual(0x27BD0010, hook_words[-4])
-        self.assertEqual(0x24040002, hook_words[-3])
-        self.assertEqual(0x03E00008, hook_words[-2])
-        self.assertEqual(0, hook_words[-1])
+        self.assertEqual(0x02, hook_words[-5] >> 26)  # tail-jump geometry extension
+        self.assertEqual((0, 0, 0, 0), hook_words[-4:])
+
+        extension_va = (hook_words[-5] & 0x03FFFFFF) << 2
+        extension_file = p_offset + extension_va - p_vaddr
+        extension_words = struct.unpack_from(
+            f"<{COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE // 4}I",
+            result,
+            extension_file,
+        )
+        self.assertEqual(
+            (
+                0x000D7100, 0x000D7940, 0x01CF7021,
+                0x3C0F0045, 0x25EF0AC4, 0x01EE7821,
+                0x3C0E4360, 0xADEE0000,       # width 224
+                0x3C0E4250, 0x11A00002, 0x00000000,
+                0x3C0E42C2, 0xADEE0008,       # pivot-X 52 / 97
+                0x8FBF000C, 0x27BD0010, 0x24040002,
+                0x03E00008, 0x00000000,
+            ),
+            extension_words,
+        )
 
         # The two sibling resources share a body but move the tail 58px.  After
         # r38 scaling, body-left/text-left move only 13px right for slot 2.

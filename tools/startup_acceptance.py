@@ -40,6 +40,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
     COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
     COMPANION_ACTION_BUBBLE_TABLE_RECORD_OFFSET,
+    COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
     COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
     COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
@@ -47,6 +48,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
     COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
     COMPANION_ACTION_SLOT2_BUBBLE_TABLE_RECORD_OFFSET,
+    COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY,
     COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
     COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_SLOT_RESOURCES,
@@ -59,6 +61,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
+    COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE,
     COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
     COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS,
     COMPANION_AFK_PANEL_FRAME_COUNT,
@@ -71,6 +74,10 @@ from tools.companion_hud import (
     COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
     COMPANION_AFK_EMPTY_VA,
     COMPANION_AFK_EXPECTED_LIVE_FIELDS,
+    COMPANION_AFK_GEOMETRY_HOOK_SIZE,
+    COMPANION_AFK_SCALE_HOOK_SIZE,
+    COMPANION_AFK_TEXT_SAFE_CELLS,
+    COMPANION_AFK_TEXT_SCALES,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_RECORDS_PER_COMPANION,
@@ -442,7 +449,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
                 COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
                 COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
             ),
-            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
+            COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
         ),
         (
             COMPANION_ACTION_SLOT2_BUBBLE_TABLE_RECORD_OFFSET,
@@ -453,7 +460,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
                 COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
                 COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
             ),
-            COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
+            COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY,
         ),
     )
     for record_offset, metadata_va, offsets, geometry in bubble_specs:
@@ -545,11 +552,31 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         or hook_words[7] != 0x2C43001F
         or 0x860D02D0 not in hook_words
         or hook_words[-6] != 0x25A50068
-        or hook_words[-5] != 0x8FBF000C
-        or hook_words[-4] != 0x27BD0010
-        or hook_words[-3] != 0x24040002
-        or hook_words[-2] != 0x03E00008
-        or hook_words[-1] != 0
+        or hook_words[-5] >> 26 != 0x02
+        or hook_words[-4:] != (0, 0, 0, 0)
+    ):
+        return False
+
+    action_geometry_va = (hook_words[-5] & 0x03FFFFFF) << 2
+    action_geometry_rel = action_geometry_va - p_vaddr
+    if (
+        action_geometry_rel < 0
+        or action_geometry_rel + COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE > p_filesz
+    ):
+        return False
+    action_geometry_file = p_offset + action_geometry_rel
+    if struct.unpack_from(
+        f"<{COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE // 4}I",
+        raw,
+        action_geometry_file,
+    ) != (
+        0x000D7100, 0x000D7940, 0x01CF7021,
+        0x3C0F0045, 0x25EF0AC4, 0x01EE7821,
+        0x3C0E4360, 0xADEE0000,
+        0x3C0E4250, 0x11A00002, 0x00000000,
+        0x3C0E42C2, 0xADEE0008,
+        0x8FBF000C, 0x27BD0010, 0x24040002,
+        0x03E00008, 0x00000000,
     ):
         return False
 
@@ -606,6 +633,100 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         if lo & 0x8000:
             lo -= 0x10000
         return ((hi << 16) + lo) & 0xFFFFFFFF
+
+    # r47 AFK restores the selected shared green resource to native geometry
+    # before constructing free-talk, while leaving blue 0x6A pristine.
+    afk_geometry_jal = struct.unpack_from("<I", raw, 0x66050)[0]
+    if (
+        afk_geometry_jal >> 26 != 0x03
+        or struct.unpack_from("<I", raw, 0x66054)[0] != 0x000219C0
+    ):
+        return False
+    afk_geometry_va = (afk_geometry_jal & 0x03FFFFFF) << 2
+    afk_geometry_rel = afk_geometry_va - p_vaddr
+    if (
+        afk_geometry_rel < 0
+        or afk_geometry_rel + COMPANION_AFK_GEOMETRY_HOOK_SIZE > p_filesz
+    ):
+        return False
+    if struct.unpack_from(
+        f"<{COMPANION_AFK_GEOMETRY_HOOK_SIZE // 4}I",
+        raw,
+        p_offset + afk_geometry_rel,
+    ) != (
+        0x86020004, 0x2C490259, 0x15200016, 0x00000000,
+        0x860802F8, 0x2D090002, 0x11200012, 0x00000000,
+        0x00084900, 0x00085140, 0x012A4821,
+        0x3C0A0045, 0x254A0AC4, 0x01495021,
+        0x3C094390, 0xAD490000,
+        0x3C0942A0, 0xAD490004,
+        0x3C09429A, 0xAD49000C,
+        0x3C094286, 0x11000002, 0x00000000,
+        0x3C0942FA, 0xAD490008,
+        0x000219C0, 0x03E00008, 0x00000000,
+    ):
+        return False
+
+    scale_jal_1 = struct.unpack_from("<I", raw, 0x6625C)[0]
+    scale_jal_2 = struct.unpack_from("<I", raw, 0x6632C)[0]
+    if (
+        scale_jal_1 != scale_jal_2
+        or scale_jal_1 >> 26 != 0x03
+        or struct.unpack_from("<I", raw, 0x66260)[0] != 0
+        or struct.unpack_from("<I", raw, 0x66330)[0] != 0
+        or struct.unpack_from("<I", raw, 0x6621C)[0] != 0x3C023F80
+        or struct.unpack_from("<I", raw, 0x66220)[0] != 0x44828000
+        or struct.unpack_from("<I", raw, 0x662EC)[0] != 0x3C023F80
+        or struct.unpack_from("<I", raw, 0x662F0)[0] != 0x44828000
+    ):
+        return False
+    scale_hook_va = (scale_jal_1 & 0x03FFFFFF) << 2
+    scale_hook_rel = scale_hook_va - p_vaddr
+    if (
+        scale_hook_rel < 0
+        or scale_hook_rel + COMPANION_AFK_SCALE_HOOK_SIZE > p_filesz
+    ):
+        return False
+    scale_words = struct.unpack_from(
+        f"<{COMPANION_AFK_SCALE_HOOK_SIZE // 4}I",
+        raw,
+        p_offset + scale_hook_rel,
+    )
+    if (
+        scale_words[:6]
+        != (0x86080004, 0x2508FDA7, 0x2D090258, 0x11200008, 0, 0x00084880)
+        or scale_words[8:]
+        != (
+            0x01495021, 0xC5500000, 0x03E00008, 0,
+            0x3C083F80, 0x44888000, 0x03E00008, 0,
+        )
+    ):
+        return False
+    scale_table_va = _materialized_va(scale_words[6], scale_words[7])
+    scale_table_rel = scale_table_va - p_vaddr
+    expected_scales = struct.pack(
+        f"<{len(COMPANION_AFK_TEXT_SCALES)}f",
+        *COMPANION_AFK_TEXT_SCALES,
+    )
+    if (
+        scale_table_rel < 0
+        or scale_table_rel + len(expected_scales) > p_filesz
+        or raw[
+            p_offset + scale_table_rel:
+            p_offset + scale_table_rel + len(expected_scales)
+        ] != expected_scales
+    ):
+        return False
+    for lines, scale in zip(
+        COMPANION_AFK_TRANSLATIONS,
+        COMPANION_AFK_TEXT_SCALES,
+        strict=True,
+    ):
+        if any(
+            line and len(line) * scale > COMPANION_AFK_TEXT_SAFE_CELLS + 1e-6
+            for line in lines
+        ):
+            return False
 
     table_va = _materialized_va(hook_words[14], hook_words[15])
     table_rel = table_va - p_vaddr
@@ -930,7 +1051,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         _check(
             "companion_hud_layout",
             _verify_companion_hud_layout(raw),
-            "companion action callout is not using the compact r35 group-2 0x68 bubble geometry",
+            "companion action/AFK shared bubble is not using the r47 consumer-specific geometry and text-fit runtime",
         )
     )
     heap_break_ok = (
