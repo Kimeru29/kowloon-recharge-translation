@@ -675,3 +675,16 @@ The AFK text constructor uses style-0, whose renderer advance is 16px. Native AF
 Current scale distribution: 81 records remain at 1.0 and 519 scale below 1.0; minimum is 0.4342105263 for 38-character rows. This is intentionally horizontal-only: row Y positions and the untouched f17/f18 transform components remain native. If runtime readability of the longest lines is later judged too compressed, the next safe investigation is the AFK text object's actual newline/wrap support; do not mutate `0x6A` or shared geometry again to solve text length.
 
 Compatibility rule: r47 extras are appended after the r46 visibility hook. The 999 AFK pointer targets and visibility-hook VA/content are unchanged r46→r47. The existing action hook keeps its VA and size; only its return tail changes into a jump to the appended compact-geometry extension. This preserves all historical translated addresses while separating AFK and L1 behavior at runtime.
+
+
+## r48 correction: AFK caller f16 is alpha; object +0x48 is X scale
+
+Pablo's r47 screenshot is decisive runtime evidence: the bubble geometry is corrected, but the AFK text disappears. Re-disassembly of the constructor chain explains why. At both specialized free-talk callsites, caller `f16` is loaded with 1.0 before `jal 0x001950A0`. Inside that constructor, the value is forwarded to the generic object constructor `0x00188AD0` as the fourth normalized color component. The generic constructor clamps the four color values to [0,1] and stores them as RGBA state. Therefore the r47 table values in f16 were changing alpha, not text width.
+
+The real transform fields are object `+0x48/+0x4C`. The text renderer loads `+0x48` into `f29`; horizontal glyph-coordinate math multiplies by that value. It separately loads `+0x4C` into `f28`, which is used on the vertical path. This makes `+0x48` the correct, directly observed horizontal scale owner.
+
+r48 keeps `0x6625C=0x3C023F80; 0x66260=0x44828000` and `0x6632C=0x3C023F80; 0x66330=0x44828000`, restoring full alpha for both specialized AFK rows. The post-constructor stores are the safe hook sites. Line 1 replaces `0x66284: sw v0,0x28(s0)` with JAL and moves that store into `0x66288` as the delay slot; the helper restores the displaced `lh v0,0x0A(s0)`. Line 2 does the same at `0x66354/0x66358`, restoring `v0=0x78` before native `sh v0,8(s0)`.
+
+The existing 64-byte scale-hook allocation is sufficient and remains at VA `0x00949824` / file `0x849A74`. It preserves the returned text object in t3, derives the zero-based AFK record index, loads the existing r47 table word, writes it to `0x48(t3)`, and distinguishes the two continuation contracts from RA. This introduces no nested calls and touches only caller-saved registers.
+
+Compatibility proof: r47→r48 changes no segment sizes and no relocated VAs. Scale table VA `0x00948EC4` is identical and its complete 2,400 bytes are identical. All 999 AFK pointer owners and all r47 geometry/resource/runtime helpers except the 64-byte scale-hook body are byte-identical. Do not reintroduce pre-constructor f16 scaling; f16 is now a protected alpha owner for this path.

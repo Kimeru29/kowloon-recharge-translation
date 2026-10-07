@@ -373,7 +373,7 @@ class CompanionHudTests(unittest.TestCase):
             words,
         )
 
-    def test_r47_afk_runtime_restores_native_outer_geometry_and_scales_every_record(self) -> None:
+    def test_r48_afk_runtime_keeps_full_alpha_and_scales_horizontal_transform(self) -> None:
         result = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, _flags, _align = struct.unpack_from(
             "<IIIIIIII", result, 0x54
@@ -432,17 +432,27 @@ class CompanionHudTests(unittest.TestCase):
             geometry_words,
         )
 
-        scale_jal_1 = struct.unpack_from("<I", result, 0x6625C)[0]
-        scale_jal_2 = struct.unpack_from("<I", result, 0x6632C)[0]
+        # Runtime proved r47's f16 hook was scaling alpha. Both the ordinary
+        # h_buddy and specialized Re:charge constructors must keep f16=1.0.
+        for lui_offset, mtc1_offset in (
+            (0x6621C, 0x66220),
+            (0x6625C, 0x66260),
+            (0x662EC, 0x662F0),
+            (0x6632C, 0x66330),
+        ):
+            self.assertEqual(0x3C023F80, struct.unpack_from("<I", result, lui_offset)[0])
+            self.assertEqual(0x44828000, struct.unpack_from("<I", result, mtc1_offset)[0])
+
+        # r48 applies the calculated fit after construction to object +0x48,
+        # which the native renderer multiplies into horizontal glyph position.
+        scale_jal_1 = struct.unpack_from("<I", result, 0x66284)[0]
+        scale_jal_2 = struct.unpack_from("<I", result, 0x66354)[0]
         self.assertEqual(scale_jal_1, scale_jal_2)
         self.assertEqual(0x03, scale_jal_1 >> 26)
-        self.assertEqual(0, struct.unpack_from("<I", result, 0x66260)[0])
-        self.assertEqual(0, struct.unpack_from("<I", result, 0x66330)[0])
-        # Original/non-Re:charge h_buddy text keeps f16=1.0.
-        self.assertEqual(0x3C023F80, struct.unpack_from("<I", result, 0x6621C)[0])
-        self.assertEqual(0x44828000, struct.unpack_from("<I", result, 0x66220)[0])
-        self.assertEqual(0x3C023F80, struct.unpack_from("<I", result, 0x662EC)[0])
-        self.assertEqual(0x44828000, struct.unpack_from("<I", result, 0x662F0)[0])
+        self.assertEqual(0xAE020028, struct.unpack_from("<I", result, 0x66288)[0])
+        self.assertEqual(0x00022900, struct.unpack_from("<I", result, 0x6628C)[0])
+        self.assertEqual(0xAE02002C, struct.unpack_from("<I", result, 0x66358)[0])
+        self.assertEqual(0xA6020008, struct.unpack_from("<I", result, 0x6635C)[0])
 
         scale_va = (scale_jal_1 & 0x03FFFFFF) << 2
         scale_file = p_offset + scale_va - p_vaddr
@@ -453,21 +463,33 @@ class CompanionHudTests(unittest.TestCase):
         )
         self.assertEqual(
             (
-                0x86080004, 0x2508FDA7, 0x2D090258, 0x11200008,
-                0x00000000, 0x00084880,
+                0x00405821,  # addu t3,v0,zero: constructed text object
+                0x86080004,  # lh t0,4(s0): AFK record
+                0x2508FDA7,  # subtract first Re:charge record 0x259
+                0x00084080,  # index * 4
             ),
-            scale_words[:6],
+            scale_words[:4],
         )
+        self.assertEqual(0x3C090000, scale_words[4] & 0xFFFF0000)
+        self.assertEqual(0x01284821, scale_words[5])
+        self.assertEqual(0x8D280000, scale_words[6] & 0xFFFF0000)
+        self.assertEqual(0xAD680048, scale_words[7])  # sw scale,0x48(text object)
         self.assertEqual(
             (
-                0x01495021, 0xC5500000, 0x03E00008, 0x00000000,
-                0x3C083F80, 0x44888000, 0x03E00008, 0x00000000,
+                0x3C080016,
+                0x3508620C,  # line-1 return address
+                0x17E80002,
+                0x24020078,  # line-2 continuation v0
+                0x8602000A,  # line-1 continuation v0
+                0x03E00008,
+                0x00000000,
+                0x00000000,
             ),
             scale_words[8:],
         )
 
-        hi = scale_words[6] & 0xFFFF
-        lo = scale_words[7] & 0xFFFF
+        hi = scale_words[4] & 0xFFFF
+        lo = scale_words[6] & 0xFFFF
         if lo & 0x8000:
             lo -= 0x10000
         scale_table_va = ((hi << 16) + lo) & 0xFFFFFFFF

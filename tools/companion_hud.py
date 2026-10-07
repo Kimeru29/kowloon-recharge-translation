@@ -133,18 +133,29 @@ COMPANION_AFK_GEOMETRY_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x66050, 0x86020004),  # lh v0,4(s0): current talk record
     (0x66054, 0x000219C0),  # sll v1,v0,7 (kept as JAL delay slot)
 )
+# r47 incorrectly treated f16 as X scale. Runtime + constructor tracing proves
+# f16 is the fourth clamped RGBA component (alpha), so r48 freezes it at 1.0.
+COMPANION_AFK_ALPHA_PREIMAGES: tuple[tuple[int, int], ...] = (
+    (0x6625C, 0x3C023F80),  # line 1: lui v0,1.0
+    (0x66260, 0x44828000),  # mtc1 v0,f16 (alpha)
+    (0x6632C, 0x3C023F80),  # line 2: lui v0,1.0
+    (0x66330, 0x44828000),  # mtc1 v0,f16 (alpha)
+)
+# The real horizontal transform is object +0x48. Apply it only after the
+# specialized AFK text constructor returns, preserving the native continuation
+# in each JAL delay slot/helper return value.
 COMPANION_AFK_SCALE_PREIMAGES: tuple[tuple[int, int], ...] = (
-    (0x6625C, 0x3C023F80),  # line 1 AFK f16=1.0
-    (0x66260, 0x44828000),
-    (0x6632C, 0x3C023F80),  # line 2 AFK f16=1.0
-    (0x66330, 0x44828000),
+    (0x66284, 0xAE020028),  # line 1: sw v0,0x28(s0)
+    (0x66288, 0x8602000A),  # lh v0,0x0a(s0)
+    (0x66354, 0xAE02002C),  # line 2: sw v0,0x2c(s0)
+    (0x66358, 0x24020078),  # li v0,0x78
 )
 COMPANION_AFK_RUNTIME_PATCH_OFFSETS = (
     0x66050,
-    0x6625C,
-    0x66260,
-    0x6632C,
-    0x66330,
+    0x66284,
+    0x66288,
+    0x66354,
+    0x66358,
 )
 # Existing H_TalkBuddyTask owner that skips the complete L1 callout when zero.
 # r44 introduced the relocated predicate; r45 refined it to native AFK states
@@ -399,26 +410,33 @@ def _action_geometry_extension_bytes() -> bytes:
 
 
 def _afk_scale_hook_bytes(*, table_va: int) -> bytes:
-    """Load a record-wide horizontal AFK text scale into f16."""
+    """Apply record-wide X scale to the constructed AFK text object.
+
+    The specialized constructor returns the text object in v0. Runtime tracing
+    proves object +0x48 is the horizontal transform; caller f16 is alpha and
+    must remain the native 1.0. The two post-constructor callsites have different
+    continuation values, so RA selects the value to restore in v0 before return.
+    """
 
     table_hi, table_lo = _split_address(table_va)
+    line1_return_va = 0x0016620C
     words = (
-        _mips_i(0x21, 16, 8, 0x0004),       # lh t0,4(s0) record index
+        _mips_r(2, 0, 11, 0, 0x21),         # addu t3,v0,zero: text object
+        _mips_i(0x21, 16, 8, 0x0004),       # lh t0,4(s0): AFK record index
         _mips_i(0x09, 8, 8, -COMPANION_AFK_FIRST_RECORD_INDEX),
-        _mips_i(0x0B, 8, 9, COMPANION_AFK_RECORD_COUNT),  # sltiu t1,t0,600
-        _mips_i(0x04, 9, 0, 8),             # beq t1,zero,fallback
-        0x00000000,                          # nop
-        _mips_r(0, 8, 9, 2, 0x00),          # sll t1,t0,2
-        _mips_i(0x0F, 0, 10, table_hi),      # lui t2,hi(scale table)
-        _mips_i(0x09, 10, 10, table_lo),     # addiu t2,t2,lo(scale table)
-        _mips_r(10, 9, 10, 0, 0x21),        # addu t2,t2,t1
-        _mips_i(0x31, 10, 16, 0),            # lwc1 f16,0(t2)
+        _mips_r(0, 8, 8, 2, 0x00),          # sll t0,t0,2
+        _mips_i(0x0F, 0, 9, table_hi),       # lui t1,hi(scale table)
+        _mips_r(9, 8, 9, 0, 0x21),          # addu t1,t1,t0
+        _mips_i(0x23, 9, 8, table_lo),       # lw t0,lo(scale table)(t1)
+        _mips_i(0x2B, 11, 8, 0x0048),       # sw t0,0x48(t3): horizontal scale
+        _mips_i(0x0F, 0, 8, line1_return_va >> 16),
+        _mips_i(0x0D, 8, 8, line1_return_va & 0xFFFF),
+        _mips_i(0x05, 31, 8, 2),            # bne ra,t0,line2_return
+        _mips_i(0x09, 0, 2, 0x0078),        # delay: line2 needs v0=0x78
+        _mips_i(0x21, 16, 2, 0x000A),       # line1: lh v0,0x0a(s0)
         _mips_r(31, 0, 0, 0, 0x08),         # jr ra
         0x00000000,                          # nop
-        _mips_i(0x0F, 0, 8, 0x3F80),        # fallback: lui t0,1.0
-        _mips_mtc1(8, 16),                   # mtc1 t0,f16
-        _mips_r(31, 0, 0, 0, 0x08),         # jr ra
-        0x00000000,                          # nop
+        0x00000000,                          # stable 64-byte payload size
     )
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_AFK_SCALE_HOOK_SIZE:
@@ -1070,6 +1088,7 @@ def finalize_companion_action_runtime_layout(
         ("runtime", COMPANION_ACTION_RUNTIME_PREIMAGES),
         ("visibility", COMPANION_ACTION_VISIBILITY_PREIMAGES),
         ("AFK geometry", COMPANION_AFK_GEOMETRY_PREIMAGES),
+        ("AFK alpha", COMPANION_AFK_ALPHA_PREIMAGES),
         ("AFK scale", COMPANION_AFK_SCALE_PREIMAGES),
     ):
         for offset, expected in preimages:
@@ -1085,12 +1104,15 @@ def finalize_companion_action_runtime_layout(
     # slot; the helper recomputes v0/v1 before returning.
     struct.pack_into("<I", result, 0x66050, _jal_word(afk_geometry_hook_va))
 
-    # Replace only the Re:charge/free-talk f16=1.0 setup. The original h_buddy
-    # text path at 0x6621C/0x66220 and 0x662EC/0x662F0 remains pristine.
-    struct.pack_into("<I", result, 0x6625C, _jal_word(scale_hook_va))
-    struct.pack_into("<I", result, 0x66260, 0x00000000)
-    struct.pack_into("<I", result, 0x6632C, _jal_word(scale_hook_va))
-    struct.pack_into("<I", result, 0x66330, 0x00000000)
+    # r48 keeps the specialized AFK constructor's f16=1.0 untouched:
+    # constructor tracing proves f16 is alpha, not geometry. Apply the calculated
+    # horizontal scale to the returned text object's +0x48 transform instead.
+    # The original object stores move into each JAL delay slot; the helper
+    # restores the overwritten continuation value in v0 before returning.
+    struct.pack_into("<I", result, 0x66284, _jal_word(scale_hook_va))
+    struct.pack_into("<I", result, 0x66288, 0xAE020028)  # sw v0,0x28(s0)
+    struct.pack_into("<I", result, 0x66354, _jal_word(scale_hook_va))
+    struct.pack_into("<I", result, 0x66358, 0xAE02002C)  # sw v0,0x2c(s0)
 
     # Use the existing "skip complete L1 callout" branch, but compute its guard
     # from H_TalkBuddyTask's own state. The JAL occupies the old guard load,
