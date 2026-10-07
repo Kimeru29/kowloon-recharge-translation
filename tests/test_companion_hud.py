@@ -24,12 +24,6 @@ from tools.companion_hud import (
     COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
     COMPANION_ACTION_SLOT_RESOURCES,
     COMPANION_ACTION_SLOT_TEXT_X,
-    COMPANION_ACTION_BUBBLE_METADATA_SIZE,
-    COMPANION_GROUP2_NEXT_TABLE_POINTER_OFFSET,
-    COMPANION_GROUP2_NEXT_TABLE_VA,
-    COMPANION_GROUP2_RESOURCE_COUNT,
-    COMPANION_GROUP2_TABLE_OFFSET,
-    COMPANION_GROUP2_TABLE_POINTER_OFFSET,
     COMPANION_ACTION_ID_GETTER_VA,
     COMPANION_ACTION_ID_KEY,
     COMPANION_ACTION_ID_REFERENCE_PREIMAGES,
@@ -41,9 +35,7 @@ from tools.companion_hud import (
     COMPANION_SLOT_INDEX_PREIMAGES,
     COMPANION_SLOT_POSITIONS,
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
-    COMPANION_COMMENT_EXTRA_POINTER_ALIASES,
     COMPANION_COMMENT_LINES,
-    companion_comment_pointer_offsets,
     encode_companion_action,
     patch_companion_action_layout,
     validate_companion_hud_source,
@@ -77,11 +69,6 @@ class CompanionHudTests(unittest.TestCase):
     def test_r30_comment_inventory_is_complete_ps4_exact_and_fail_closed(self) -> None:
         self.assertEqual(1650, len(COMPANION_COMMENT_LINES))
         self.assertEqual(1784, sum(len(spec.pointer_offsets) for spec in COMPANION_COMMENT_LINES))
-        self.assertEqual(10, sum(len(offsets) for offsets in COMPANION_COMMENT_EXTRA_POINTER_ALIASES.values()))
-        self.assertEqual(
-            1794,
-            sum(len(companion_comment_pointer_offsets(spec)) for spec in COMPANION_COMMENT_LINES),
-        )
         self.assertEqual(7, sum(spec.official_english == "@D" for spec in COMPANION_COMMENT_LINES))
         self.assertEqual(1650, len({spec.source_offset for spec in COMPANION_COMMENT_LINES}))
         first = COMPANION_COMMENT_LINES[0]
@@ -95,30 +82,6 @@ class CompanionHudTests(unittest.TestCase):
         tampered[first.pointer_offsets[0]] ^= 1
         with self.assertRaisesRegex(ValueError, "companion comment pointer preimage mismatch"):
             validate_companion_hud_source(bytes(tampered))
-
-        extra_pointer = COMPANION_COMMENT_EXTRA_POINTER_ALIASES[0x3C46E8][0]
-        tampered = bytearray(RAW)
-        tampered[extra_pointer] ^= 1
-        with self.assertRaisesRegex(ValueError, "companion comment pointer preimage mismatch"):
-            validate_companion_hud_source(bytes(tampered))
-
-    def test_r39_comment_alias_inventory_covers_every_direct_source_pointer(self) -> None:
-        source_vas = {
-            _ELF_MAIN_VADDR + spec.source_offset - _ELF_MAIN_FILE_OFFSET
-            for spec in COMPANION_COMMENT_LINES
-        }
-        discovered = {
-            offset
-            for offset in range(0, len(RAW) - 3, 4)
-            if struct.unpack_from("<I", RAW, offset)[0] in source_vas
-        }
-        owned = {
-            pointer_offset
-            for spec in COMPANION_COMMENT_LINES
-            for pointer_offset in companion_comment_pointer_offsets(spec)
-        }
-        self.assertEqual(1794, len(discovered))
-        self.assertEqual(discovered, owned)
 
     def test_r30_companion_action_inventory_covers_hud_skill_labels(self) -> None:
         self.assertEqual(31, len(COMPANION_ACTION_LABELS))
@@ -141,15 +104,6 @@ class CompanionHudTests(unittest.TestCase):
                 target_va = struct.unpack_from("<I", result, pointer_offset)[0]
                 expected = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
                 self.assertEqual(expected, _read_at_va(result, target_va, len(expected)))
-
-        comments_by_source = {spec.source_offset: spec for spec in COMPANION_COMMENT_LINES}
-        for source_offset, pointer_offsets in COMPANION_COMMENT_EXTRA_POINTER_ALIASES.items():
-            spec = comments_by_source[source_offset]
-            expected = encode_ps2_english(spec.display_english, collapse_spaces=False) + b"\x00"
-            for pointer_offset in pointer_offsets:
-                with self.subTest(extra_pointer_offset=hex(pointer_offset)):
-                    target_va = struct.unpack_from("<I", result, pointer_offset)[0]
-                    self.assertEqual(expected, _read_at_va(result, target_va, len(expected)))
 
         for spec in (COMPANION_COMMENT_LINES[0], COMPANION_ACTION_LABELS[25]):
             source = spec.source_text.encode("cp932") + b"\x00"
@@ -184,8 +138,7 @@ class CompanionHudTests(unittest.TestCase):
         self.assertTrue(all(len(line) <= 17 for layout in COMPANION_ACTION_LAYOUTS for line in layout.lines))
 
         result = build_early_ui_elf(RAW)
-        # r39 restores the shared 0x68/0x69 metadata for passive/AFK chatter.
-        # The accepted r35 compact geometry lives only in private action clones.
+        # The accepted one-line startup/default geometry remains exactly r35.
         bubble_offsets = (
             COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
             COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
@@ -193,7 +146,7 @@ class CompanionHudTests(unittest.TestCase):
             COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
         )
         self.assertEqual(
-            COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
+            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
             tuple(struct.unpack_from("<f", result, offset)[0] for offset in bubble_offsets),
         )
 
@@ -253,61 +206,16 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(0x38420000 | COMPANION_ACTION_ID_KEY, hook_words[6])
         self.assertEqual(0x2C43001F, hook_words[7])
         self.assertIn(0x860D02D0, hook_words)         # lh t5,0x2d0(s0): slot 0/1
-        self.assertEqual(
-            0x25A50000 | COMPANION_ACTION_SLOT_RESOURCES[0],
-            hook_words[-6],
-        )
+        self.assertEqual(0x25A50068, hook_words[-6])  # a1 = slot + 0x68
         self.assertEqual(0x8FBF000C, hook_words[-5])
         self.assertEqual(0x27BD0010, hook_words[-4])
         self.assertEqual(0x24040002, hook_words[-3])
         self.assertEqual(0x03E00008, hook_words[-2])
         self.assertEqual(0, hook_words[-1])
 
-        # r39 extends group 2 instead of mutating shared 0x68/0x69. The first
-        # 164 records are byte-identical and private 0xA4/0xA5 point at compact
-        # relocated clones, preserving the accepted r38 active-action geometry.
-        self.assertEqual((0xA4, 0xA5), COMPANION_ACTION_SLOT_RESOURCES)
-        resource_table_va = struct.unpack_from("<I", result, COMPANION_GROUP2_TABLE_POINTER_OFFSET)[0]
-        self.assertNotEqual(COMPANION_GROUP2_NEXT_TABLE_VA, resource_table_va)
-        self.assertEqual(
-            COMPANION_GROUP2_NEXT_TABLE_VA,
-            struct.unpack_from("<I", result, COMPANION_GROUP2_NEXT_TABLE_POINTER_OFFSET)[0],
-        )
-        resource_table_file = p_offset + resource_table_va - p_vaddr
-        source_table = RAW[
-            COMPANION_GROUP2_TABLE_OFFSET:
-            COMPANION_GROUP2_TABLE_OFFSET + COMPANION_GROUP2_RESOURCE_COUNT * 8
-        ]
-        self.assertEqual(
-            source_table,
-            result[
-                resource_table_file:
-                resource_table_file + COMPANION_GROUP2_RESOURCE_COUNT * 8
-            ],
-        )
-        private_geometries = (
-            COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY,
-            COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY,
-        )
-        for slot, (resource_id, expected_geometry) in enumerate(
-            zip(COMPANION_ACTION_SLOT_RESOURCES, private_geometries, strict=True)
-        ):
-            metadata_va, record_count = struct.unpack_from(
-                "<II", result, resource_table_file + resource_id * 8
-            )
-            self.assertEqual(1, record_count)
-            metadata_file = p_offset + metadata_va - p_vaddr
-            self.assertEqual(
-                expected_geometry,
-                struct.unpack_from("<ffff", result, metadata_file + 4),
-            )
-            if slot == 1:
-                self.assertEqual(
-                    COMPANION_ACTION_BUBBLE_METADATA_SIZE,
-                    metadata_va - previous_metadata_va,
-                )
-            previous_metadata_va = metadata_va
-
+        # The two sibling resources share a body but move the tail 58px.  After
+        # r38 scaling, body-left/text-left move only 13px right for slot 2.
+        self.assertEqual((0x68, 0x69), COMPANION_ACTION_SLOT_RESOURCES)
         body_left = (
             COMPANION_SLOT_POSITIONS[0][0] - COMPANION_ACTION_BUBBLE_TARGET_GEOMETRY[2],
             COMPANION_SLOT_POSITIONS[1][0] - COMPANION_ACTION_SLOT2_BUBBLE_TARGET_GEOMETRY[2],
@@ -346,11 +254,6 @@ class CompanionHudTests(unittest.TestCase):
         tampered = bytearray(RAW)
         tampered[COMPANION_SLOT_POSITION_TABLE_OFFSET] ^= 1
         with self.assertRaisesRegex(ValueError, "companion slot position table drifted"):
-            patch_companion_action_layout(bytes(tampered))
-
-        tampered = bytearray(RAW)
-        tampered[COMPANION_GROUP2_TABLE_POINTER_OFFSET] ^= 1
-        with self.assertRaisesRegex(ValueError, "companion group-2 table owner drifted"):
             patch_companion_action_layout(bytes(tampered))
 
         for offset, _expected in (*COMPANION_SLOT_INDEX_PREIMAGES, *COMPANION_ACTION_ID_REFERENCE_PREIMAGES):

@@ -166,81 +166,6 @@ _NAME_FLOW_FLAG_ZERO_WORD = 0x0000282D  # daddu a1, zero, zero
 _NAME_FLOW_FLAG_ONE_WORD = 0x24050001   # addiu a1, zero, 1
 _NAME_FLOW_TRANSITION_JAL_WORD = 0x0C0A1788  # jal 0x285e20
 
-# The official remaster's English m_name constants are M_NAME_NAME_EN_MAX=8
-# and M_NAME_LOCALIZE_NAME_SIZE_USA=8.  The PS2 editor artificially caps the
-# same two name fields at 3+3 even though its downstream setters copy 32 bytes
-# per field.  English already skips the kana-reading states, so reuse those
-# otherwise-dead object regions to give surname and given name one 32-byte
-# C-string arena each: +0x48..+0x67 and +0x68..+0x87.  Eight PS2-wide glyphs
-# consume 16 bytes, leaving ample NUL/padding in each arena.  Every changed
-# instruction is fail-closed against the pristine executable.
-NAME_ENGLISH_MAX_CHARS = 8
-NAME_ENGLISH_EDITOR_PATCHES: tuple[tuple[int, int, int], ...] = (
-    # Backspace/delete: 8-char split, 8-char shifts, second field at +0x68.
-    (0x184FC8, 0x24030003, 0x24030008),
-    (0x185020, 0x28820002, 0x28820007),
-    (0x18502C, 0x2604004C, 0x26040056),
-    (0x185078, 0xA0400052, 0xA0400058),
-    (0x185088, 0xA0400053, 0xA0400059),
-    (0x185090, 0x2444FFFD, 0x2444FFF8),
-    (0x1850A4, 0x8062005A, 0x8062006A),
-    (0x1850A8, 0xA0620058, 0xA0620068),
-    (0x1850AC, 0x8062005B, 0x8062006B),
-    (0x1850B0, 0xA0620059, 0xA0620069),
-    (0x1850B8, 0x28820002, 0x28820007),
-    (0x1850C4, 0x2604005C, 0x26040076),
-    (0x1850DC, 0x26050058, 0x26050068),
-    # Character append: split at 8, keep reading buffers completely inactive.
-    (0x18549C, 0x24020003, 0x24020008),
-    (0x1854EC, 0x2604001A, 0x10000041),  # b 0x285574
-    (0x1854F0, 0x0C0A0428, 0x00000000),
-    (0x185568, 0x2463FFFD, 0x2463FFF8),
-    (0x185574, 0x24640058, 0x24640068),
-    (0x18558C, 0x26050058, 0x26050068),
-    (0x185598, 0x2604001A, 0x10000016),  # b 0x285574
-    (0x18559C, 0x0C0A0428, 0x00000000),
-    (0x185614, 0x2A210003, 0x2A210008),
-    (0x185624, 0x28420003, 0x28420008),
-    (0x185664, 0x28420006, 0x28420010),
-    (0x185670, 0x24020005, 0x2402000F),
-    # Final cleanup/save: process 8 glyphs, save given from +0x68, skip readings.
-    (0x18604C, 0x24100002, 0x24100007),
-    (0x186094, 0x24100002, 0x24100007),
-    (0x1860A8, 0x24440058, 0x24440068),
-    (0x1860C8, 0xA0400058, 0xA0400068),
-    (0x1860CC, 0xA0400059, 0xA0400069),
-    (0x1860DC, 0x24100005, 0x10000023),  # b 0x2860ec
-    (0x1860E0, 0x1000000E, 0x00000000),
-    (0x186170, 0x26250058, 0x26250068),
-    (0x1861C4, 0x34048000, 0x10000015),  # b 0x28619c
-    (0x1861C8, 0x26250078, 0x00000000),
-    # Initial load: each global name setter exposes a 32-byte field.  Fill the
-    # two enlarged arenas and skip the now-unused kana-reading copies.
-    (0x18645C, 0x24060006, 0x24060020),
-    (0x186468, 0x26040058, 0x26040068),
-    (0x186470, 0x24060006, 0x24060020),
-    (0x18647C, 0x26040068, 0x10000009),  # b 0x286424
-    (0x186480, 0x8E0500DC, 0x00000000),
-)
-
-
-def patch_name_english_editor(raw: bytes) -> bytes:
-    for offset, expected, _replacement in NAME_ENGLISH_EDITOR_PATCHES:
-        if offset + 4 > len(raw):
-            raise ValueError("English name-editor patch is outside executable")
-        actual = struct.unpack_from("<I", raw, offset)[0]
-        if actual != expected:
-            raise ValueError(
-                f"English name-editor preimage mismatch at {offset:#x}: "
-                f"expected {expected:#010x}, got {actual:#010x}"
-            )
-
-    result = bytearray(raw)
-    for offset, _expected, replacement in NAME_ENGLISH_EDITOR_PATCHES:
-        struct.pack_into("<I", result, offset, replacement)
-    return bytes(result)
-
-
 # The M_Name prompt renderer uses one 16-pixel two-byte glyph font object and
 # repositions it per state before selecting text from NAME_PROMPT_TEXTS. Japanese
 # fixed X origins are visibly right-shifted with English. Entries 0/1 and 2/3
@@ -525,7 +450,6 @@ def build_startup_ui_elf(raw: bytes) -> bytes:
     titled = patch_title_labels(laid_out)
     relocated = patch_name_prompt_arena(titled)
     flowed = patch_name_entry_flow(relocated)
-    widened = patch_name_english_editor(flowed)
-    prompt_layout = patch_name_prompt_layout(widened)
+    prompt_layout = patch_name_prompt_layout(flowed)
     confirmation_focus = patch_name_confirmation_focus(prompt_layout)
     return patch_fixed_strings(confirmation_focus, STARTUP_FIXED_PATCHES)
