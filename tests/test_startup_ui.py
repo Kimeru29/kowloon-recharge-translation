@@ -17,6 +17,8 @@ from tools.startup_ui import (
     TITLE_NEW_GAME_START,
     TITLE_POINTER_TABLE_OFFSET,
     NAME_CONFIRMATION_FOCUS_PATCHES,
+    NAME_ENGLISH_EDITOR_PATCHES,
+    NAME_ENGLISH_MAX_CHARS,
     NAME_PROMPT_LAYOUT_PATCHES,
     NAME_PROMPT_POINTER_TABLE_OFFSET,
     NAME_PROMPT_TEXTS,
@@ -196,6 +198,33 @@ class StartupUiPatchTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "name.*flow|Name.*flow"):
             build_startup_ui_elf(bytes(tampered))
 
+    def test_english_name_editor_matches_remaster_eight_plus_eight_contract(self) -> None:
+        result = build_startup_ui_elf(RAW)
+
+        self.assertEqual(8, NAME_ENGLISH_MAX_CHARS)
+        self.assertGreater(len(NAME_ENGLISH_EDITOR_PATCHES), 30)
+        for offset, pristine, replacement in NAME_ENGLISH_EDITOR_PATCHES:
+            with self.subTest(offset=hex(offset)):
+                self.assertEqual(pristine, struct.unpack_from("<I", RAW, offset)[0])
+                self.assertEqual(replacement, struct.unpack_from("<I", result, offset)[0])
+
+        # The English editor now treats the old surname+reading and
+        # given+reading storage as two independent 32-byte C-string arenas.
+        # The second visible field therefore starts at +0x68, and both the
+        # init and commit paths use the same widened owner.
+        self.assertEqual(0x26040068, struct.unpack_from("<I", result, 0x186468)[0])
+        self.assertEqual(0x26250068, struct.unpack_from("<I", result, 0x186170)[0])
+        self.assertEqual(0x28420010, struct.unpack_from("<I", result, 0x185664)[0])
+        self.assertEqual(0x2402000F, struct.unpack_from("<I", result, 0x185670)[0])
+
+    def test_english_name_editor_fails_closed_on_each_owner_drift(self) -> None:
+        for offset, _expected, _replacement in NAME_ENGLISH_EDITOR_PATCHES:
+            with self.subTest(offset=hex(offset)):
+                tampered = bytearray(RAW)
+                tampered[offset] ^= 1
+                with self.assertRaisesRegex(ValueError, "English name-editor"):
+                    build_startup_ui_elf(bytes(tampered))
+
     def test_name_keyboard_uses_ps2_adapted_latin_rows_with_two_byte_cell_geometry(self) -> None:
         result = build_startup_ui_elf(RAW)
         expected_rows = (
@@ -260,6 +289,8 @@ class StartupUiPatchTests(unittest.TestCase):
         allowed.update(range(0x5869C0, 0x586AF0))
         allowed.update(range(0x577C60, 0x577C78))
         allowed.update(range(0x186A68, 0x186A6C))
+        for offset, _expected, _replacement in NAME_ENGLISH_EDITOR_PATCHES:
+            allowed.update(range(offset, offset + 4))
         for patch in STARTUP_FIXED_PATCHES:
             allowed.update(range(patch.offset, patch.offset + patch.capacity))
         # Runtime owners for the two centered English license-status lines.
