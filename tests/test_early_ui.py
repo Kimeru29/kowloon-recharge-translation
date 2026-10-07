@@ -18,6 +18,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS,
+    COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS,
     COMPANION_AFK_EMPTY_VA,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
@@ -193,7 +194,11 @@ class EarlyUiPatchTests(unittest.TestCase):
                 allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
         for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES:
             allowed.update(range(offset, offset + 4))
-        for offset in (*COMPANION_ACTION_RUNTIME_PATCH_OFFSETS, *COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS):
+        for offset in (
+            *COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
+            *COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS,
+            *COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS,
+        ):
             allowed.update(range(offset, offset + 4))
         for offset in (
             COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,

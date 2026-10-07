@@ -61,6 +61,14 @@ from tools.companion_hud import (
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
     COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS,
+    COMPANION_AFK_PANEL_FRAME_COUNT,
+    COMPANION_AFK_PANEL_FRAME_STRIDE,
+    COMPANION_AFK_PANEL_METADATA_OFFSET,
+    COMPANION_AFK_PANEL_METADATA_VA,
+    COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
+    COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET,
+    COMPANION_AFK_PANEL_TARGET_GEOMETRIES,
+    COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
     COMPANION_AFK_EMPTY_VA,
     COMPANION_AFK_EXPECTED_LIVE_FIELDS,
     COMPANION_AFK_RECORD_COUNT,
@@ -456,6 +464,35 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         if tuple(struct.unpack_from("<f", raw, offset)[0] for offset in offsets) != geometry:
             return False
 
+    # r45 keeps AFK's slot-specific green 0x68/0x69 speaker tail and compacts
+    # only the paired blue 0x6A panel. Its three animation frames retain their
+    # native 1px pivot-Y progression, while slot 2's panel body follows the same
+    # 13px shift as the compact green sibling body.
+    if (
+        COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET + 8 > len(raw)
+        or struct.unpack_from("<II", raw, COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET)
+        != (COMPANION_AFK_PANEL_METADATA_VA, COMPANION_AFK_PANEL_FRAME_COUNT)
+    ):
+        return False
+    for frame_index, target in enumerate(COMPANION_AFK_PANEL_TARGET_GEOMETRIES):
+        frame_offset = (
+            COMPANION_AFK_PANEL_METADATA_OFFSET
+            + frame_index * COMPANION_AFK_PANEL_FRAME_STRIDE
+        )
+        if frame_offset + 0x14 > len(raw):
+            return False
+        if struct.unpack_from("<ffff", raw, frame_offset + 4) != target:
+            return False
+    for placement_offset, target in zip(
+        COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
+        COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
+        strict=True,
+    ):
+        if placement_offset + 20 > len(raw):
+            return False
+        if struct.unpack_from("<IIfff", raw, placement_offset) != target:
+            return False
+
     # Both resources are the proven sibling pair and produce only a 13px body
     # shift while the companion anchors themselves remain 58px apart.
     if COMPANION_ACTION_SLOT_RESOURCES != (0x68, 0x69):
@@ -516,9 +553,10 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     ):
         return False
 
-    # r44 keeps the original skip target but evaluates the guard in a tiny
-    # side-effect-free predicate: preserve s0+0x2c8, then suppress only when
-    # record index >= 601 and one of the four speech render handles is live.
+    # r45 keeps the same whole-callout skip target, but binds it to the
+    # task's native AFK-visible lifecycle: free-talk record >= 601 and state
+    # 11..13 (constructed, visible, teardown). This replaces r44's indirect
+    # render-handle inference.
     visibility_jal = struct.unpack_from("<I", raw, 0x666BC)[0]
     if (
         visibility_jal >> 26 != 0x03
@@ -541,23 +579,23 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     )
     if visibility_words != (
         0x8E0202C8,
-        0x1040000F,
+        0x1040000C,
         0x00000000,
         0x86080004,
         0x2D090259,
-        0x1520000B,
+        0x15200008,
         0x00000000,
-        0x8E080020,
-        0x8E090024,
-        0x01094025,
-        0x8E090028,
-        0x01094025,
-        0x8E09002C,
-        0x01094025,
-        0x11000002,
+        0x86080002,
+        0x2508FFF5,
+        0x2D090003,
+        0x11200003,
         0x00000000,
         0x00001021,
+        0x00000000,
         0x03E00008,
+        0x00000000,
+        0x00000000,
+        0x00000000,
         0x00000000,
     ):
         return False

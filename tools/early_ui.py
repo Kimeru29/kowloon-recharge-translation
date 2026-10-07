@@ -4,6 +4,7 @@ from tools.adv_layout import patch_adv_horizontal_layout
 from tools.companion_hud import (
     finalize_companion_action_runtime_layout,
     patch_companion_action_layout,
+    patch_companion_afk_layout,
     relocated_companion_entries,
 )
 from tools.dungeon_ui import dungeon_code_references, relocated_dungeon_entries
@@ -23,7 +24,8 @@ def build_early_ui_elf(raw: bytes) -> bytes:
     menus = patch_menu_labels(startup)
     menu_entries = relocated_menu_entries(menus)
     horizontal_adv = patch_adv_horizontal_layout(menus)
-    companion_layout = patch_companion_action_layout(horizontal_adv)
+    companion_action_layout = patch_companion_action_layout(horizontal_adv)
+    companion_layout = patch_companion_afk_layout(companion_action_layout)
     dungeon_entries = relocated_dungeon_entries(companion_layout)
     dungeon_refs = dungeon_code_references(companion_layout)
     companion_entries = relocated_companion_entries(companion_layout)

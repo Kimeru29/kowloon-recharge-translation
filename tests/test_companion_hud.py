@@ -35,6 +35,16 @@ from tools.companion_hud import (
     COMPANION_ACTION_RUNTIME_PREIMAGES,
     COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
     COMPANION_ACTION_VISIBILITY_PREIMAGES,
+    COMPANION_AFK_PANEL_FRAME_COUNT,
+    COMPANION_AFK_PANEL_FRAME_STRIDE,
+    COMPANION_AFK_PANEL_METADATA_OFFSET,
+    COMPANION_AFK_PANEL_METADATA_VA,
+    COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
+    COMPANION_AFK_PANEL_PRISTINE_GEOMETRIES,
+    COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS,
+    COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET,
+    COMPANION_AFK_PANEL_TARGET_GEOMETRIES,
+    COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
     COMPANION_AFK_EMPTY_VA,
     COMPANION_AFK_EXPECTED_LIVE_FIELDS,
     COMPANION_AFK_MAX_CHARS,
@@ -47,6 +57,7 @@ from tools.companion_hud import (
     COMPANION_COMMENT_LINES,
     encode_companion_action,
     patch_companion_action_layout,
+    patch_companion_afk_layout,
     relocated_companion_entries,
     validate_companion_afk_source,
     validate_companion_hud_source,
@@ -260,7 +271,77 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_action(COMPANION_ACTION_LABELS[24].english).count(b"\x0a"))
         self.assertNotIn(b"\x0a", encode_companion_action(COMPANION_ACTION_LABELS[25].english))
 
-    def test_r44_visibility_hook_suppresses_only_live_afk_callouts(self) -> None:
+    def test_r45_afk_panel_is_compact_and_slot_aligned_without_touching_action_resources(self) -> None:
+        result = patch_companion_afk_layout(RAW)
+
+        self.assertEqual(
+            (COMPANION_AFK_PANEL_METADATA_VA, COMPANION_AFK_PANEL_FRAME_COUNT),
+            struct.unpack_from("<II", result, COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET),
+        )
+        for frame_index, target in enumerate(COMPANION_AFK_PANEL_TARGET_GEOMETRIES):
+            frame_offset = (
+                COMPANION_AFK_PANEL_METADATA_OFFSET
+                + frame_index * COMPANION_AFK_PANEL_FRAME_STRIDE
+            )
+            self.assertEqual(target, struct.unpack_from("<ffff", result, frame_offset + 4))
+
+        for offset, target in zip(
+            COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
+            COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
+            strict=True,
+        ):
+            self.assertEqual(target, struct.unpack_from("<IIfff", result, offset))
+
+        # 0x68/0x69 remain owned by the accepted action-layout patch; the AFK
+        # panel pass must not mutate either shared speech-bubble metadata record.
+        self.assertEqual(
+            RAW[COMPANION_ACTION_BUBBLE_WIDTH_OFFSET:COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET + 4],
+            result[COMPANION_ACTION_BUBBLE_WIDTH_OFFSET:COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET + 4],
+        )
+        self.assertEqual(
+            RAW[
+                COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET:
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET + 4
+            ],
+            result[
+                COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET:
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET + 4
+            ],
+        )
+
+        owner_bytes = struct.pack("<II", 2, 0x6A)
+        owners = tuple(
+            offset
+            for offset in range(0, len(RAW) - len(owner_bytes) + 1, 4)
+            if RAW[offset:offset + len(owner_bytes)] == owner_bytes
+        )
+        self.assertEqual(COMPANION_AFK_PANEL_PLACEMENT_OFFSETS, owners)
+
+    def test_r45_afk_panel_layout_fails_closed_on_owner_drift(self) -> None:
+        tampered = bytearray(RAW)
+        tampered[COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET] ^= 1
+        with self.assertRaisesRegex(ValueError, "AFK panel resource-table drifted"):
+            patch_companion_afk_layout(bytes(tampered))
+
+        for frame_index in range(COMPANION_AFK_PANEL_FRAME_COUNT):
+            frame_offset = (
+                COMPANION_AFK_PANEL_METADATA_OFFSET
+                + frame_index * COMPANION_AFK_PANEL_FRAME_STRIDE
+            )
+            with self.subTest(frame=frame_index):
+                tampered = bytearray(RAW)
+                tampered[frame_offset + 4] ^= 1
+                with self.assertRaisesRegex(ValueError, "AFK panel metadata drifted"):
+                    patch_companion_afk_layout(bytes(tampered))
+
+        for offset in COMPANION_AFK_PANEL_PLACEMENT_OFFSETS:
+            with self.subTest(placement=hex(offset)):
+                tampered = bytearray(RAW)
+                tampered[offset + 8] ^= 1
+                with self.assertRaisesRegex(ValueError, "AFK panel placement drifted"):
+                    patch_companion_afk_layout(bytes(tampered))
+
+    def test_r45_visibility_hook_suppresses_native_afk_states_11_through_13(self) -> None:
         result = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, _flags, _align = struct.unpack_from(
             "<IIIIIIII", result, 0x54
@@ -283,16 +364,18 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(
             (
                 0x8E0202C8,  # original s0+0x2c8 L1 visibility guard
-                0x1040000F, 0x00000000,
+                0x1040000C, 0x00000000,
                 0x86080004,  # current talk-record index
                 0x2D090259,  # AFK/free-talk starts at record 601
-                0x1520000B, 0x00000000,
-                0x8E080020, 0x8E090024, 0x01094025,
-                0x8E090028, 0x01094025,
-                0x8E09002C, 0x01094025,  # four live speech render handles
-                0x11000002, 0x00000000,
-                0x00001021,  # v0=0 only for a live AFK callout
+                0x15200008, 0x00000000,
+                0x86080002,  # native H_TalkBuddyTask state
+                0x2508FFF5,  # normalize state 11 -> 0
+                0x2D090003,  # states 11..13 only
+                0x11200003, 0x00000000,
+                0x00001021,  # v0=0 only during the AFK-visible lifecycle
+                0x00000000,
                 0x03E00008, 0x00000000,
+                0x00000000, 0x00000000, 0x00000000,
             ),
             words,
         )

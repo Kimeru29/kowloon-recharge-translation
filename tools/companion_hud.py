@@ -30,6 +30,49 @@ COMPANION_AFK_MAX_CHARS = 38
 COMPANION_AFK_TABLE_SHA256 = "5c1f0c9348502012fd0f51d0160f5fe9a903006c317519b20ad75af60369020a"
 COMPANION_AFK_SOURCE_SHA256 = "eaeb3bd7b6dab806aaa894f5458d13b1f0a29e7221ba0d5f4b9dc04f846d0641"
 
+# Native Re:charge free-talk composition. AFK creates two layers: the
+# slot-specific green 0x68/0x69 speech pointer plus a blue group-2/resource
+# 0x6A panel. Resource 0x6A has exactly two structured placement owners in the
+# ELF (the two AFK slots) and three animation metadata frames. r45 compacts only
+# this AFK-exclusive blue panel so it aligns with the already accepted compact
+# 0x68/0x69 body while preserving the green tail as the speaker cue.
+COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET = 0x380E40
+COMPANION_AFK_PANEL_METADATA_VA = 0x00450B20
+COMPANION_AFK_PANEL_METADATA_OFFSET = 0x350BA0
+COMPANION_AFK_PANEL_FRAME_STRIDE = 0x30
+COMPANION_AFK_PANEL_FRAME_COUNT = 3
+COMPANION_AFK_PANEL_PRISTINE_GEOMETRIES = (
+    (288.0, 56.0, 67.0, 74.0),
+    (288.0, 56.0, 67.0, 75.0),
+    (288.0, 56.0, 67.0, 76.0),
+)
+COMPANION_AFK_PANEL_TARGET_GEOMETRIES = (
+    (224.0, 56.0, 52.0, 45.0),
+    (224.0, 56.0, 52.0, 46.0),
+    (224.0, 56.0, 52.0, 47.0),
+)
+COMPANION_AFK_PANEL_PLACEMENT_OFFSETS = (0x3F8E44, 0x3F8E58)
+COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS = (
+    (2, 0x6A, 246.0, 172.0, 381.0),
+    (2, 0x6A, 246.0, 172.0, 381.0),
+)
+COMPANION_AFK_PANEL_TARGET_PLACEMENTS = (
+    (2, 0x6A, 246.0, 172.0, 381.0),
+    # 0x69's compact body is only 13px right of 0x68 even though its tail
+    # targets the second companion 58px away. Match that body shift here.
+    (2, 0x6A, 246.0, 185.0, 381.0),
+)
+COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS = (
+    # Width / pivot-X / pivot-Y for each 0x6A animation frame.
+    0x350BA4, 0x350BAC, 0x350BB0,
+    0x350BD4, 0x350BDC, 0x350BE0,
+    0x350C04, 0x350C0C, 0x350C10,
+    # Slot-2 0x6A placement X.
+    0x3F8E64,
+)
+COMPANION_AFK_VISIBLE_STATE_FIRST = 11
+COMPANION_AFK_VISIBLE_STATE_LAST = 13
+
 # r31-r38 presentation owners for the persistent companion action caption.
 # r35 proved the accepted one-line 224x48 down-tail presentation, r36 made
 # height/wrapping generic, and r37 separated action id from HUD+0x2D0's 0/1
@@ -318,34 +361,40 @@ def _runtime_hook_bytes(*, table_va: int, state_va: int) -> bytes:
 
 
 def _visibility_hook_bytes() -> bytes:
-    """Return the r44 L1-callout visibility predicate.
+    """Return the r45 L1-callout visibility predicate.
 
-    The existing callsite treats v0==0 as "skip the entire L1 callout". Preserve
-    its original s0+0x2C8 guard first. Only suppress an otherwise-visible action
-    callout when H_TalkBuddyTask is on a Re:charge free-talk record (index >=
-    0x259) and at least one of its four speech render handles is live.
+    Preserve the original s0+0x2C8 callout guard first. Re:charge free-talk is
+    selected by record index >= 0x259, then the native task enters state 11
+    immediately after constructing the AFK panel/text and tears it down through
+    states 12 and 13 before returning to state 8. Suppress the independent L1
+    action callout only for that exact native AFK-visible lifecycle.
     """
 
     words = (
         _mips_i(0x23, 16, 2, 0x02C8),       # lw v0,0x2c8(s0): original guard
-        _mips_i(0x04, 2, 0, 15),            # beq v0,zero,return
+        _mips_i(0x04, 2, 0, 12),            # beq v0,zero,return
         0x00000000,                          # nop
         _mips_i(0x21, 16, 8, 0x0004),       # lh t0,4(s0): current record index
         _mips_i(0x0B, 8, 9, COMPANION_AFK_FIRST_RECORD_INDEX),  # sltiu t1,t0,0x259
-        _mips_i(0x05, 9, 0, 11),            # bne t1,zero,return (normal h_buddy)
+        _mips_i(0x05, 9, 0, 8),             # bne t1,zero,return (normal h_buddy)
         0x00000000,                          # nop
-        _mips_i(0x23, 16, 8, 0x0020),       # lw t0,0x20(s0)
-        _mips_i(0x23, 16, 9, 0x0024),       # lw t1,0x24(s0)
-        _mips_r(8, 9, 8, 0, 0x25),          # or t0,t0,t1
-        _mips_i(0x23, 16, 9, 0x0028),       # lw t1,0x28(s0)
-        _mips_r(8, 9, 8, 0, 0x25),          # or t0,t0,t1
-        _mips_i(0x23, 16, 9, 0x002C),       # lw t1,0x2c(s0)
-        _mips_r(8, 9, 8, 0, 0x25),          # or t0,t0,t1
-        _mips_i(0x04, 8, 0, 2),             # beq t0,zero,return
+        _mips_i(0x21, 16, 8, 0x0002),       # lh t0,2(s0): H_TalkBuddyTask state
+        _mips_i(0x09, 8, 8, -COMPANION_AFK_VISIBLE_STATE_FIRST), # addiu t0,t0,-11
+        _mips_i(
+            0x0B,
+            8,
+            9,
+            COMPANION_AFK_VISIBLE_STATE_LAST - COMPANION_AFK_VISIBLE_STATE_FIRST + 1,
+        ),                                   # sltiu t1,t0,3 => states 11..13
+        _mips_i(0x04, 9, 0, 3),             # beq t1,zero,return
         0x00000000,                          # nop
         _mips_r(0, 0, 2, 0, 0x21),          # addu v0,zero,zero: hide L1 callout
-        _mips_r(31, 0, 0, 0, 0x08),         # jr ra
+        0x00000000,                          # alignment / fallthrough padding
+        _mips_r(31, 0, 0, 0, 0x08),         # return: jr ra
         0x00000000,                          # nop
+        0x00000000,
+        0x00000000,
+        0x00000000,
     )
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_VISIBILITY_HOOK_SIZE:
@@ -593,6 +642,81 @@ def validate_companion_hud_source(raw: bytes) -> None:
                 "companion action pointer preimage mismatch: "
                 f"id={spec.action_id}, expected {expected_va:#x}, got {actual_va:#x}"
             )
+
+
+def patch_companion_afk_layout(raw: bytes) -> bytes:
+    """Compact only the native Re:charge AFK blue panel and align it per slot."""
+
+    metadata_va, metadata_count = struct.unpack_from(
+        "<II", raw, COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET
+    )
+    if (metadata_va, metadata_count) != (
+        COMPANION_AFK_PANEL_METADATA_VA,
+        COMPANION_AFK_PANEL_FRAME_COUNT,
+    ):
+        raise ValueError(
+            "companion AFK panel resource-table drifted: "
+            f"expected ({COMPANION_AFK_PANEL_METADATA_VA:#010x}, "
+            f"{COMPANION_AFK_PANEL_FRAME_COUNT}), got "
+            f"({metadata_va:#010x}, {metadata_count})"
+        )
+
+    # The only structured group-2/resource-0x6A owners are the two AFK slot
+    # placement records. This is intentionally stricter than scanning arbitrary
+    # words for the integer 0x6A.
+    owner_bytes = struct.pack("<II", 2, 0x6A)
+    structured_owners = tuple(
+        offset
+        for offset in range(0, len(raw) - len(owner_bytes) + 1, 4)
+        if raw[offset:offset + len(owner_bytes)] == owner_bytes
+    )
+    if structured_owners != COMPANION_AFK_PANEL_PLACEMENT_OFFSETS:
+        raise ValueError(
+            "companion AFK panel structured-owner drifted: "
+            f"expected {[hex(x) for x in COMPANION_AFK_PANEL_PLACEMENT_OFFSETS]}, "
+            f"got {[hex(x) for x in structured_owners]}"
+        )
+
+    out = bytearray(raw)
+    for frame_index, (expected, target) in enumerate(
+        zip(
+            COMPANION_AFK_PANEL_PRISTINE_GEOMETRIES,
+            COMPANION_AFK_PANEL_TARGET_GEOMETRIES,
+            strict=True,
+        )
+    ):
+        frame_offset = (
+            COMPANION_AFK_PANEL_METADATA_OFFSET
+            + frame_index * COMPANION_AFK_PANEL_FRAME_STRIDE
+        )
+        actual = struct.unpack_from("<ffff", raw, frame_offset + 4)
+        if actual != expected:
+            raise ValueError(
+                "companion AFK panel metadata drifted: "
+                f"frame={frame_index}, expected {expected!r}, got {actual!r}"
+            )
+        # Preserve height. Compact width and retarget the pivot to the already
+        # accepted 224px green body while keeping the native three-frame Y delta.
+        struct.pack_into("<f", out, frame_offset + 4, target[0])
+        struct.pack_into("<f", out, frame_offset + 8, target[1])
+        struct.pack_into("<f", out, frame_offset + 0x0C, target[2])
+        struct.pack_into("<f", out, frame_offset + 0x10, target[3])
+
+    for placement_offset, expected, target in zip(
+        COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
+        COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS,
+        COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
+        strict=True,
+    ):
+        actual = struct.unpack_from("<IIfff", raw, placement_offset)
+        if actual != expected:
+            raise ValueError(
+                "companion AFK panel placement drifted: "
+                f"{placement_offset:#x}: expected {expected!r}, got {actual!r}"
+            )
+        struct.pack_into("<IIfff", out, placement_offset, *target)
+
+    return bytes(out)
 
 
 def patch_companion_action_layout(raw: bytes) -> bytes:

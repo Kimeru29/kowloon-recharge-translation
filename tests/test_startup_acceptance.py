@@ -37,6 +37,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS,
+    COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS,
     COMPANION_AFK_TABLE_OFFSET,
     COMPANION_SLOT_INDEX_PREIMAGES,
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
@@ -203,6 +204,7 @@ class StartupAcceptanceTests(unittest.TestCase):
         offsets = [offset for offset, _expected, _replacement in COMPANION_ACTION_LAYOUT_PATCHES]
         offsets.extend(COMPANION_ACTION_RUNTIME_PATCH_OFFSETS)
         offsets.extend(COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS)
+        offsets.extend(COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS)
         offsets.extend(offset for offset, _expected in COMPANION_SLOT_INDEX_PREIMAGES)
         offsets.extend(offset for offset, _expected in COMPANION_ACTION_ID_REFERENCE_PREIMAGES)
         offsets.extend(
