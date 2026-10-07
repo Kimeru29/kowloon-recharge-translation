@@ -114,6 +114,14 @@ COMPANION_AFK_SCALE_HOOK_KEY = "companion_afk_text_scale_hook"
 COMPANION_AFK_SCALE_HOOK_SIZE = 64
 COMPANION_AFK_GEOMETRY_HOOK_KEY = "companion_afk_native_geometry_hook"
 COMPANION_AFK_GEOMETRY_HOOK_SIZE = 112
+# r49 appends a fixed-width multiline layout after every r48 payload. Keeping
+# the older scale/geometry owners allocated preserves all previously translated
+# VAs even though the r49 callsites no longer jump to them.
+COMPANION_AFK_WRAP_LAYOUT_TABLE_KEY = "companion_afk_wrap_layout_table"
+COMPANION_AFK_WRAP_GEOMETRY_HOOK_KEY = "companion_afk_wrap_geometry_hook"
+COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE = 184
+COMPANION_AFK_WRAP_TEXT_HOOK_KEY = "companion_afk_wrap_text_hook"
+COMPANION_AFK_WRAP_TEXT_HOOK_SIZE = 112
 COMPANION_AFK_FIRST_RECORD_INDEX = 0x259
 COMPANION_AFK_TEXT_STYLE_CELL_WIDTH = 16.0
 COMPANION_AFK_TEXT_BODY_WIDTH = 288.0
@@ -127,6 +135,22 @@ COMPANION_AFK_TEXT_SAFE_WIDTH = (
 COMPANION_AFK_TEXT_SAFE_CELLS = (
     COMPANION_AFK_TEXT_SAFE_WIDTH / COMPANION_AFK_TEXT_STYLE_CELL_WIDTH
 )
+# r49 never grows AFK horizontally. 16 cells = 256px, safely inside the proven
+# 264px text body. Native line spacing is 18px (Y=313 then Y=331). Additional
+# wrapped rows grow both bubble layers upward while their bottom/tail anchors
+# stay fixed.
+COMPANION_AFK_WRAP_CELLS = 16
+COMPANION_AFK_LINE_STEP = 18.0
+COMPANION_AFK_GREEN_BASE_HEIGHT = 80.0
+COMPANION_AFK_GREEN_BASE_PIVOT_Y = 77.0
+COMPANION_AFK_BLUE_BASE_HEIGHT = 56.0
+COMPANION_AFK_BLUE_BASE_PIVOT_Y = (74.0, 75.0, 76.0)
+COMPANION_AFK_TEXT1_BASE_Y = 313.0
+COMPANION_AFK_TEXT2_BASE_Y = 331.0
+# 0x1950A0 rejects converted strings whose source length is >=0x1FE. The
+# current corpus is far below this, but keep generic wrapping fail-closed at the
+# engine's own hard capacity instead of silently overflowing its 0x1FE buffer.
+COMPANION_AFK_SOURCE_MAX_BYTES = 0x1FD
 # The AFK task restores shared 0x68/0x69 to native geometry before constructing
 # free-talk. The normal action renderer re-applies compact geometry every draw.
 COMPANION_AFK_GEOMETRY_PREIMAGES: tuple[tuple[int, int], ...] = (
@@ -323,6 +347,128 @@ def _layout_table_bytes() -> bytes:
     )
 
 
+@dataclass(frozen=True)
+class CompanionAfkLayout:
+    line1_rows: tuple[str, ...]
+    line2_rows: tuple[str, ...]
+    green_height: float
+    green_pivot_y: float
+    blue_height: float
+    blue_pivot_y: tuple[float, float, float]
+    text1_y: float
+    text2_y: float
+
+
+def wrap_companion_afk_text(
+    text: str,
+    *,
+    max_cells: int = COMPANION_AFK_WRAP_CELLS,
+) -> tuple[str, ...]:
+    """Word-wrap one AFK field into fixed-width native style-0 rows.
+
+    Long tokens are hard-split so no row can ever exceed the horizontal body
+    budget. There is intentionally no artificial line-count ceiling: vertical
+    capacity is derived from the resulting row count.
+    """
+
+    if max_cells <= 0:
+        raise ValueError("companion AFK max_cells must be positive")
+    words = text.split()
+    if not words:
+        return ()
+
+    rows: list[str] = []
+    current = ""
+    for word in words:
+        while len(word) > max_cells:
+            if current:
+                rows.append(current)
+                current = ""
+            rows.append(word[:max_cells])
+            word = word[max_cells:]
+        if not word:
+            continue
+        candidate = word if not current else f"{current} {word}"
+        if len(candidate) <= max_cells:
+            current = candidate
+        else:
+            rows.append(current)
+            current = word
+    if current:
+        rows.append(current)
+    return tuple(rows)
+
+
+def encode_companion_afk_text(text: str) -> bytes:
+    """Encode AFK English with native raw-newline controls.
+
+    0x195960 converts raw 0x0A into internal control 0xFF0E. For the current
+    corpus every break replaces a source space, so padding after the first NUL
+    keeps each r48 relocation allocation exactly the same size and therefore
+    keeps all later r48 payload VAs stable. Future harder splits remain generic
+    and may grow the allocation if necessary.
+    """
+
+    rows = wrap_companion_afk_text(text)
+    payload = b"\x0a".join(
+        encode_ps2_english(row, collapse_spaces=False) for row in rows
+    ) + b"\x00"
+    source_bytes = len(payload) - 1
+    if source_bytes > COMPANION_AFK_SOURCE_MAX_BYTES:
+        raise ValueError(
+            f"companion AFK wrapped source exceeds engine capacity: {source_bytes} bytes"
+        )
+
+    old_allocation = len(encode_ps2_english(text, collapse_spaces=False)) + 1
+    if len(payload) < old_allocation:
+        payload += b"\x00" * (old_allocation - len(payload))
+    return payload
+
+
+def companion_afk_layout(lines: tuple[str, str]) -> CompanionAfkLayout:
+    line1_rows = wrap_companion_afk_text(lines[0])
+    line2_rows = wrap_companion_afk_text(lines[1])
+    if not line1_rows:
+        raise ValueError("companion AFK record unexpectedly has no primary text row")
+
+    total_rows = len(line1_rows) + len(line2_rows)
+    extra_height = COMPANION_AFK_LINE_STEP * max(0, total_rows - 2)
+    text1_y = COMPANION_AFK_TEXT1_BASE_Y - extra_height
+    text2_y = text1_y + COMPANION_AFK_LINE_STEP * len(line1_rows)
+    return CompanionAfkLayout(
+        line1_rows=line1_rows,
+        line2_rows=line2_rows,
+        green_height=COMPANION_AFK_GREEN_BASE_HEIGHT + extra_height,
+        green_pivot_y=COMPANION_AFK_GREEN_BASE_PIVOT_Y + extra_height,
+        blue_height=COMPANION_AFK_BLUE_BASE_HEIGHT + extra_height,
+        blue_pivot_y=tuple(
+            value + extra_height for value in COMPANION_AFK_BLUE_BASE_PIVOT_Y
+        ),
+        text1_y=text1_y,
+        text2_y=text2_y,
+    )
+
+
+COMPANION_AFK_LAYOUTS: tuple[CompanionAfkLayout, ...] = tuple(
+    companion_afk_layout(lines) for lines in COMPANION_AFK_TRANSLATIONS
+)
+
+
+def _afk_wrap_layout_table_bytes() -> bytes:
+    return b"".join(
+        struct.pack(
+            "<8f",
+            layout.green_height,
+            layout.green_pivot_y,
+            layout.blue_height,
+            *layout.blue_pivot_y,
+            layout.text1_y,
+            layout.text2_y,
+        )
+        for layout in COMPANION_AFK_LAYOUTS
+    )
+
+
 def companion_afk_text_scale(lines: tuple[str, str]) -> float:
     """Return the record-wide X scale that keeps both AFK rows inside 288px."""
 
@@ -480,6 +626,111 @@ def _afk_geometry_hook_bytes() -> bytes:
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_AFK_GEOMETRY_HOOK_SIZE:
         raise AssertionError(f"companion AFK geometry hook drifted: {len(code)}")
+    return code
+
+
+def _afk_wrap_geometry_hook_bytes(*, table_va: int) -> bytes:
+    """Apply record-specific fixed-width AFK geometry before construction.
+
+    Width and X pivots remain native. Height and Y pivots grow together, so the
+    green tail/bottom anchor and blue-panel bottom stay fixed while extra rows
+    extend upward. The selected green slot and all three blue animation frames
+    receive the same per-record vertical delta.
+    """
+
+    table_hi, table_lo = _split_address(table_va)
+    words = (
+        _mips_i(0x21, 16, 2, 0x0004),       # lh v0,4(s0): record index
+        _mips_i(0x09, 2, 8, -COMPANION_AFK_FIRST_RECORD_INDEX),
+        _mips_i(0x0B, 8, 9, COMPANION_AFK_RECORD_COUNT),
+        _mips_i(0x04, 9, 0, 38),            # invalid record -> return
+        0x00000000,
+        _mips_i(0x21, 16, 10, 0x02F8),      # lh t2,0x2f8(s0): slot 0/1
+        _mips_i(0x0B, 10, 9, 2),
+        _mips_i(0x04, 9, 0, 34),            # invalid slot -> return
+        0x00000000,
+        _mips_r(0, 8, 11, 5, 0x00),         # sll t3,t0,5: layout * 32
+        _mips_i(0x0F, 0, 12, table_hi),
+        _mips_i(0x09, 12, 12, table_lo),
+        _mips_r(12, 11, 12, 0, 0x21),       # t4 = layout record
+        _mips_r(0, 10, 13, 4, 0x00),        # slot*16
+        _mips_r(0, 10, 14, 5, 0x00),        # slot*32
+        _mips_r(13, 14, 13, 0, 0x21),       # t5 = slot*48
+        _mips_i(0x0F, 0, 14, 0x0045),
+        _mips_i(0x09, 14, 14, 0x0AC4),      # t6 = green slot0 width field
+        _mips_r(14, 13, 14, 0, 0x21),
+        _mips_i(0x0F, 0, 15, 0x4390),       # native width 288
+        _mips_i(0x2B, 14, 15, 0),
+        _mips_i(0x23, 12, 15, 0),            # dynamic green height
+        _mips_i(0x2B, 14, 15, 4),
+        _mips_i(0x23, 12, 15, 4),            # dynamic green pivot-Y
+        _mips_i(0x2B, 14, 15, 12),
+        _mips_i(0x0F, 0, 15, 0x4286),       # slot0 pivot-X 67
+        _mips_i(0x04, 10, 0, 2),
+        0x00000000,
+        _mips_i(0x0F, 0, 15, 0x42FA),       # slot1 pivot-X 125
+        _mips_i(0x2B, 14, 15, 8),
+        _mips_i(0x0F, 0, 14, 0x0045),
+        _mips_i(0x09, 14, 14, 0x0B28),      # blue frame0 height field
+        _mips_i(0x23, 12, 15, 8),            # dynamic blue height
+        _mips_i(0x2B, 14, 15, 0),
+        _mips_i(0x2B, 14, 15, 0x30),
+        _mips_i(0x2B, 14, 15, 0x60),
+        _mips_i(0x23, 12, 15, 12),           # frame0 pivot-Y
+        _mips_i(0x2B, 14, 15, 8),
+        _mips_i(0x23, 12, 15, 16),           # frame1 pivot-Y
+        _mips_i(0x2B, 14, 15, 0x38),
+        _mips_i(0x23, 12, 15, 20),           # frame2 pivot-Y
+        _mips_i(0x2B, 14, 15, 0x68),
+        _mips_i(0x21, 16, 2, 0x0004),       # return: restore pristine results
+        _mips_r(0, 2, 3, 7, 0x00),          # sll v1,v0,7
+        _mips_r(31, 0, 0, 0, 0x08),
+        0x00000000,
+    )
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE:
+        raise AssertionError(f"companion AFK wrap geometry hook drifted: {len(code)}")
+    return code
+
+
+def _afk_wrap_text_hook_bytes(*, table_va: int) -> bytes:
+    """Place wrapped AFK text vertically and keep horizontal scale at 1.0."""
+
+    table_hi, table_lo = _split_address(table_va)
+    line1_return_va = 0x0016620C
+    words = (
+        _mips_r(2, 0, 11, 0, 0x21),         # t3 = returned text object
+        _mips_i(0x0F, 0, 15, 0x3F80),       # 1.0
+        _mips_i(0x2B, 11, 15, 0x0048),      # X scale = native 1.0
+        _mips_i(0x0F, 0, 14, line1_return_va >> 16),
+        _mips_i(0x0D, 14, 14, line1_return_va & 0xFFFF),
+        _mips_i(0x21, 16, 8, 0x0004),       # record index
+        _mips_i(0x09, 8, 8, -COMPANION_AFK_FIRST_RECORD_INDEX),
+        _mips_i(0x0B, 8, 9, COMPANION_AFK_RECORD_COUNT),
+        _mips_i(0x04, 9, 0, 12),            # invalid -> continuation only
+        0x00000000,
+        _mips_r(0, 8, 8, 5, 0x00),          # layout * 32
+        _mips_i(0x0F, 0, 9, table_hi),
+        _mips_i(0x09, 9, 9, table_lo),
+        _mips_r(9, 8, 9, 0, 0x21),
+        _mips_i(0x05, 31, 14, 4),           # line2 -> +28
+        0x00000000,
+        _mips_i(0x23, 9, 10, 24),           # line1 Y
+        _mips_i(0x04, 0, 0, 2),             # -> store Y
+        0x00000000,
+        _mips_i(0x23, 9, 10, 28),           # line2 Y
+        _mips_i(0x2B, 11, 10, 0x0018),      # object Y
+        _mips_i(0x05, 31, 14, 4),           # line2 continuation
+        _mips_i(0x09, 0, 2, 0x0078),        # delay: line2 v0=0x78
+        _mips_i(0x21, 16, 2, 0x000A),       # line1 continuation
+        _mips_r(31, 0, 0, 0, 0x08),
+        0x00000000,
+        _mips_r(31, 0, 0, 0, 0x08),         # line2 return
+        0x00000000,
+    )
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_AFK_WRAP_TEXT_HOOK_SIZE:
+        raise AssertionError(f"companion AFK wrap text hook drifted: {len(code)}")
     return code
 
 
@@ -771,11 +1022,7 @@ def _relocated_companion_afk_entries(raw: bytes) -> tuple[RelocatedText, ...]:
                         f"companion_afk_{companion_id:02d}_"
                         f"{companion_line:02d}_{line_number}"
                     ),
-                    encoded=encode_ps2_english(
-                        english,
-                        collapse_spaces=False,
-                    )
-                    + b"\x00",
+                    encoded=encode_companion_afk_text(english),
                     pointer_offsets=(pointer_offset,),
                 )
             )
@@ -1007,6 +1254,9 @@ def finalize_companion_action_runtime_layout(
         scale_table_va = installed.target_vas[COMPANION_AFK_SCALE_TABLE_KEY]
         scale_hook_va = installed.target_vas[COMPANION_AFK_SCALE_HOOK_KEY]
         afk_geometry_hook_va = installed.target_vas[COMPANION_AFK_GEOMETRY_HOOK_KEY]
+        afk_wrap_table_va = installed.target_vas[COMPANION_AFK_WRAP_LAYOUT_TABLE_KEY]
+        afk_wrap_geometry_hook_va = installed.target_vas[COMPANION_AFK_WRAP_GEOMETRY_HOOK_KEY]
+        afk_wrap_text_hook_va = installed.target_vas[COMPANION_AFK_WRAP_TEXT_HOOK_KEY]
         action_geometry_extension_va = installed.target_vas[
             COMPANION_ACTION_GEOMETRY_EXTENSION_KEY
         ]
@@ -1021,6 +1271,9 @@ def finalize_companion_action_runtime_layout(
         scale_table_va,
         scale_hook_va,
         afk_geometry_hook_va,
+        afk_wrap_table_va,
+        afk_wrap_geometry_hook_va,
+        afk_wrap_text_hook_va,
         action_geometry_extension_va,
     )
     if any(value & 3 for value in runtime_vas):
@@ -1073,6 +1326,16 @@ def finalize_companion_action_runtime_layout(
             _afk_geometry_hook_bytes(),
             "companion AFK native-geometry hook",
         ),
+        (
+            afk_wrap_geometry_hook_va,
+            _afk_wrap_geometry_hook_bytes(table_va=afk_wrap_table_va),
+            "companion AFK wrap geometry hook",
+        ),
+        (
+            afk_wrap_text_hook_va,
+            _afk_wrap_text_hook_bytes(table_va=afk_wrap_table_va),
+            "companion AFK wrap text hook",
+        ),
     )
     for payload_va, payload, owner in runtime_payloads:
         payload_file = installed.info.file_offset + (
@@ -1099,19 +1362,17 @@ def finalize_companion_action_runtime_layout(
                     f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
                 )
 
-    # Restore native shared 0x68/0x69 geometry before AFK constructs its
-    # green outer bubble. Preserve the original sll v1,v0,7 as the JAL delay
-    # slot; the helper recomputes v0/v1 before returning.
-    struct.pack_into("<I", result, 0x66050, _jal_word(afk_geometry_hook_va))
+    # r49 owns AFK geometry per record. Width and X pivots remain native while
+    # wrapped-row count grows both green and blue layers upward. Preserve the
+    # original sll v1,v0,7 in the JAL delay slot; the helper restores v0/v1.
+    struct.pack_into("<I", result, 0x66050, _jal_word(afk_wrap_geometry_hook_va))
 
-    # r48 keeps the specialized AFK constructor's f16=1.0 untouched:
-    # constructor tracing proves f16 is alpha, not geometry. Apply the calculated
-    # horizontal scale to the returned text object's +0x48 transform instead.
-    # The original object stores move into each JAL delay slot; the helper
-    # restores the overwritten continuation value in v0 before returning.
-    struct.pack_into("<I", result, 0x66284, _jal_word(scale_hook_va))
+    # Keep constructor alpha at native 1.0. After each AFK text object is
+    # created, place it at the record-specific Y and force horizontal scale to
+    # 1.0; wrapping rather than squeezing now guarantees the fixed-width bound.
+    struct.pack_into("<I", result, 0x66284, _jal_word(afk_wrap_text_hook_va))
     struct.pack_into("<I", result, 0x66288, 0xAE020028)  # sw v0,0x28(s0)
-    struct.pack_into("<I", result, 0x66354, _jal_word(scale_hook_va))
+    struct.pack_into("<I", result, 0x66354, _jal_word(afk_wrap_text_hook_va))
     struct.pack_into("<I", result, 0x66358, 0xAE02002C)  # sw v0,0x2c(s0)
 
     # Use the existing "skip complete L1 callout" branch, but compute its guard
@@ -1232,6 +1493,31 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             RelocatedText(
                 key=COMPANION_ACTION_GEOMETRY_EXTENSION_KEY,
                 encoded=b"\x00" * COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE,
+                pointer_offsets=(),
+                alignment=4,
+            ),
+        )
+    )
+    # r49 appends its multiline layout strictly after every r48 payload. The
+    # wrapped AFK strings preserve their old allocation sizes for the current
+    # corpus, so all historical target VAs above remain stable.
+    entries.extend(
+        (
+            RelocatedText(
+                key=COMPANION_AFK_WRAP_LAYOUT_TABLE_KEY,
+                encoded=_afk_wrap_layout_table_bytes(),
+                pointer_offsets=(),
+                alignment=4,
+            ),
+            RelocatedText(
+                key=COMPANION_AFK_WRAP_GEOMETRY_HOOK_KEY,
+                encoded=b"\x00" * COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE,
+                pointer_offsets=(),
+                alignment=4,
+            ),
+            RelocatedText(
+                key=COMPANION_AFK_WRAP_TEXT_HOOK_KEY,
+                encoded=b"\x00" * COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
                 pointer_offsets=(),
                 alignment=4,
             ),

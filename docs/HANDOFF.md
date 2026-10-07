@@ -484,3 +484,18 @@ The same r47 600-float table is retained byte-for-byte. The same 64-byte relocat
 Binary safety is unusually strong: r47 and r48 pre-ROFS ELFs are both 8,690,540 bytes with identical translation-segment size. Only 80 bytes across 15 ranges differ, all in the two restored alpha setups, two post-construction hook sites, or the existing scale-hook body. All 999 AFK pointers, the scale table, green/blue metadata, AFK placements, geometry hook, visibility hook, normal action hook and action-geometry extension are unchanged.
 
 Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r48.iso`, SHA-256 `f91f14d34052a73a10f425cbbcd7c85c8b37d99aad0284de0e60257229cb319a`; pre/post-ROFS ELF `793d6a3c28dd894bfe85d4c16dfe1792ee70e5f36e607e9b98b4e3bbb301d49a` / `350477c63701e5a8eaa1efee9af05e6384dbcd84743f51bb55ef781b24521695`; final-image acceptance **155/155**; focused suite **38/38**; both complete suites execute **250 tests**; repeat ISO byte-for-byte identical. Runtime proof of text visibility and long-line fit remains pending.
+
+
+### v11-r49 generic AFK multiline / upward-growth candidate
+
+Pablo runtime-tested r48 and confirmed the blue-tinted companion free-talk composition and English opacity are fixed. The remaining r48 failure is long English escaping the bubble horizontally. r49 replaces horizontal scaling with native multiline wrapping and record-specific vertical growth.
+
+The AFK source converter at VA `0x00195960` explicitly maps raw `0x0A` to internal newline command `0xFF0E`. r49 therefore wraps all 999 live AFK fields to at most 16 style-0 cells (256px inside the 264px body), hard-splitting oversized tokens if needed. There is no artificial line-count limit; only the game's native <0x1FE-byte source-buffer capacity is enforced fail-closed.
+
+A 600-record layout table controls height/pivot/Y. Extra rows add 18px each. Green and blue widths remain 288px; X pivots remain native; height and pivot-Y grow together, so bottom edges and slot-specific speaker tails remain anchored while the bubble extends upward. The post-construction text hook fixes object +0x48 at 1.0 and changes only object +0x18 Y. Constructor f16 remains 1.0 alpha.
+
+Current corpus row-count distribution is 44/162/166/179/47/2 records for 1/2/3/4/5/6 rows respectively. Maximum current vertical growth is 72px (green 152px, blue 128px). 726 AFK fields receive native newline controls. Because current breaks replace spaces, all r48 AFK allocation sizes and all 999 pointer words remain unchanged.
+
+r49 is append-compatible with r48: +19,496 bytes = 19,200-byte layout table +184 geometry hook +112 text hook. Old r48 payload VAs/content stay intact. The common-prefix audit found 16,622 changed bytes across 1,328 ranges, all classified as one segment-size word, three callsite retargets, or wrapped AFK payload bytes; no unknown ranges.
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r49.iso`, SHA-256 `6fdcc8b7c4fe5e004c448a77b007cb39085f2d79eb6ac486ce01f791dd465321`; pre/post-ROFS ELF `084f09b0be4f181626fe4cf9205b939ba3368b3b178c75bb0ceacb4edf362e0e` / `c499b25f1142d9f4c4ae9791443cb20f38ccfa62d3335869f45e4279f2fe07bf`; focused suite **39/39**; both complete suites execute **251 tests**; final-image acceptance **155/155**; repeat ISO byte-for-byte identical. Runtime proof of multiline rendering/upward growth remains pending. Do not launch PCSX2 automatically.

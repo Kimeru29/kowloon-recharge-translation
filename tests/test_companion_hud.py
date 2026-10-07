@@ -53,6 +53,16 @@ from tools.companion_hud import (
     COMPANION_AFK_SCALE_HOOK_SIZE,
     COMPANION_AFK_TEXT_SAFE_CELLS,
     COMPANION_AFK_TEXT_SCALES,
+    COMPANION_AFK_LAYOUTS,
+    COMPANION_AFK_WRAP_CELLS,
+    COMPANION_AFK_LINE_STEP,
+    COMPANION_AFK_GREEN_BASE_HEIGHT,
+    COMPANION_AFK_GREEN_BASE_PIVOT_Y,
+    COMPANION_AFK_BLUE_BASE_HEIGHT,
+    COMPANION_AFK_BLUE_BASE_PIVOT_Y,
+    COMPANION_AFK_TEXT1_BASE_Y,
+    COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE,
+    COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_TABLE_OFFSET,
@@ -61,12 +71,14 @@ from tools.companion_hud import (
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
     encode_companion_action,
+    encode_companion_afk_text,
     patch_companion_action_layout,
     patch_companion_afk_layout,
     relocated_companion_entries,
     validate_companion_afk_source,
     validate_companion_hud_source,
     wrap_companion_action_text,
+    wrap_companion_afk_text,
 )
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.early_ui import build_early_ui_elf
@@ -171,7 +183,7 @@ class CompanionHudTests(unittest.TestCase):
         salah = next(entry for entry in entries if entry.key == "companion_afk_25_01_1")
         self.assertEqual((0x3F5028,), salah.pointer_offsets)
         self.assertEqual(
-            encode_ps2_english("Hm? Lost your way?", collapse_spaces=False) + b"\x00",
+            encode_companion_afk_text("Hm? Lost your way?"),
             salah.encoded,
         )
 
@@ -373,67 +385,36 @@ class CompanionHudTests(unittest.TestCase):
             words,
         )
 
-    def test_r48_afk_runtime_keeps_full_alpha_and_scales_horizontal_transform(self) -> None:
+    def test_r49_afk_wrap_is_generic_and_grows_upward(self) -> None:
         result = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, _flags, _align = struct.unpack_from(
             "<IIIIIIII", result, 0x54
         )
 
-        # Shared 0x68/0x69 are pristine at rest; runtime consumers now own
-        # their temporary geometry instead of fighting over global metadata.
+        # Static metadata remains pristine; all AFK resizing is runtime-only.
         self.assertEqual(
             COMPANION_ACTION_BUBBLE_PRISTINE_GEOMETRY,
-            tuple(
-                struct.unpack_from("<f", result, offset)[0]
-                for offset in (
-                    COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
-                    COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
-                    COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
-                    COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
-                )
-            ),
+            tuple(struct.unpack_from("<f", result, offset)[0] for offset in (
+                COMPANION_ACTION_BUBBLE_WIDTH_OFFSET,
+                COMPANION_ACTION_BUBBLE_HEIGHT_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_X_OFFSET,
+                COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET,
+            )),
         )
         self.assertEqual(
             COMPANION_ACTION_SLOT2_BUBBLE_PRISTINE_GEOMETRY,
-            tuple(
-                struct.unpack_from("<f", result, offset)[0]
-                for offset in (
-                    COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
-                    COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
-                    COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
-                    COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
-                )
-            ),
+            tuple(struct.unpack_from("<f", result, offset)[0] for offset in (
+                COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_HEIGHT_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_X_OFFSET,
+                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET,
+            )),
         )
+        for frame_index, expected in enumerate(COMPANION_AFK_PANEL_PRISTINE_GEOMETRIES):
+            frame_offset = COMPANION_AFK_PANEL_METADATA_OFFSET + frame_index * COMPANION_AFK_PANEL_FRAME_STRIDE
+            self.assertEqual(expected, struct.unpack_from("<ffff", result, frame_offset + 4))
 
-        geometry_jal = struct.unpack_from("<I", result, 0x66050)[0]
-        self.assertEqual(0x03, geometry_jal >> 26)
-        self.assertEqual(0x000219C0, struct.unpack_from("<I", result, 0x66054)[0])
-        geometry_va = (geometry_jal & 0x03FFFFFF) << 2
-        geometry_file = p_offset + geometry_va - p_vaddr
-        geometry_words = struct.unpack_from(
-            f"<{COMPANION_AFK_GEOMETRY_HOOK_SIZE // 4}I",
-            result,
-            geometry_file,
-        )
-        self.assertEqual(
-            (
-                0x86020004, 0x2C490259, 0x15200016, 0x00000000,
-                0x860802F8, 0x2D090002, 0x11200012, 0x00000000,
-                0x00084900, 0x00085140, 0x012A4821,
-                0x3C0A0045, 0x254A0AC4, 0x01495021,
-                0x3C094390, 0xAD490000,       # width 288
-                0x3C0942A0, 0xAD490004,       # height 80
-                0x3C09429A, 0xAD49000C,       # pivot-Y 77
-                0x3C094286, 0x11000002, 0x00000000,
-                0x3C0942FA, 0xAD490008,       # pivot-X 67 / 125
-                0x000219C0, 0x03E00008, 0x00000000,
-            ),
-            geometry_words,
-        )
-
-        # Runtime proved r47's f16 hook was scaling alpha. Both the ordinary
-        # h_buddy and specialized Re:charge constructors must keep f16=1.0.
+        # Runtime proved f16 is alpha. Every constructor path keeps it at 1.0.
         for lui_offset, mtc1_offset in (
             (0x6621C, 0x66220),
             (0x6625C, 0x66260),
@@ -443,90 +424,124 @@ class CompanionHudTests(unittest.TestCase):
             self.assertEqual(0x3C023F80, struct.unpack_from("<I", result, lui_offset)[0])
             self.assertEqual(0x44828000, struct.unpack_from("<I", result, mtc1_offset)[0])
 
-        # r48 applies the calculated fit after construction to object +0x48,
-        # which the native renderer multiplies into horizontal glyph position.
-        scale_jal_1 = struct.unpack_from("<I", result, 0x66284)[0]
-        scale_jal_2 = struct.unpack_from("<I", result, 0x66354)[0]
-        self.assertEqual(scale_jal_1, scale_jal_2)
-        self.assertEqual(0x03, scale_jal_1 >> 26)
-        self.assertEqual(0xAE020028, struct.unpack_from("<I", result, 0x66288)[0])
-        self.assertEqual(0x00022900, struct.unpack_from("<I", result, 0x6628C)[0])
-        self.assertEqual(0xAE02002C, struct.unpack_from("<I", result, 0x66358)[0])
-        self.assertEqual(0xA6020008, struct.unpack_from("<I", result, 0x6635C)[0])
+        # r49 geometry is selected per AFK record before resource construction.
+        geometry_jal = struct.unpack_from("<I", result, 0x66050)[0]
+        self.assertEqual(0x03, geometry_jal >> 26)
+        self.assertEqual(0x000219C0, struct.unpack_from("<I", result, 0x66054)[0])
+        geometry_va = (geometry_jal & 0x03FFFFFF) << 2
+        geometry_file = p_offset + geometry_va - p_vaddr
+        geometry_words = struct.unpack_from(
+            f"<{COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE // 4}I", result, geometry_file
+        )
+        self.assertEqual(COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE // 4, len(geometry_words))
+        self.assertEqual((0x86020004, 0x2448FDA7, 0x2D090258, 0x11200026), geometry_words[:4])
+        self.assertEqual(0x860A02F8, geometry_words[5])  # slot 0/1
+        self.assertEqual(0x00085940, geometry_words[9])  # record * 32
+        self.assertEqual(0x3C0C0000, geometry_words[10] & 0xFFFF0000)
+        self.assertEqual(0x258C0000, geometry_words[11] & 0xFFFF0000)
+        self.assertEqual(0x3C0F4390, geometry_words[19])  # width is always 288
+        self.assertEqual(0xADCF0000, geometry_words[20])
+        self.assertEqual(0x3C0F4286, geometry_words[25])  # slot0 pivot X 67
+        self.assertEqual(0x3C0F42FA, geometry_words[28])  # slot1 pivot X 125
+        self.assertEqual((0x86020004, 0x000219C0, 0x03E00008, 0), geometry_words[-4:])
 
-        scale_va = (scale_jal_1 & 0x03FFFFFF) << 2
-        scale_file = p_offset + scale_va - p_vaddr
-        scale_words = struct.unpack_from(
-            f"<{COMPANION_AFK_SCALE_HOOK_SIZE // 4}I",
-            result,
-            scale_file,
-        )
-        self.assertEqual(
-            (
-                0x00405821,  # addu t3,v0,zero: constructed text object
-                0x86080004,  # lh t0,4(s0): AFK record
-                0x2508FDA7,  # subtract first Re:charge record 0x259
-                0x00084080,  # index * 4
-            ),
-            scale_words[:4],
-        )
-        self.assertEqual(0x3C090000, scale_words[4] & 0xFFFF0000)
-        self.assertEqual(0x01284821, scale_words[5])
-        self.assertEqual(0x8D280000, scale_words[6] & 0xFFFF0000)
-        self.assertEqual(0xAD680048, scale_words[7])  # sw scale,0x48(text object)
-        self.assertEqual(
-            (
-                0x3C080016,
-                0x3508620C,  # line-1 return address
-                0x17E80002,
-                0x24020078,  # line-2 continuation v0
-                0x8602000A,  # line-1 continuation v0
-                0x03E00008,
-                0x00000000,
-                0x00000000,
-            ),
-            scale_words[8:],
-        )
-
-        hi = scale_words[4] & 0xFFFF
-        lo = scale_words[6] & 0xFFFF
+        hi = geometry_words[10] & 0xFFFF
+        lo = geometry_words[11] & 0xFFFF
         if lo & 0x8000:
             lo -= 0x10000
-        scale_table_va = ((hi << 16) + lo) & 0xFFFFFFFF
-        scale_table_file = p_offset + scale_table_va - p_vaddr
-        self.assertGreaterEqual(scale_table_va, p_vaddr)
-        self.assertLessEqual(
-            scale_table_va + len(COMPANION_AFK_TEXT_SCALES) * 4,
-            p_vaddr + p_filesz,
-        )
-        self.assertEqual(
+        layout_table_va = ((hi << 16) + lo) & 0xFFFFFFFF
+        layout_table_file = p_offset + layout_table_va - p_vaddr
+        expected_layout_table = b"".join(
             struct.pack(
-                f"<{len(COMPANION_AFK_TEXT_SCALES)}f",
-                *COMPANION_AFK_TEXT_SCALES,
-            ),
-            result[
-                scale_table_file:
-                scale_table_file + len(COMPANION_AFK_TEXT_SCALES) * 4
-            ],
+                "<8f",
+                layout.green_height,
+                layout.green_pivot_y,
+                layout.blue_height,
+                *layout.blue_pivot_y,
+                layout.text1_y,
+                layout.text2_y,
+            )
+            for layout in COMPANION_AFK_LAYOUTS
+        )
+        self.assertEqual(600 * 32, len(expected_layout_table))
+        self.assertEqual(
+            expected_layout_table,
+            result[layout_table_file:layout_table_file + len(expected_layout_table)],
         )
 
-        self.assertEqual(COMPANION_AFK_RECORD_COUNT, len(COMPANION_AFK_TEXT_SCALES))
-        for record_index, (lines, scale) in enumerate(
-            zip(COMPANION_AFK_TRANSLATIONS, COMPANION_AFK_TEXT_SCALES, strict=True)
+        # Both text constructors share one post-construction hook. It keeps X
+        # scale at 1.0 and changes only object +0x18 (Y position).
+        text_jal_1 = struct.unpack_from("<I", result, 0x66284)[0]
+        text_jal_2 = struct.unpack_from("<I", result, 0x66354)[0]
+        self.assertEqual(text_jal_1, text_jal_2)
+        self.assertEqual(0x03, text_jal_1 >> 26)
+        self.assertEqual(0xAE020028, struct.unpack_from("<I", result, 0x66288)[0])
+        self.assertEqual(0xAE02002C, struct.unpack_from("<I", result, 0x66358)[0])
+        text_va = (text_jal_1 & 0x03FFFFFF) << 2
+        text_file = p_offset + text_va - p_vaddr
+        text_words = struct.unpack_from(
+            f"<{COMPANION_AFK_WRAP_TEXT_HOOK_SIZE // 4}I", result, text_file
+        )
+        self.assertEqual((0x00405821, 0x3C0F3F80, 0xAD6F0048), text_words[:3])
+        self.assertEqual(0x00084140, text_words[10])  # record * 32
+        self.assertEqual(0x3C090000, text_words[11] & 0xFFFF0000)
+        self.assertEqual(0x25290000, text_words[12] & 0xFFFF0000)
+        self.assertEqual(0x8D2A0018, text_words[16])  # line1 Y
+        self.assertEqual(0x8D2A001C, text_words[19])  # line2 Y
+        self.assertEqual(0xAD6A0018, text_words[20])  # object +0x18
+        self.assertEqual(layout_table_va, (
+            ((text_words[11] & 0xFFFF) << 16)
+            + ((text_words[12] & 0xFFFF) - (0x10000 if text_words[12] & 0x8000 else 0))
+        ) & 0xFFFFFFFF)
+
+        # Complete-corpus invariant: every visual row is <=16 cells. Bubble width
+        # never changes; only height/pivot-Y grow, so both layers extend upward
+        # while their bottom/tail relationships remain fixed for either slot.
+        self.assertEqual(COMPANION_AFK_RECORD_COUNT, len(COMPANION_AFK_LAYOUTS))
+        for record_index, (source_lines, layout) in enumerate(
+            zip(COMPANION_AFK_TRANSLATIONS, COMPANION_AFK_LAYOUTS, strict=True)
         ):
-            longest = max((len(line) for line in lines if line), default=0)
-            expected = 1.0 if longest == 0 else min(
-                1.0,
-                COMPANION_AFK_TEXT_SAFE_CELLS / longest,
-            )
+            rows = (*layout.line1_rows, *layout.line2_rows)
+            total_rows = len(rows)
+            delta = COMPANION_AFK_LINE_STEP * max(0, total_rows - 2)
             with self.subTest(record=record_index):
-                self.assertAlmostEqual(expected, scale)
-                for line in lines:
-                    if line:
-                        self.assertLessEqual(
-                            len(line) * scale,
-                            COMPANION_AFK_TEXT_SAFE_CELLS + 1e-6,
-                        )
+                self.assertTrue(rows)
+                self.assertTrue(all(1 <= len(row) <= COMPANION_AFK_WRAP_CELLS for row in rows))
+                self.assertEqual(COMPANION_AFK_GREEN_BASE_HEIGHT + delta, layout.green_height)
+                self.assertEqual(COMPANION_AFK_GREEN_BASE_PIVOT_Y + delta, layout.green_pivot_y)
+                self.assertEqual(COMPANION_AFK_BLUE_BASE_HEIGHT + delta, layout.blue_height)
+                self.assertEqual(3.0, layout.green_height - layout.green_pivot_y)
+                self.assertEqual(
+                    COMPANION_AFK_TEXT1_BASE_Y - delta,
+                    layout.text1_y,
+                )
+                if layout.line2_rows:
+                    last_row_y = layout.text2_y + COMPANION_AFK_LINE_STEP * (len(layout.line2_rows) - 1)
+                else:
+                    last_row_y = layout.text1_y + COMPANION_AFK_LINE_STEP * (len(layout.line1_rows) - 1)
+                self.assertLessEqual(last_row_y, 331.0)
+                if total_rows >= 2:
+                    self.assertEqual(331.0, last_row_y)
+                for base, pivot in zip(COMPANION_AFK_BLUE_BASE_PIVOT_Y, layout.blue_pivot_y, strict=True):
+                    self.assertEqual(base + delta, pivot)
+                    self.assertEqual(COMPANION_AFK_BLUE_BASE_HEIGHT - base, layout.blue_height - pivot)
+
+                for source in source_lines:
+                    if not source:
+                        continue
+                    encoded = encode_companion_afk_text(source)
+                    expected_rows = wrap_companion_afk_text(source)
+                    self.assertEqual(max(0, len(expected_rows) - 1), encoded.split(b"\x00", 1)[0].count(b"\x0a"))
+                    # Current corpus preserves r48 allocation size exactly.
+                    self.assertEqual(
+                        len(encode_ps2_english(source, collapse_spaces=False)) + 1,
+                        len(encoded),
+                    )
+
+        # The generic wrapper has no corpus-specific ceiling and hard-splits an
+        # overlong token while still enforcing the same horizontal bound.
+        self.assertEqual(("X" * 16, "X" * 16, "X" * 8), wrap_companion_afk_text("X" * 40))
+        self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
     def test_r38_runtime_selector_keeps_body_stable_and_points_tail_at_active_slot(self) -> None:
         result = build_early_ui_elf(RAW)
