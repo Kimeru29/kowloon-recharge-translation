@@ -464,10 +464,10 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         if tuple(struct.unpack_from("<f", raw, offset)[0] for offset in offsets) != geometry:
             return False
 
-    # r45 keeps AFK's slot-specific green 0x68/0x69 speaker tail and compacts
-    # only the paired blue 0x6A panel. Its three animation frames retain their
-    # native 1px pivot-Y progression, while slot 2's panel body follows the same
-    # 13px shift as the compact green sibling body.
+    # r46 preserves AFK's native blue 0x6A resource exactly after r45's
+    # compacted geometry made that panel disappear at runtime. These checks are
+    # validation-only: resource record, all three native animation frames and
+    # both native slot placements must remain pristine.
     if (
         COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET + 8 > len(raw)
         or struct.unpack_from("<II", raw, COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET)

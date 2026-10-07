@@ -32,10 +32,10 @@ COMPANION_AFK_SOURCE_SHA256 = "eaeb3bd7b6dab806aaa894f5458d13b1f0a29e7221ba0d5f4
 
 # Native Re:charge free-talk composition. AFK creates two layers: the
 # slot-specific green 0x68/0x69 speech pointer plus a blue group-2/resource
-# 0x6A panel. Resource 0x6A has exactly two structured placement owners in the
-# ELF (the two AFK slots) and three animation metadata frames. r45 compacts only
-# this AFK-exclusive blue panel so it aligns with the already accepted compact
-# 0x68/0x69 body while preserving the green tail as the speaker cue.
+# 0x6A panel. r45's attempt to compact 0x6A made the blue panel disappear at
+# runtime, so r46 treats the native 0x6A geometry/placements as immutable and
+# validates them fail-closed without writing them. The exact two structured
+# placement owners and three animation frames remain documented below.
 COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET = 0x380E40
 COMPANION_AFK_PANEL_METADATA_VA = 0x00450B20
 COMPANION_AFK_PANEL_METADATA_OFFSET = 0x350BA0
@@ -46,29 +46,23 @@ COMPANION_AFK_PANEL_PRISTINE_GEOMETRIES = (
     (288.0, 56.0, 67.0, 75.0),
     (288.0, 56.0, 67.0, 76.0),
 )
-COMPANION_AFK_PANEL_TARGET_GEOMETRIES = (
-    (224.0, 56.0, 52.0, 45.0),
-    (224.0, 56.0, 52.0, 46.0),
-    (224.0, 56.0, 52.0, 47.0),
-)
+COMPANION_AFK_PANEL_TARGET_GEOMETRIES = COMPANION_AFK_PANEL_PRISTINE_GEOMETRIES
 COMPANION_AFK_PANEL_PLACEMENT_OFFSETS = (0x3F8E44, 0x3F8E58)
 COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS = (
     (2, 0x6A, 246.0, 172.0, 381.0),
     (2, 0x6A, 246.0, 172.0, 381.0),
 )
-COMPANION_AFK_PANEL_TARGET_PLACEMENTS = (
-    (2, 0x6A, 246.0, 172.0, 381.0),
-    # 0x69's compact body is only 13px right of 0x68 even though its tail
-    # targets the second companion 58px away. Match that body shift here.
-    (2, 0x6A, 246.0, 185.0, 381.0),
-)
-COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS = (
-    # Width / pivot-X / pivot-Y for each 0x6A animation frame.
+COMPANION_AFK_PANEL_TARGET_PLACEMENTS = COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS
+# r46 intentionally writes no 0x6A geometry/placement bytes. Keep a separate
+# validation-owner inventory so final-image acceptance still fails closed if
+# native AFK panel data drifts.
+COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS: tuple[int, ...] = ()
+COMPANION_AFK_PANEL_VALIDATION_OFFSETS = (
+    COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET,
     0x350BA4, 0x350BAC, 0x350BB0,
     0x350BD4, 0x350BDC, 0x350BE0,
     0x350C04, 0x350C0C, 0x350C10,
-    # Slot-2 0x6A placement X.
-    0x3F8E64,
+    *COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
 )
 COMPANION_AFK_VISIBLE_STATE_FIRST = 11
 COMPANION_AFK_VISIBLE_STATE_LAST = 13
@@ -113,8 +107,8 @@ COMPANION_ACTION_VISIBILITY_HOOK_KEY = "companion_action_afk_visibility_hook"
 COMPANION_ACTION_VISIBILITY_HOOK_SIZE = 76
 COMPANION_AFK_FIRST_RECORD_INDEX = 0x259
 # Existing H_TalkBuddyTask owner that skips the complete L1 callout when zero.
-# r44 replaces only the guard load with a side-effect-free predicate hook and
-# keeps the branch destination/path intact.
+# r44 introduced the relocated predicate; r45 refined it to native AFK states
+# 11..13. r46 preserves that hook byte-for-byte and only restores native 0x6A.
 COMPANION_ACTION_VISIBILITY_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x666BC, 0x8E0202C8),  # lw v0,0x2c8(s0): original action-callout guard
     (0x666C0, 0x10400074),  # beq v0,zero,0x166814
@@ -645,7 +639,7 @@ def validate_companion_hud_source(raw: bytes) -> None:
 
 
 def patch_companion_afk_layout(raw: bytes) -> bytes:
-    """Compact only the native Re:charge AFK blue panel and align it per slot."""
+    """Validate native Re:charge AFK panel ownership without changing geometry."""
 
     metadata_va, metadata_count = struct.unpack_from(
         "<II", raw, COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET
@@ -677,14 +671,7 @@ def patch_companion_afk_layout(raw: bytes) -> bytes:
             f"got {[hex(x) for x in structured_owners]}"
         )
 
-    out = bytearray(raw)
-    for frame_index, (expected, target) in enumerate(
-        zip(
-            COMPANION_AFK_PANEL_PRISTINE_GEOMETRIES,
-            COMPANION_AFK_PANEL_TARGET_GEOMETRIES,
-            strict=True,
-        )
-    ):
+    for frame_index, expected in enumerate(COMPANION_AFK_PANEL_PRISTINE_GEOMETRIES):
         frame_offset = (
             COMPANION_AFK_PANEL_METADATA_OFFSET
             + frame_index * COMPANION_AFK_PANEL_FRAME_STRIDE
@@ -695,17 +682,10 @@ def patch_companion_afk_layout(raw: bytes) -> bytes:
                 "companion AFK panel metadata drifted: "
                 f"frame={frame_index}, expected {expected!r}, got {actual!r}"
             )
-        # Preserve height. Compact width and retarget the pivot to the already
-        # accepted 224px green body while keeping the native three-frame Y delta.
-        struct.pack_into("<f", out, frame_offset + 4, target[0])
-        struct.pack_into("<f", out, frame_offset + 8, target[1])
-        struct.pack_into("<f", out, frame_offset + 0x0C, target[2])
-        struct.pack_into("<f", out, frame_offset + 0x10, target[3])
 
-    for placement_offset, expected, target in zip(
+    for placement_offset, expected in zip(
         COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
         COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS,
-        COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
         strict=True,
     ):
         actual = struct.unpack_from("<IIfff", raw, placement_offset)
@@ -714,9 +694,10 @@ def patch_companion_afk_layout(raw: bytes) -> bytes:
                 "companion AFK panel placement drifted: "
                 f"{placement_offset:#x}: expected {expected!r}, got {actual!r}"
             )
-        struct.pack_into("<IIfff", out, placement_offset, *target)
 
-    return bytes(out)
+    # r45 proved that writing these values is unsafe even when static geometry
+    # checks pass. r46 deliberately returns the native bytes unchanged.
+    return raw
 
 
 def patch_companion_action_layout(raw: bytes) -> bytes:

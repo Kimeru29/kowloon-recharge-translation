@@ -271,43 +271,29 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_action(COMPANION_ACTION_LABELS[24].english).count(b"\x0a"))
         self.assertNotIn(b"\x0a", encode_companion_action(COMPANION_ACTION_LABELS[25].english))
 
-    def test_r45_afk_panel_is_compact_and_slot_aligned_without_touching_action_resources(self) -> None:
+    def test_r46_afk_panel_preserves_native_geometry_and_placements(self) -> None:
         result = patch_companion_afk_layout(RAW)
 
+        # r46 is deliberately validation-only after r45 made the blue panel
+        # disappear at runtime. Every native 0x6A byte must remain pristine.
+        self.assertEqual(RAW, result)
         self.assertEqual(
             (COMPANION_AFK_PANEL_METADATA_VA, COMPANION_AFK_PANEL_FRAME_COUNT),
             struct.unpack_from("<II", result, COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET),
         )
-        for frame_index, target in enumerate(COMPANION_AFK_PANEL_TARGET_GEOMETRIES):
+        for frame_index, expected in enumerate(COMPANION_AFK_PANEL_PRISTINE_GEOMETRIES):
             frame_offset = (
                 COMPANION_AFK_PANEL_METADATA_OFFSET
                 + frame_index * COMPANION_AFK_PANEL_FRAME_STRIDE
             )
-            self.assertEqual(target, struct.unpack_from("<ffff", result, frame_offset + 4))
+            self.assertEqual(expected, struct.unpack_from("<ffff", result, frame_offset + 4))
 
-        for offset, target in zip(
+        for offset, expected in zip(
             COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
-            COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
+            COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS,
             strict=True,
         ):
-            self.assertEqual(target, struct.unpack_from("<IIfff", result, offset))
-
-        # 0x68/0x69 remain owned by the accepted action-layout patch; the AFK
-        # panel pass must not mutate either shared speech-bubble metadata record.
-        self.assertEqual(
-            RAW[COMPANION_ACTION_BUBBLE_WIDTH_OFFSET:COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET + 4],
-            result[COMPANION_ACTION_BUBBLE_WIDTH_OFFSET:COMPANION_ACTION_BUBBLE_PIVOT_Y_OFFSET + 4],
-        )
-        self.assertEqual(
-            RAW[
-                COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET:
-                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET + 4
-            ],
-            result[
-                COMPANION_ACTION_SLOT2_BUBBLE_WIDTH_OFFSET:
-                COMPANION_ACTION_SLOT2_BUBBLE_PIVOT_Y_OFFSET + 4
-            ],
-        )
+            self.assertEqual(expected, struct.unpack_from("<IIfff", result, offset))
 
         owner_bytes = struct.pack("<II", 2, 0x6A)
         owners = tuple(
@@ -317,7 +303,7 @@ class CompanionHudTests(unittest.TestCase):
         )
         self.assertEqual(COMPANION_AFK_PANEL_PLACEMENT_OFFSETS, owners)
 
-    def test_r45_afk_panel_layout_fails_closed_on_owner_drift(self) -> None:
+    def test_r46_afk_panel_validation_fails_closed_on_owner_drift(self) -> None:
         tampered = bytearray(RAW)
         tampered[COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET] ^= 1
         with self.assertRaisesRegex(ValueError, "AFK panel resource-table drifted"):
@@ -341,7 +327,7 @@ class CompanionHudTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "AFK panel placement drifted"):
                     patch_companion_afk_layout(bytes(tampered))
 
-    def test_r45_visibility_hook_suppresses_native_afk_states_11_through_13(self) -> None:
+    def test_r46_keeps_r45_visibility_hook_for_native_afk_states_11_through_13(self) -> None:
         result = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, _flags, _align = struct.unpack_from(
             "<IIIIIIII", result, 0x54
