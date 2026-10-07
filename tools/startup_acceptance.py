@@ -667,17 +667,30 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     ):
         return False
 
-    scale_jal_1 = struct.unpack_from("<I", raw, 0x6625C)[0]
-    scale_jal_2 = struct.unpack_from("<I", raw, 0x6632C)[0]
+    # r48 keeps the constructor's fourth RGBA component (f16/alpha) at
+    # full native opacity for both h_buddy and Re:charge free-talk.
+    for lui_offset, mtc1_offset in (
+        (0x6621C, 0x66220),
+        (0x6625C, 0x66260),
+        (0x662EC, 0x662F0),
+        (0x6632C, 0x66330),
+    ):
+        if (
+            struct.unpack_from("<I", raw, lui_offset)[0] != 0x3C023F80
+            or struct.unpack_from("<I", raw, mtc1_offset)[0] != 0x44828000
+        ):
+            return False
+
+    # Horizontal fit is applied after object construction to text-object +0x48.
+    scale_jal_1 = struct.unpack_from("<I", raw, 0x66284)[0]
+    scale_jal_2 = struct.unpack_from("<I", raw, 0x66354)[0]
     if (
         scale_jal_1 != scale_jal_2
         or scale_jal_1 >> 26 != 0x03
-        or struct.unpack_from("<I", raw, 0x66260)[0] != 0
-        or struct.unpack_from("<I", raw, 0x66330)[0] != 0
-        or struct.unpack_from("<I", raw, 0x6621C)[0] != 0x3C023F80
-        or struct.unpack_from("<I", raw, 0x66220)[0] != 0x44828000
-        or struct.unpack_from("<I", raw, 0x662EC)[0] != 0x3C023F80
-        or struct.unpack_from("<I", raw, 0x662F0)[0] != 0x44828000
+        or struct.unpack_from("<I", raw, 0x66288)[0] != 0xAE020028
+        or struct.unpack_from("<I", raw, 0x6628C)[0] != 0x00022900
+        or struct.unpack_from("<I", raw, 0x66358)[0] != 0xAE02002C
+        or struct.unpack_from("<I", raw, 0x6635C)[0] != 0xA6020008
     ):
         return False
     scale_hook_va = (scale_jal_1 & 0x03FFFFFF) << 2
@@ -693,16 +706,20 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         p_offset + scale_hook_rel,
     )
     if (
-        scale_words[:6]
-        != (0x86080004, 0x2508FDA7, 0x2D090258, 0x11200008, 0, 0x00084880)
+        scale_words[:4]
+        != (0x00405821, 0x86080004, 0x2508FDA7, 0x00084080)
+        or scale_words[4] & 0xFFFF0000 != 0x3C090000
+        or scale_words[5] != 0x01284821
+        or scale_words[6] & 0xFFFF0000 != 0x8D280000
+        or scale_words[7] != 0xAD680048
         or scale_words[8:]
         != (
-            0x01495021, 0xC5500000, 0x03E00008, 0,
-            0x3C083F80, 0x44888000, 0x03E00008, 0,
+            0x3C080016, 0x3508620C, 0x17E80002, 0x24020078,
+            0x8602000A, 0x03E00008, 0, 0,
         )
     ):
         return False
-    scale_table_va = _materialized_va(scale_words[6], scale_words[7])
+    scale_table_va = _materialized_va(scale_words[4], scale_words[6])
     scale_table_rel = scale_table_va - p_vaddr
     expected_scales = struct.pack(
         f"<{len(COMPANION_AFK_TEXT_SCALES)}f",

@@ -471,3 +471,16 @@ The text-fit mechanism is record-generic. Native AFK style 0 advances 16px per w
 Payload ordering is a compatibility invariant. r47's scale table, scale hook, AFK native-geometry hook and L1 geometry extension are appended after the existing r46 visibility hook. Direct binary audit confirms the 999 free-talk pointer values, visibility-hook bytes and every old translated payload address remain stable. The only old translated code mutation is the final action-hook return tail, which now jumps to the extension.
 
 Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r47.iso`, SHA-256 `c81013599fa3b504670f630c8644f35c0c8bcccf36bc5967a3866183387a73aa`; pre/post-ROFS ELF `94f055aa0a659be822cfc2f097cd873929e6d89b0022d4fc72b57a3514787039` / `02b713ef36cd3daa641208c029743ea069f254a759277a49755f19d06dcac9d7`; final-image acceptance **155/155**; focused suite **38/38**; both complete suites execute **250 tests**; deterministic repeat ISO is byte-for-byte identical. Runtime proof of the final geometry/scale behavior is pending.
+
+
+### v11-r48 AFK text opacity/X-scale correction
+
+r47 geometry is runtime-accepted by Pablo's screenshot: the AFK bubble now presents the intended blue/green native-sized composition. The missing text is a separate regression caused by misidentifying caller `f16` as an X-scale parameter.
+
+The specialized free-talk constructor at `0x001950A0` passes caller `f16` through the generic object constructor as the fourth clamped RGBA component. r47 therefore scaled text alpha down with the per-record fit table. r48 restores both specialized AFK `f16=1.0` owners exactly and moves the fit to the proven horizontal transform: renderer code reads text-object `+0x48` and multiplies it into horizontal glyph coordinates; `+0x4C` is the separate vertical transform.
+
+The same r47 600-float table is retained byte-for-byte. The same 64-byte relocated hook slot is reused at the same VA. Instead of running before construction, it runs after each AFK text object is returned, stores the selected record scale to object `+0x48`, and restores the native continuation value expected by each callsite. Nothing is appended, relocated, or resized relative to r47.
+
+Binary safety is unusually strong: r47 and r48 pre-ROFS ELFs are both 8,690,540 bytes with identical translation-segment size. Only 80 bytes across 15 ranges differ, all in the two restored alpha setups, two post-construction hook sites, or the existing scale-hook body. All 999 AFK pointers, the scale table, green/blue metadata, AFK placements, geometry hook, visibility hook, normal action hook and action-geometry extension are unchanged.
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r48.iso`, SHA-256 `f91f14d34052a73a10f425cbbcd7c85c8b37d99aad0284de0e60257229cb319a`; pre/post-ROFS ELF `793d6a3c28dd894bfe85d4c16dfe1792ee70e5f36e607e9b98b4e3bbb301d49a` / `350477c63701e5a8eaa1efee9af05e6384dbcd84743f51bb55ef781b24521695`; final-image acceptance **155/155**; focused suite **38/38**; both complete suites execute **250 tests**; repeat ISO byte-for-byte identical. Runtime proof of text visibility and long-line fit remains pending.
