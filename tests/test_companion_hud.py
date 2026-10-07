@@ -35,9 +35,7 @@ from tools.companion_hud import (
     COMPANION_SLOT_INDEX_PREIMAGES,
     COMPANION_SLOT_POSITIONS,
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
-    COMPANION_COMMENT_EXTRA_POINTER_ALIASES,
     COMPANION_COMMENT_LINES,
-    companion_comment_pointer_offsets,
     encode_companion_action,
     patch_companion_action_layout,
     validate_companion_hud_source,
@@ -71,11 +69,6 @@ class CompanionHudTests(unittest.TestCase):
     def test_r30_comment_inventory_is_complete_ps4_exact_and_fail_closed(self) -> None:
         self.assertEqual(1650, len(COMPANION_COMMENT_LINES))
         self.assertEqual(1784, sum(len(spec.pointer_offsets) for spec in COMPANION_COMMENT_LINES))
-        self.assertEqual(10, sum(len(offsets) for offsets in COMPANION_COMMENT_EXTRA_POINTER_ALIASES.values()))
-        self.assertEqual(
-            1794,
-            sum(len(companion_comment_pointer_offsets(spec)) for spec in COMPANION_COMMENT_LINES),
-        )
         self.assertEqual(7, sum(spec.official_english == "@D" for spec in COMPANION_COMMENT_LINES))
         self.assertEqual(1650, len({spec.source_offset for spec in COMPANION_COMMENT_LINES}))
         first = COMPANION_COMMENT_LINES[0]
@@ -89,30 +82,6 @@ class CompanionHudTests(unittest.TestCase):
         tampered[first.pointer_offsets[0]] ^= 1
         with self.assertRaisesRegex(ValueError, "companion comment pointer preimage mismatch"):
             validate_companion_hud_source(bytes(tampered))
-
-        extra_pointer = COMPANION_COMMENT_EXTRA_POINTER_ALIASES[0x3C46E8][0]
-        tampered = bytearray(RAW)
-        tampered[extra_pointer] ^= 1
-        with self.assertRaisesRegex(ValueError, "companion comment pointer preimage mismatch"):
-            validate_companion_hud_source(bytes(tampered))
-
-    def test_r41_comment_alias_inventory_covers_every_direct_source_pointer(self) -> None:
-        source_vas = {
-            _ELF_MAIN_VADDR + spec.source_offset - _ELF_MAIN_FILE_OFFSET
-            for spec in COMPANION_COMMENT_LINES
-        }
-        discovered = {
-            offset
-            for offset in range(0, len(RAW) - 3, 4)
-            if struct.unpack_from("<I", RAW, offset)[0] in source_vas
-        }
-        owned = {
-            pointer_offset
-            for spec in COMPANION_COMMENT_LINES
-            for pointer_offset in companion_comment_pointer_offsets(spec)
-        }
-        self.assertEqual(1794, len(discovered))
-        self.assertEqual(discovered, owned)
 
     def test_r30_companion_action_inventory_covers_hud_skill_labels(self) -> None:
         self.assertEqual(31, len(COMPANION_ACTION_LABELS))
@@ -135,15 +104,6 @@ class CompanionHudTests(unittest.TestCase):
                 target_va = struct.unpack_from("<I", result, pointer_offset)[0]
                 expected = encode_ps2_english(english, collapse_spaces=False) + b"\x00"
                 self.assertEqual(expected, _read_at_va(result, target_va, len(expected)))
-
-        comments_by_source = {spec.source_offset: spec for spec in COMPANION_COMMENT_LINES}
-        for source_offset, pointer_offsets in COMPANION_COMMENT_EXTRA_POINTER_ALIASES.items():
-            spec = comments_by_source[source_offset]
-            expected = encode_ps2_english(spec.display_english, collapse_spaces=False) + b"\x00"
-            for pointer_offset in pointer_offsets:
-                with self.subTest(extra_pointer_offset=hex(pointer_offset)):
-                    target_va = struct.unpack_from("<I", result, pointer_offset)[0]
-                    self.assertEqual(expected, _read_at_va(result, target_va, len(expected)))
 
         for spec in (COMPANION_COMMENT_LINES[0], COMPANION_ACTION_LABELS[25]):
             source = spec.source_text.encode("cp932") + b"\x00"

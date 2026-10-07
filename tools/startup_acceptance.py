@@ -62,7 +62,6 @@ from tools.companion_hud import (
     COMPANION_SLOT_POSITIONS,
     COMPANION_SLOT_POSITION_TABLE_OFFSET,
     COMPANION_COMMENT_LINES,
-    companion_comment_pointer_offsets,
     encode_companion_action,
 )
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
@@ -308,11 +307,7 @@ def _verify_companion_hud_semantics(
     raw: bytes,
     segment: tuple[int, int, int, int] | None,
 ) -> tuple[bool, bool]:
-    comments_ok = (
-        segment is not None
-        and len(COMPANION_COMMENT_LINES) == 1650
-        and sum(len(companion_comment_pointer_offsets(spec)) for spec in COMPANION_COMMENT_LINES) == 1794
-    )
+    comments_ok = segment is not None and len(COMPANION_COMMENT_LINES) == 1650
     for spec in COMPANION_COMMENT_LINES:
         if not comments_ok:
             break
@@ -320,7 +315,7 @@ def _verify_companion_hud_semantics(
         if raw[spec.source_offset:spec.source_offset + len(source)] != source:
             comments_ok = False
             break
-        for pointer_offset in companion_comment_pointer_offsets(spec):
+        for pointer_offset in spec.pointer_offsets:
             if pointer_offset + 4 > len(raw):
                 comments_ok = False
                 break

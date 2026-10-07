@@ -120,29 +120,6 @@ class CompanionActionLabel:
 COMPANION_COMMENT_LINES: tuple[CompanionCommentLine, ...] = tuple(
     CompanionCommentLine(*record) for record in COMPANION_COMMENT_DATA
 )
-
-# r41 is deliberately text-only relative to the known-good r38 runtime layout.
-# r30 generated all 1,784 pointers inside the 601-event h_buddy table, but a
-# whole-ELF scan later found ten additional direct aliases to nine of those same
-# Japanese source strings. Own only those pointer words; do not alter any bubble
-# resource tables, geometry, hooks, or other runtime structures.
-COMPANION_COMMENT_EXTRA_POINTER_ALIASES: dict[int, tuple[int, ...]] = {
-    0x3C46E8: (0x3E6728, 0x3F3BA8),
-    0x3C8C10: (0x3F452C,),
-    0x3C7880: (0x4104A0,),
-    0x3C7080: (0x43C42C,),
-    0x3C66D0: (0x48897C,),
-    0x3C6B80: (0x497190,),
-    0x3C66B0: (0x49B564,),
-    0x3C6810: (0x4BE468,),
-    0x3C4ED0: (0x576778,),
-}
-
-
-def companion_comment_pointer_offsets(spec: CompanionCommentLine) -> tuple[int, ...]:
-    return spec.pointer_offsets + COMPANION_COMMENT_EXTRA_POINTER_ALIASES.get(spec.source_offset, ())
-
-
 COMPANION_ACTION_LABELS: tuple[CompanionActionLabel, ...] = tuple(
     CompanionActionLabel(*record) for record in COMPANION_ACTION_DATA
 )
@@ -330,13 +307,7 @@ def validate_companion_hud_source(raw: bytes) -> None:
     if len(COMPANION_COMMENT_LINES) != 1650:
         raise ValueError(f"companion comment corpus size drifted: {len(COMPANION_COMMENT_LINES)}")
     if sum(len(spec.pointer_offsets) for spec in COMPANION_COMMENT_LINES) != 1784:
-        raise ValueError("companion comment event-table pointer-alias count drifted")
-    if sum(len(offsets) for offsets in COMPANION_COMMENT_EXTRA_POINTER_ALIASES.values()) != 10:
-        raise ValueError("companion comment extra pointer-alias count drifted")
-    if not set(COMPANION_COMMENT_EXTRA_POINTER_ALIASES) <= {
-        spec.source_offset for spec in COMPANION_COMMENT_LINES
-    }:
-        raise ValueError("companion comment extra pointer alias has unknown source")
+        raise ValueError("companion comment pointer-alias count drifted")
     if len(COMPANION_ACTION_LABELS) != 31:
         raise ValueError(f"companion action corpus size drifted: {len(COMPANION_ACTION_LABELS)}")
 
@@ -349,7 +320,7 @@ def validate_companion_hud_source(raw: bytes) -> None:
             source_text=spec.source_text,
         )
         expected_va = _source_va(spec.source_offset)
-        for pointer_offset in companion_comment_pointer_offsets(spec):
+        for pointer_offset in spec.pointer_offsets:
             if pointer_offset in owned_pointers:
                 raise ValueError(f"duplicate companion comment pointer owner: {pointer_offset:#x}")
             owned_pointers.add(pointer_offset)
@@ -561,7 +532,7 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
         RelocatedText(
             key=f"companion_comment_{spec.source_offset:06x}",
             encoded=encode_ps2_english(spec.display_english, collapse_spaces=False) + b"\x00",
-            pointer_offsets=companion_comment_pointer_offsets(spec),
+            pointer_offsets=spec.pointer_offsets,
         )
         for spec in COMPANION_COMMENT_LINES
     ]

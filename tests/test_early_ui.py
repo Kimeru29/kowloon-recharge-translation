@@ -18,7 +18,6 @@ from tools.companion_hud import (
     COMPANION_ACTION_LAYOUT_PATCHES,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_COMMENT_LINES,
-    companion_comment_pointer_offsets,
 )
 from tools.early_ui import EARLY_UI_PATCHES, build_early_ui_elf
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
@@ -175,7 +174,7 @@ class EarlyUiPatchTests(unittest.TestCase):
         for spec in DUNGEON_ITEM_NAMES:
             allowed.update(range(spec.pointer_offset, spec.pointer_offset + 4))
         for spec in COMPANION_COMMENT_LINES:
-            for pointer_offset in companion_comment_pointer_offsets(spec):
+            for pointer_offset in spec.pointer_offsets:
                 allowed.update(range(pointer_offset, pointer_offset + 4))
         for spec in COMPANION_ACTION_LABELS:
             if spec.english is not None:
