@@ -161,7 +161,7 @@ COMPANION_ACTION_R53_BLUE_CREATE_KEY = "companion_action_r53_blue_create"
 COMPANION_ACTION_R53_BLUE_CREATE_SIZE = 156
 COMPANION_ACTION_R53_SHOW_KEY = "companion_action_r53_blue_show"
 COMPANION_ACTION_R53_HIDE_KEY = "companion_action_r53_blue_hide"
-COMPANION_ACTION_R53_ALPHA_HOOK_SIZE = 48
+COMPANION_ACTION_R53_ALPHA_HOOK_SIZE = 80
 COMPANION_ACTION_R53_BLUE_OFFSET = 0x02F4
 COMPANION_ACTION_R53_SHOW_SITE = 0x65A88
 COMPANION_ACTION_R53_HIDE_SITES = (0x65B40, 0x65C5C)
@@ -207,6 +207,8 @@ COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION = 18.0
 # r55: conservative 3px bottom-only trim on blue for >2-row callouts.
 COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM = 6.0
 COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION = 9.0
+# r57: only the observed >=4-row overflow needs further blue bottom reduction.
+COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM = 6.0
 COMPANION_AFK_GREEN_BASE_HEIGHT = 80.0
 COMPANION_AFK_GREEN_BASE_PIVOT_Y = 77.0
 COMPANION_AFK_BLUE_BASE_HEIGHT = 56.0
@@ -501,7 +503,10 @@ def companion_afk_layout(lines: tuple[str, str]) -> CompanionAfkLayout:
 
     total_rows = len(line1_rows) + len(line2_rows)
     extra_height = COMPANION_AFK_LINE_STEP * max(0, total_rows - 2)
-    blue_bottom_trim = COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0
+    blue_bottom_trim = (
+        (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
+        + (COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM if total_rows >= 4 else 0.0)
+    )
     text1_y = COMPANION_AFK_TEXT1_BASE_Y - extra_height
     # The first and second native text objects are independent, and embedded
     # newlines advance at ~18 game units on the tested four-row AFK callout.
@@ -1033,26 +1038,43 @@ def _action_r53_blue_create_bytes(*, hook_va: int) -> bytes:
 
 
 def _action_r53_blue_alpha_bytes(*, visible: bool, create_va: int) -> bytes:
-    """Mirror native green alpha to exactly the sprite located by the scanner."""
+    """Reacquire the native blue during the real green show/hide transitions.
+
+    At r56 construction time there may not be an active group2/id0x6A sprite.
+    The native frame-alpha callbacks run AFTER creation and can resolve it.
+    Rescan at each callback, not just once at task creation. Save live $ra,
+    $v0 and f12 around the constructor-compatible scanner; maintain the
+    displaced green sb and caller delay-slot semantics.
+    """
     state_hi, state_lo = _split_address(
         create_va + COMPANION_ACTION_R53_BLUE_CREATE_SIZE - 4
     )
     alpha_source = 5 if visible else 0
     words = [
-        _mips_i(0x28, 2, alpha_source, 0x23), # displaced native green sb
-        _mips_i(0x0F, 0, 12, state_hi),
-        _mips_i(0x09, 12, 12, state_lo),
-        _mips_i(0x23, 12, 12, 0),           # native located blue pointer
-        _mips_i(0x04, 12, 0, 3),
-        _mips_r(0, 3, 13, 2, 0x00),          # frame*4 delay
-        _mips_r(12, 13, 12, 0, 0x21),
-        _mips_i(0x28, 12, alpha_source, 0x23),
-        _mips_r(31, 0, 0, 0, 0x08),
-        0,0,0,
+        _mips_i(0x28, 2, alpha_source, 0x23), # 0: displaced native green sb
+        _mips_i(0x09, 29, 29, -32),        # 1: 16-byte aligned stack
+        _mips_i(0x2B, 29, 31, 28),        # 2: save ra
+        _mips_i(0x2B, 29, 2, 24),         # 3: native green loop v0
+        _mips_i(0x39, 29, 12, 20),        # 4: save f12
+        _jal_word(create_va),             # 5: reacquire/reposition live blue
+        0,                                # 6: delay
+        _mips_i(0x31, 29, 12, 20),        # 7: restore f12
+        _mips_i(0x23, 29, 2, 24),         # 8: restore v0
+        _mips_i(0x23, 29, 31, 28),        # 9: restore ra
+        _mips_i(0x09, 29, 29, 32),        # 10: restore sp
+        _mips_i(0x0F, 0, 12, state_hi),   # 11: locate cached pointer
+        _mips_i(0x09, 12, 12, state_lo),  # 12
+        _mips_i(0x23, 12, 12, 0),         # 13
+        _mips_i(0x04, 12, 0, 3),          # 14: absent -> return
+        _mips_r(0, 3, 13, 2, 0x00),       # 15: frame*4, delay slot
+        _mips_r(12, 13, 12, 0, 0x21),    # 16
+        _mips_i(0x28, 12, alpha_source, 0x23), # 17: blue vertex alpha
+        _mips_r(31, 0, 0, 0, 0x08),       # 18: jr ra
+        0,                                # 19: delay
     ]
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_R53_ALPHA_HOOK_SIZE:
-        raise AssertionError("r56 native pool alpha hook size drift")
+        raise AssertionError("r57 native pool alpha-rescan hook size drift")
     return code
 
 

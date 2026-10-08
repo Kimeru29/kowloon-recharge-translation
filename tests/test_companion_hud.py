@@ -65,6 +65,7 @@ from tools.companion_hud import (
     COMPANION_AFK_GREEN_BASE_PIVOT_Y,
     COMPANION_AFK_BLUE_BASE_HEIGHT,
     COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM,
+    COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM,
     COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION,
     COMPANION_AFK_BLUE_BASE_PIVOT_Y,
     COMPANION_AFK_TEXT1_BASE_Y,
@@ -554,7 +555,10 @@ class CompanionHudTests(unittest.TestCase):
                 self.assertTrue(all(1 <= len(row) <= COMPANION_AFK_WRAP_CELLS for row in rows))
                 self.assertEqual(COMPANION_AFK_GREEN_BASE_HEIGHT + delta, layout.green_height)
                 self.assertEqual(COMPANION_AFK_GREEN_BASE_PIVOT_Y + delta, layout.green_pivot_y)
-                trim = COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0
+                trim = (
+                    (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
+                    + (COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM if total_rows >= 4 else 0.0)
+                )
                 self.assertEqual(COMPANION_AFK_BLUE_BASE_HEIGHT + delta - trim, layout.blue_height)
                 self.assertEqual(3.0, layout.green_height - layout.green_pivot_y)
                 self.assertEqual(
@@ -613,7 +617,7 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(214.0, long_afk.text1_y)
         self.assertEqual(251.0, long_afk.text2_y)
         self.assertEqual(144.0, long_afk.green_height)
-        self.assertEqual(114.0, long_afk.blue_height)
+        self.assertEqual(108.0, long_afk.blue_height)
         self.assertEqual(269.0, long_afk.text2_y + COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION)
         short_afk = COMPANION_AFK_LAYOUTS[480]
         self.assertEqual(("Come now, this", "way."), short_afk.line1_rows)
@@ -680,17 +684,24 @@ class CompanionHudTests(unittest.TestCase):
         for alpha_site in (0x65A88, 0x65B40, 0x65C5C):
             jal = struct.unpack_from("<I", result, alpha_site)[0]
             va = (jal & 0x03FFFFFF) << 2
-            words = struct.unpack_from("<12I", result, p_offset + va - p_vaddr)
-            self.assertEqual(0x3C0C0000, words[1] & 0xFFFF0000)
-            self.assertEqual(0x258C0000, words[2] & 0xFFFF0000)
-            self.assertEqual(0x8D8C0000, words[3])
+            words = struct.unpack_from("<20I", result, p_offset + va - p_vaddr)
+            self.assertEqual(0x27BDFFE0, words[1])  # aligned -32 stack
+            self.assertEqual(0xAFBF001C, words[2])  # preserve native RA
+            self.assertEqual(0xAFA20018, words[3])  # preserve native v0
+            self.assertEqual(0xE7AC0014, words[4])  # preserve native f12
+            self.assertEqual(3, words[5] >> 26)
+            self.assertEqual(new_va, (words[5] & 0x03FFFFFF) << 2)
+            self.assertEqual(0xC7AC0014, words[7]) # restore f12
+            self.assertEqual(0x8FA20018, words[8]) # restore v0
+            self.assertEqual(0x8FBF001C, words[9]) # restore ra
+            self.assertEqual(0x27BD0020, words[10]) # restore sp
             self.assertEqual(
                 cached_va,
-                ((words[1] & 0xFFFF) << 16)
-                + (words[2] & 0xFFFF)
-                - (0x10000 if words[2] & 0x8000 else 0),
+                ((words[11] & 0xFFFF) << 16)
+                + (words[12] & 0xFFFF)
+                - (0x10000 if words[12] & 0x8000 else 0),
             )
-            self.assertEqual(0xA1850023 if alpha_site == 0x65A88 else 0xA1800023, words[7])
+            self.assertEqual(0xA1850023 if alpha_site == 0x65A88 else 0xA1800023, words[17])
         for off in (0x66668, 0x66DD4):
             self.assertEqual(0x0C06850C, struct.unpack_from("<I", result, off)[0])
         for owner, offset in (
@@ -703,6 +714,7 @@ class CompanionHudTests(unittest.TestCase):
             ("L1 green X copy", create_offset + 20 * 4),
             ("L1 green Y copy", create_offset + 22 * 4),
             ("L1 native blue depth", create_offset + 26 * 4),
+            ("L1 animated live-rescan JAL", create_offset + 20),
             ("L1 visibility show", 0x65A88),
             ("L1 visibility hide", 0x65B40),
             ("L1 fade hide", 0x65C5C),
