@@ -56,9 +56,12 @@ COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS = (
 # placement also follows the slot-1 X anchor; runtime pivot-X then keeps the
 # blue body aligned with the matching green 0x68/0x69 consumer.
 COMPANION_AFK_ANCHOR_Y = 346.0
+# r53: 3px inset on both sides keeps blue tint behind the green frame.
+COMPANION_AFK_R53_BLUE_INSET_X = 3.0
+COMPANION_AFK_R53_BLUE_WIDTH = 282.0
 COMPANION_AFK_PANEL_TARGET_PLACEMENTS = (
-    (2, 0x6A, 246.0, 172.0, COMPANION_AFK_ANCHOR_Y),
-    (2, 0x6A, 246.0, 230.0, COMPANION_AFK_ANCHOR_Y),
+    (2, 0x6A, 246.0, 175.0, COMPANION_AFK_ANCHOR_Y),
+    (2, 0x6A, 246.0, 233.0, COMPANION_AFK_ANCHOR_Y),
 )
 COMPANION_AFK_GREEN_PLACEMENT_OFFSETS = (0x3F8E1C, 0x3F8E30)
 COMPANION_AFK_GREEN_PRISTINE_PLACEMENTS = (
@@ -74,6 +77,7 @@ COMPANION_AFK_GREEN_TARGET_PLACEMENTS = (
 COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS: tuple[int, ...] = (
     0x3F8E2C,
     0x3F8E40,
+    0x3F8E50,
     0x3F8E54,
     0x3F8E64,
     0x3F8E68,
@@ -150,6 +154,26 @@ COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE = 212
 COMPANION_ACTION_R50_PANEL_EXTENSION_KEY = "companion_action_r50_panel_extension"
 COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE = 136
 # r52 replaces both r51 runtime hooks with one AFK-only constructor fix.
+
+# r53: L1 blue object uses the existing unused task+0x2F4 sprite slot,
+# but unlike r51 its opacity tracks every native green action transition.
+COMPANION_ACTION_R53_BLUE_CREATE_KEY = "companion_action_r53_blue_create"
+COMPANION_ACTION_R53_BLUE_CREATE_SIZE = 100
+COMPANION_ACTION_R53_SHOW_KEY = "companion_action_r53_blue_show"
+COMPANION_ACTION_R53_HIDE_KEY = "companion_action_r53_blue_hide"
+COMPANION_ACTION_R53_ALPHA_HOOK_SIZE = 32
+COMPANION_ACTION_R53_BLUE_OFFSET = 0x02F4
+COMPANION_ACTION_R53_SHOW_SITE = 0x65A88
+COMPANION_ACTION_R53_HIDE_SITES = (0x65B40, 0x65C5C)
+COMPANION_ACTION_R53_BLUE_PREIMAGES = (
+    (0x66668, 0x0C06850C),   # task reset cleanup sprite destructor
+    (0x66DD4, 0x0C06850C),   # terminal cleanup sprite destructor
+    (0x66740, 0x3C024371),   # action constructor next-resource f12
+    (0x66744, 0x44826000),
+    (0x65A88, 0xA0450023),   # green show vertex alpha
+    (0x65B40, 0xA0400023),   # green hide vertex alpha
+    (0x65C5C, 0xA0400023),   # green hide after task fade
+)
 COMPANION_AFK_R52_PRETEXT_HOOK_KEY = "companion_afk_r52_pretext_hook"
 COMPANION_AFK_R52_PRETEXT_HOOK_SIZE = 84
 COMPANION_AFK_R52_PRETEXT_PREIMAGES = (
@@ -816,7 +840,7 @@ def _afk_r50_geometry_hook_bytes(*, table_va: int) -> bytes:
         _mips_i(0x2B, 14, 15, 8),           # green pivot-X
         _mips_i(0x0F, 0, 14, 0x0045),
         _mips_i(0x09, 14, 14, 0x0B24),      # blue frame0 width field
-        _mips_i(0x0F, 0, 13, 0x4390),       # 288.0
+        _mips_i(0x0F, 0, 13, 0x438D),       # r53 AFK blue 282.0, green stays 288
         _mips_i(0x2B, 14, 13, 0x00),
         _mips_i(0x2B, 14, 13, 0x30),
         _mips_i(0x2B, 14, 13, 0x60),
@@ -893,7 +917,9 @@ def _action_r50_panel_extension_bytes() -> bytes:
 def _afk_r52_pretext_hook_bytes(*, table_va: int) -> bytes:
     """Bind AFK Y to both native constructor inputs before text creation.
 
-    Unlike r51, keep the caller's stack-spilled f13 (sp+0x1a4) synchronized.
+    Unlike r51/r52, preserve t0-t3: the specialized constructor saves t1 as
+    a native text argument before generating glyphs. Only t4-t6 are scratch;
+    caller stack-spilled f13 (sp+0x1a4) remains synchronized.
     All non-AFK records continue with the original value. This never creates
     an independent group-2 sprite or alters L1 ownership/lifecycle.
     """
@@ -902,23 +928,23 @@ def _afk_r52_pretext_hook_bytes(*, table_va: int) -> bytes:
     line1_return_va = 0x001661D8
     words = (
         _mips_mtc1(0, 14),                    # displaced mtc1 zero,f14
-        _mips_i(0x21, 16, 8, 0x0004),        # lh t0,4(s0): AFK record
-        _mips_i(0x09, 8, 8, -COMPANION_AFK_FIRST_RECORD_INDEX),
-        _mips_i(0x0B, 8, 9, COMPANION_AFK_RECORD_COUNT),
-        _mips_i(0x04, 9, 0, 14),            # non-AFK -> return, no stack change
+        _mips_i(0x21, 16, 12, 0x0004),        # lh t4,4(s0): AFK record
+        _mips_i(0x09, 12, 12, -COMPANION_AFK_FIRST_RECORD_INDEX),
+        _mips_i(0x0B, 12, 13, COMPANION_AFK_RECORD_COUNT),
+        _mips_i(0x04, 13, 0, 14),            # non-AFK -> return, no stack change
         0x00000000,
-        _mips_r(0, 8, 8, 5, 0x00),          # index * 32
-        _mips_i(0x0F, 0, 9, table_hi),
-        _mips_i(0x09, 9, 9, table_lo),
-        _mips_r(9, 8, 9, 0, 0x21),
-        _mips_i(0x0F, 0, 10, line1_return_va >> 16),
-        _mips_i(0x0D, 10, 10, line1_return_va & 0xFFFF),
-        _mips_i(0x05, 31, 10, 4),           # line2 -> +28
+        _mips_r(0, 12, 12, 5, 0x00),          # t4 index * 32
+        _mips_i(0x0F, 0, 13, table_hi),
+        _mips_i(0x09, 13, 13, table_lo),
+        _mips_r(13, 12, 13, 0, 0x21),
+        _mips_i(0x0F, 0, 14, line1_return_va >> 16),
+        _mips_i(0x0D, 14, 14, line1_return_va & 0xFFFF),
+        _mips_i(0x05, 31, 14, 4),           # line2 -> +28
         0x00000000,
-        _mips_i(0x31, 9, 13, 24),           # lwc1 f13,line1_y
+        _mips_i(0x31, 13, 13, 24),           # lwc1 f13,line1_y
         _mips_i(0x04, 0, 0, 2),             # join spill/return
         0x00000000,
-        _mips_i(0x31, 9, 13, 28),           # lwc1 f13,line2_y
+        _mips_i(0x31, 13, 13, 28),           # lwc1 f13,line2_y
         _mips_i(0x39, 29, 13, 0x01A4),     # swc1 f13,0x1a4(sp): native spill
         _mips_r(31, 0, 0, 0, 0x08),         # jr ra
         0x00000000,
@@ -927,6 +953,69 @@ def _afk_r52_pretext_hook_bytes(*, table_va: int) -> bytes:
     if len(code) != COMPANION_AFK_R52_PRETEXT_HOOK_SIZE:
         raise AssertionError(f"companion AFK r52 pretext hook drifted: {len(code)}")
     return code
+
+
+
+def _action_r53_blue_create_bytes() -> bytes:
+    """Create L1 blue at the green instance anchor, initially fully transparent.
+
+    The accepted native L1 state machine owns its subsequent fade/show/hide.
+    Copying only the resource and task lifetime (r51) made it permanently visible.
+    """
+    words = (
+        _mips_i(0x37, 29, 6, 0x0178),  # ld a2,0x178(sp): exact green X/Y
+        _mips_i(0x09, 29, 29, -16),
+        _mips_i(0x2B, 29, 31, 12),
+        _mips_i(0x0F, 0, 2, 0x4372),   # 242.5 between green 243 and text 242
+        _mips_i(0x0D, 2, 2, 0x8000),
+        _mips_mtc1(2, 12),
+        _mips_i(0x09, 0, 4, 2),
+        _mips_i(0x09, 0, 5, 0x006A),
+        _mips_r(0, 0, 7, 0, 0x21),
+        _jal_word(0x00107D60),
+        0,
+        _mips_i(0x2B, 16, 2, COMPANION_ACTION_R53_BLUE_OFFSET),
+        _mips_i(0x23, 16, 12, COMPANION_ACTION_R53_BLUE_OFFSET), # lw t4,slot
+        _mips_i(0x04, 12, 0, 5),          # null allocation skips all alpha writes
+        0,                                # safe branch delay
+        _mips_i(0x28, 12, 0, 0x23),
+        _mips_i(0x28, 12, 0, 0x27),
+        _mips_i(0x28, 12, 0, 0x2B),
+        _mips_i(0x28, 12, 0, 0x2F),
+        _mips_i(0x23, 29, 31, 12),
+        _mips_i(0x09, 29, 29, 16),
+        _mips_i(0x0F, 0, 2, 0x4371),   # restore f12 for next resource
+        _mips_mtc1(2, 12),
+        _mips_r(31, 0, 0, 0, 0x08),
+        0,
+    )
+    blob = b"".join(struct.pack("<I", word) for word in words)
+    if len(blob) != COMPANION_ACTION_R53_BLUE_CREATE_SIZE:
+        raise AssertionError("L1 blue r53 create helper size drift")
+    return blob
+
+
+def _action_r53_blue_alpha_bytes(*, visible: bool) -> bytes:
+    """Replicate original L1 green vertex alpha and apply to blue sibling.
+
+    Hooked green sb executes inside the helper. The original next lw a0,2dc
+    occupies the caller JAL delay slot; v0/a0/v1/a1 remain untouched.
+    """
+    source = 5 if visible else 0
+    words = (
+        _mips_i(0x28, 2, source, 0x23),       # native green: sb alpha,0x23(v0)
+        _mips_i(0x23, 16, 12, COMPANION_ACTION_R53_BLUE_OFFSET),  # lw t4,slot
+        _mips_i(0x04, 12, 0, 3),            # if null skip
+        _mips_r(0, 3, 13, 2, 0x00),         # sll t5,v1,2 (delay)
+        _mips_r(12, 13, 12, 0, 0x21),       # addu t4,t4,t5
+        _mips_i(0x28, 12, source, 0x23),   # blue vertex alpha
+        _mips_r(31, 0, 0, 0, 0x08),
+        0,  # native MIPS jr delay slot
+    )
+    blob = b"".join(struct.pack("<I", word) for word in words)
+    if len(blob) != COMPANION_ACTION_R53_ALPHA_HOOK_SIZE:
+        raise AssertionError("L1 blue alpha helper size drift")
+    return blob
 
 
 def _runtime_hook_bytes(
@@ -1471,6 +1560,9 @@ def finalize_companion_action_runtime_layout(
         afk_wrap_text_hook_va = installed.target_vas[COMPANION_AFK_WRAP_TEXT_HOOK_KEY]
         afk_r50_geometry_hook_va = installed.target_vas[COMPANION_AFK_R50_GEOMETRY_HOOK_KEY]
         afk_r52_pretext_hook_va = installed.target_vas[COMPANION_AFK_R52_PRETEXT_HOOK_KEY]
+        blue_create_va = installed.target_vas[COMPANION_ACTION_R53_BLUE_CREATE_KEY]
+        blue_show_va = installed.target_vas[COMPANION_ACTION_R53_SHOW_KEY]
+        blue_hide_va = installed.target_vas[COMPANION_ACTION_R53_HIDE_KEY]
         action_geometry_extension_va = installed.target_vas[
             COMPANION_ACTION_GEOMETRY_EXTENSION_KEY
         ]
@@ -1493,6 +1585,9 @@ def finalize_companion_action_runtime_layout(
         afk_wrap_text_hook_va,
         afk_r50_geometry_hook_va,
         afk_r52_pretext_hook_va,
+        blue_create_va,
+        blue_show_va,
+        blue_hide_va,
         action_geometry_extension_va,
         action_r50_panel_extension_va,
     )
@@ -1569,8 +1664,11 @@ def finalize_companion_action_runtime_layout(
         (
             afk_r52_pretext_hook_va,
             _afk_r52_pretext_hook_bytes(table_va=afk_wrap_table_va),
-            "companion AFK r52 pre-constructor Y and stack spill",
+            "companion AFK r53 preserved-text-args Y and stack spill",
         ),
+        (blue_create_va, _action_r53_blue_create_bytes(), "L1 r53 blue constructor"),
+        (blue_show_va, _action_r53_blue_alpha_bytes(visible=True), "L1 r53 blue show"),
+        (blue_hide_va, _action_r53_blue_alpha_bytes(visible=False), "L1 r53 blue hide"),
     )
     for payload_va, payload, owner in runtime_payloads:
         payload_file = installed.info.file_offset + (
@@ -1589,6 +1687,7 @@ def finalize_companion_action_runtime_layout(
         ("AFK alpha", COMPANION_AFK_ALPHA_PREIMAGES),
         ("AFK scale", COMPANION_AFK_SCALE_PREIMAGES),
         ("AFK r52 pretext", COMPANION_AFK_R52_PRETEXT_PREIMAGES),
+        ("L1 r53 blue", COMPANION_ACTION_R53_BLUE_PREIMAGES),
     ):
         for offset, expected in preimages:
             actual = struct.unpack_from("<I", result, offset)[0]
@@ -1608,6 +1707,17 @@ def finalize_companion_action_runtime_layout(
     # sprite; neither r51 L1 callsite nor its destructor change is retained.
     struct.pack_into("<I", result, 0x66250, _jal_word(afk_r52_pretext_hook_va))
     struct.pack_into("<I", result, 0x66320, _jal_word(afk_r52_pretext_hook_va))
+
+    # r53 blue is a sibling L1 object, not a permanent independent overlay.
+    # Both cleanup paths must use the sprite destructor, and all three native
+    # vertex-alpha animation loops must update it whenever green changes.
+    for site in (0x66668, 0x66DD4):
+        struct.pack_into("<I", result, site, _jal_word(0x00108650))
+    struct.pack_into("<I", result, 0x66740, _jal_word(blue_create_va))
+    struct.pack_into("<I", result, 0x66744, 0x3C024371)
+    struct.pack_into("<I", result, COMPANION_ACTION_R53_SHOW_SITE, _jal_word(blue_show_va))
+    for site in COMPANION_ACTION_R53_HIDE_SITES:
+        struct.pack_into("<I", result, site, _jal_word(blue_hide_va))
 
     # Keep constructor alpha at native 1.0. After each AFK text object is
     # created, place it at the record-specific Y and force horizontal scale to
@@ -1792,6 +1902,16 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             encoded=b"\x00" * COMPANION_AFK_R52_PRETEXT_HOOK_SIZE,
             pointer_offsets=(),
             alignment=4,
+        )
+    )
+    # r53 adds only sibling creation/opacity helpers. Existing translations,
+    # r50 geometry and the r52 AFK helper VA remain stable.
+    entries.extend(
+        RelocatedText(key=key, encoded=b"\x00" * size, pointer_offsets=(), alignment=4)
+        for key, size in (
+            (COMPANION_ACTION_R53_BLUE_CREATE_KEY, COMPANION_ACTION_R53_BLUE_CREATE_SIZE),
+            (COMPANION_ACTION_R53_SHOW_KEY, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE),
+            (COMPANION_ACTION_R53_HIDE_KEY, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE),
         )
     )
     return tuple(entries)

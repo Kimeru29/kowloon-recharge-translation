@@ -483,7 +483,7 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(0x3C0F4286, geometry_words[25])  # slot0 pivot X 67
         self.assertEqual(0x3C0F42FA, geometry_words[28])  # slot1 pivot X 125
         self.assertEqual(0x25CE0B24, geometry_words[31])  # blue frame0 width field
-        self.assertEqual(0x3C0D4390, geometry_words[32])  # blue width 288
+        self.assertEqual(0x3C0D438D, geometry_words[32])  # blue 282, 3px green inset
         self.assertEqual((0xADCF0008, 0xADCF0038, 0xADCF0068), geometry_words[40:43])
         self.assertEqual((0x86020004, 0x000219C0, 0x03E00008, 0), geometry_words[-4:])
 
@@ -586,39 +586,45 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
 
-    def test_r52_afk_stack_and_register_y_is_fail_closed_and_l1_reverted(self) -> None:
+    def test_r53_preserves_afk_native_text_args_and_l1_sprite_fades(self) -> None:
         result = build_early_ui_elf(RAW)
         _, p_offset, p_vaddr, _, p_filesz, _, _, _ = struct.unpack_from("<IIIIIIII", result, 0x54)
         first = struct.unpack_from("<I", result, 0x66250)[0]
         second = struct.unpack_from("<I", result, 0x66320)[0]
         self.assertEqual(first, second)
         self.assertEqual(3, first >> 26)
-        self.assertEqual(0x3C024375, struct.unpack_from("<I", result, 0x66254)[0])
-        self.assertEqual(0x3C024375, struct.unpack_from("<I", result, 0x66324)[0])
         helper_va = (first & 0x03FFFFFF) << 2
-        self.assertGreaterEqual(helper_va, p_vaddr)
-        self.assertLessEqual(helper_va + COMPANION_AFK_R52_PRETEXT_HOOK_SIZE, p_vaddr + p_filesz)
         helper_file = p_offset + helper_va - p_vaddr
-        words = struct.unpack_from(f"<{COMPANION_AFK_R52_PRETEXT_HOOK_SIZE // 4}I", result, helper_file)
-        self.assertEqual((0xC52D0018, 0x10000002, 0, 0xC52D001C, 0xE7AD01A4, 0x03E00008, 0), words[-7:])
-
-        # r51's independently created sprite caused the persistent blue window.
-        # No L1 object creation/destructor patch is legal until native
-        # animation/visibility ownership is proven by runtime tests.
-        self.assertEqual(0x0C06850C, struct.unpack_from("<I", result, 0x66668)[0])
-        self.assertEqual(0x3C024371, struct.unpack_from("<I", result, 0x66740)[0])
-        self.assertEqual(0x44826000, struct.unpack_from("<I", result, 0x66744)[0])
-
+        words = struct.unpack_from("<21I", result, helper_file)
+        self.assertEqual(0xE7AD01A4, words[18])
+        # r51/r52 destroyed t1, passed by 0x1950A0 as live text input.
+        self.assertEqual((12, 12), ((words[1] >> 16) & 31, (words[2] >> 16) & 31))
+        self.assertEqual(13, (words[3] >> 16) & 31)
+        for word in words:
+            opcode, rt, rd = word >> 26, (word >> 16) & 31, (word >> 11) & 31
+            if opcode in (0x09, 0x0D, 0x0F, 0x21, 0x23):
+                self.assertNotIn(rt, (8, 9, 10, 11))
+            if opcode == 0 and (word & 0x3F) in (0x00, 0x21):
+                self.assertNotIn(rd, (8, 9, 10, 11))
+        for off in (0x66668, 0x66DD4):
+            self.assertEqual(0x0C042194, struct.unpack_from("<I", result, off)[0])
         for owner, offset in (
-            ("AFK stack argument", helper_file + 18 * 4),
-            ("AFK line2 Y", helper_file + 17 * 4),
-            ("AFK constructor hook", 0x66250),
-            ("L1 r50 construction", 0x66740),
+            ("AFK Y spill", helper_file + 72),
+            ("AFK preserved register", helper_file + 4),
+            ("AFK constructor owner", 0x66250),
+            ("L1 blue creation", 0x66740),
+            ("L1 visibility show", 0x65A88),
+            ("L1 visibility hide", 0x65B40),
+            ("L1 fade hide", 0x65C5C),
+            ("L1 second destructor", 0x66DD4),
         ):
             with self.subTest(owner=owner):
-                altered = bytearray(result)
-                altered[offset] ^= 1
-                check = next(c for c in verify_startup_elf(bytes(altered)) if c["name"] == "companion_hud_layout")
+                tampered = bytearray(result)
+                tampered[offset] ^= 1
+                check = next(
+                    check for check in verify_startup_elf(bytes(tampered))
+                    if check["name"] == "companion_hud_layout"
+                )
                 self.assertFalse(check["ok"])
 
     def test_r38_runtime_selector_keeps_body_stable_and_points_tail_at_active_slot(self) -> None:

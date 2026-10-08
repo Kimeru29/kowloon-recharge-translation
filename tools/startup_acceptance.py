@@ -93,6 +93,13 @@ from tools.companion_hud import (
     COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
     COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE,
     COMPANION_AFK_R52_PRETEXT_HOOK_SIZE,
+    COMPANION_ACTION_R53_BLUE_CREATE_SIZE,
+    COMPANION_ACTION_R53_ALPHA_HOOK_SIZE,
+    COMPANION_ACTION_R53_SHOW_SITE,
+    COMPANION_ACTION_R53_HIDE_SITES,
+    _afk_r52_pretext_hook_bytes,
+    _action_r53_blue_create_bytes,
+    _action_r53_blue_alpha_bytes,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_RECORDS_PER_COMPANION,
@@ -698,7 +705,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             0x8D8F0004, 0xADCF000C,
             0x3C0F4286, 0x11400002, 0, 0x3C0F42FA, 0xADCF0008,
             0x3C0E0045, 0x25CE0B24,
-            0x3C0D4390, 0xADCD0000, 0xADCD0030, 0xADCD0060,
+            0x3C0D438D, 0xADCD0000, 0xADCD0030, 0xADCD0060,
             0x8D8D0008, 0xADCD0004, 0xADCD0034, 0xADCD0064,
             0xADCF0008, 0xADCF0038, 0xADCF0068,
             0x8D8D000C, 0xADCD000C,
@@ -786,9 +793,9 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         return False
 
 
-    # r51 runtime regression: its independent L1 0x6A sprite continued drawing
-    # while the native green bubble was hidden. r52 must keep the proven r50
-    # action lifecycle entirely intact and change AFK constructor inputs only.
+    # r53: constructor must preserve t0-t3. 0x1950A0 saves these live
+    # arguments (particularly t1, the text pointer) before text conversion.
+    # r51/r52 overwrote them and made AFK text disappear.
     pretext_jal_1 = struct.unpack_from("<I", raw, 0x66250)[0]
     pretext_jal_2 = struct.unpack_from("<I", raw, 0x66320)[0]
     if (
@@ -796,34 +803,61 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         or pretext_jal_1 >> 26 != 3
         or struct.unpack_from("<I", raw, 0x66254)[0] != 0x3C024375
         or struct.unpack_from("<I", raw, 0x66324)[0] != 0x3C024375
-        or struct.unpack_from("<I", raw, 0x66668)[0] != 0x0C06850C
-        or struct.unpack_from("<I", raw, 0x66740)[0] != 0x3C024371
-        or struct.unpack_from("<I", raw, 0x66744)[0] != 0x44826000
     ):
         return False
     pretext_va = (pretext_jal_1 & 0x03FFFFFF) << 2
     pretext_rel = pretext_va - p_vaddr
     if pretext_rel < 0 or pretext_rel + COMPANION_AFK_R52_PRETEXT_HOOK_SIZE > p_filesz:
         return False
-    pretext_words = struct.unpack_from(
-        f"<{COMPANION_AFK_R52_PRETEXT_HOOK_SIZE // 4}I",
-        raw, p_offset + pretext_rel
-    )
+    pretext_bytes = raw[
+        p_offset + pretext_rel:p_offset + pretext_rel + COMPANION_AFK_R52_PRETEXT_HOOK_SIZE
+    ]
     if (
-        pretext_words[:7] != (
-            0x44807000, 0x86080004, 0x2508FDA7, 0x2D090258,
-            0x1120000E, 0, 0x00084140,
-        )
-        or pretext_words[7] & 0xFFFF0000 != 0x3C090000
-        or pretext_words[8] & 0xFFFF0000 != 0x25290000
-        or _materialized_va(pretext_words[7], pretext_words[8]) != afk_layout_table_va
-        or pretext_words[9:] != (
-            0x01284821, 0x3C0A0016, 0x354A61D8, 0x17EA0004, 0,
-            0xC52D0018, 0x10000002, 0, 0xC52D001C,
-            0xE7AD01A4, 0x03E00008, 0,
-        )
+        pretext_bytes != _afk_r52_pretext_hook_bytes(table_va=afk_layout_table_va)
+        or struct.unpack_from("<I", pretext_bytes, 18 * 4)[0] != 0xE7AD01A4
     ):
         return False
+    # Reject any regression that writes or destroys the special constructor
+    # argument registers t0/t1/t2/t3 in this hook.
+    for w in struct.unpack("<21I", pretext_bytes):
+        op, rt, rd = w >> 26, (w >> 16) & 31, (w >> 11) & 31
+        if op in (0x09, 0x0D, 0x0F, 0x21, 0x23) and 8 <= rt <= 11:
+            return False
+        if op == 0 and (w & 0x3F) in (0x00, 0x21) and 8 <= rd <= 11:
+            return False
+
+    # The r51 independent blue sprite was never faded or hidden with green.
+    # r53 initializes all four vertex alphas to zero, mirrors the green
+    # show/hide writes at the original three native sites and destroys the
+    # resource on both L1 exit paths.
+    if (
+        any(struct.unpack_from("<I", raw, site)[0] != 0x0C042194
+            for site in (0x66668, 0x66DD4))
+        or struct.unpack_from("<I", raw, 0x66744)[0] != 0x3C024371
+    ):
+        return False
+    for site, size, payload in (
+        (0x66740, COMPANION_ACTION_R53_BLUE_CREATE_SIZE, _action_r53_blue_create_bytes()),
+        (COMPANION_ACTION_R53_SHOW_SITE, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE,
+         _action_r53_blue_alpha_bytes(visible=True)),
+        *((site, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE,
+           _action_r53_blue_alpha_bytes(visible=False))
+          for site in COMPANION_ACTION_R53_HIDE_SITES),
+    ):
+        jal = struct.unpack_from("<I", raw, site)[0]
+        if jal >> 26 != 3:
+            return False
+        va = (jal & 0x03FFFFFF) << 2
+        rel = va - p_vaddr
+        if rel < 0 or rel + size > p_filesz:
+            return False
+        if raw[p_offset + rel:p_offset + rel + size] != payload:
+            return False
+        if site in (
+            COMPANION_ACTION_R53_SHOW_SITE,
+            *COMPANION_ACTION_R53_HIDE_SITES,
+        ) and struct.unpack_from("<I", raw, site + 4)[0] != 0x8E0402DC:
+            return False
 
     # Complete-corpus generic invariant: every wrapped visual row is <=16 cells,
     # width never grows, and vertical growth preserves the native bottom anchors.
