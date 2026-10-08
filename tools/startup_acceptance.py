@@ -89,6 +89,7 @@ from tools.companion_hud import (
     COMPANION_AFK_GREEN_BASE_PIVOT_Y,
     COMPANION_AFK_BLUE_BASE_HEIGHT,
     COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM,
+    COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION,
     COMPANION_AFK_BLUE_BASE_PIVOT_Y,
     COMPANION_AFK_TEXT1_BASE_Y,
     COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE,
@@ -841,12 +842,17 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
                           & 0x03FFFFFF) << 2) - p_vaddr))
     ):
         return False
+    create_site = struct.unpack_from("<I", raw, 0x66740)[0]
+    if create_site >> 26 != 3:
+        return False
+    create_va = (create_site & 0x03FFFFFF) << 2
     for site, size, payload in (
-        (0x66740, COMPANION_ACTION_R53_BLUE_CREATE_SIZE, _action_r53_blue_create_bytes()),
+        (0x66740, COMPANION_ACTION_R53_BLUE_CREATE_SIZE,
+         _action_r53_blue_create_bytes(hook_va=create_va)),
         (COMPANION_ACTION_R53_SHOW_SITE, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE,
-         _action_r53_blue_alpha_bytes(visible=True)),
+         _action_r53_blue_alpha_bytes(visible=True, create_va=create_va)),
         *((site, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE,
-           _action_r53_blue_alpha_bytes(visible=False))
+           _action_r53_blue_alpha_bytes(visible=False, create_va=create_va))
           for site in COMPANION_ACTION_R53_HIDE_SITES),
     ):
         jal = struct.unpack_from("<I", raw, site)[0]
@@ -889,6 +895,9 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
                 + COMPANION_AFK_LINE_STEP * len(layout.line1_rows)
                 - COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION
                 * max(0, len(layout.line2_rows) - 1)
+                - COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION
+                * max(0, len(layout.line1_rows) - 1)
+                * int(bool(layout.line2_rows))
             )
             or layout.green_height - layout.green_pivot_y != 3.0
         ):
