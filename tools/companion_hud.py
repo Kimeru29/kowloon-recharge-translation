@@ -158,10 +158,10 @@ COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE = 136
 # r53: L1 blue object uses the existing unused task+0x2F4 sprite slot,
 # but unlike r51 its opacity tracks every native green action transition.
 COMPANION_ACTION_R53_BLUE_CREATE_KEY = "companion_action_r53_blue_create"
-COMPANION_ACTION_R53_BLUE_CREATE_SIZE = 100
+COMPANION_ACTION_R53_BLUE_CREATE_SIZE = 156
 COMPANION_ACTION_R53_SHOW_KEY = "companion_action_r53_blue_show"
 COMPANION_ACTION_R53_HIDE_KEY = "companion_action_r53_blue_hide"
-COMPANION_ACTION_R53_ALPHA_HOOK_SIZE = 32
+COMPANION_ACTION_R53_ALPHA_HOOK_SIZE = 48
 COMPANION_ACTION_R53_BLUE_OFFSET = 0x02F4
 COMPANION_ACTION_R53_SHOW_SITE = 0x65A88
 COMPANION_ACTION_R53_HIDE_SITES = (0x65B40, 0x65C5C)
@@ -203,6 +203,7 @@ COMPANION_AFK_WRAP_CELLS = 16
 # the newline advance. Runtime proves embedded 0xFF0E rows use a 32px visual
 # advance. r50 sizes every row with that renderer-owned step.
 COMPANION_AFK_LINE_STEP = 32.0
+COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION = 18.0
 COMPANION_AFK_GREEN_BASE_HEIGHT = 80.0
 COMPANION_AFK_GREEN_BASE_PIVOT_Y = 77.0
 COMPANION_AFK_BLUE_BASE_HEIGHT = 56.0
@@ -498,7 +499,16 @@ def companion_afk_layout(lines: tuple[str, str]) -> CompanionAfkLayout:
     total_rows = len(line1_rows) + len(line2_rows)
     extra_height = COMPANION_AFK_LINE_STEP * max(0, total_rows - 2)
     text1_y = COMPANION_AFK_TEXT1_BASE_Y - extra_height
-    text2_y = text1_y + COMPANION_AFK_LINE_STEP * len(line1_rows)
+    # The first and second native text objects are independent, and embedded
+    # newlines advance at ~18 game units on the tested four-row AFK callout.
+    # r50's 32-unit conservative BUBBLE budget remains unchanged, but applying
+    # it again to the final text object's internal rows pushes the last word
+    # ("age.") below the green bottom edge. Correct only that second baseline.
+    text2_y = (
+        text1_y
+        + COMPANION_AFK_LINE_STEP * len(line1_rows)
+        - COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION * max(0, len(line2_rows) - 1)
+    )
     return CompanionAfkLayout(
         line1_rows=line1_rows,
         line2_rows=line2_rows,
@@ -957,16 +967,21 @@ def _afk_r52_pretext_hook_bytes(*, table_va: int) -> bytes:
 
 
 def _action_r53_blue_create_bytes() -> bytes:
-    """Create L1 blue at the green instance anchor, initially fully transparent.
+    """One L1 blue: match live green position, hide stale AFK blue sibling.
 
-    The accepted native L1 state machine owns its subsequent fade/show/hide.
-    Copying only the resource and task lifetime (r51) made it permanently visible.
+    Both sprite constructors initially use stack+0x178. Crucially, this alone
+    failed visually in r53. The native resource owner at 0x107F88-0x107F94
+    stores the actual post-construction sprite X/Y at +0x3C/+0x40, so copy
+    those fields from the ALREADY-CREATED L1 green +0x2D8 sprite. The older
+    AFK 0x6A at task+0x5C is separately created and left at its old anchor;
+    zero its four vertex-alpha bytes during L1 and let AFK rebuild it during
+    the subsequent native AFK lifecycle. Never allocate a SECOND blue object.
     """
     words = (
-        _mips_i(0x37, 29, 6, 0x0178),  # ld a2,0x178(sp): exact green X/Y
+        _mips_i(0x37, 29, 6, 0x0178),       # ld a2,0x178(sp): native caller XY
         _mips_i(0x09, 29, 29, -16),
         _mips_i(0x2B, 29, 31, 12),
-        _mips_i(0x0F, 0, 2, 0x4372),   # 242.5 between green 243 and text 242
+        _mips_i(0x0F, 0, 2, 0x4372),        # 242.5 behind green 243
         _mips_i(0x0D, 2, 2, 0x8000),
         _mips_mtc1(2, 12),
         _mips_i(0x09, 0, 4, 2),
@@ -975,47 +990,66 @@ def _action_r53_blue_create_bytes() -> bytes:
         _jal_word(0x00107D60),
         0,
         _mips_i(0x2B, 16, 2, COMPANION_ACTION_R53_BLUE_OFFSET),
-        _mips_i(0x23, 16, 12, COMPANION_ACTION_R53_BLUE_OFFSET), # lw t4,slot
-        _mips_i(0x04, 12, 0, 5),          # null allocation skips all alpha writes
-        0,                                # safe branch delay
-        _mips_i(0x28, 12, 0, 0x23),
+        _mips_i(0x23, 16, 12, COMPANION_ACTION_R53_BLUE_OFFSET), # t4=new L1 blue
+        _mips_i(0x04, 12, 0, 19),          # no sprite -> preserve old
+        0,
+        _mips_i(0x28, 12, 0, 0x23),        # four initially hidden vertices
         _mips_i(0x28, 12, 0, 0x27),
         _mips_i(0x28, 12, 0, 0x2B),
         _mips_i(0x28, 12, 0, 0x2F),
-        _mips_i(0x23, 29, 31, 12),
+        _mips_i(0x23, 16, 13, 0x02D8),   # t5=green live object
+        _mips_i(0x04, 13, 0, 5),          # no green -> preserve copied XY
+        0,
+        _mips_i(0x31, 13, 0, 0x003C),    # lwc1 f0,green actual X
+        _mips_i(0x39, 12, 0, 0x003C),    # swc1 f0,blue actual X
+        _mips_i(0x31, 13, 1, 0x0040),    # lwc1 f1,green actual Y
+        _mips_i(0x39, 12, 1, 0x0040),    # swc1 f1,blue actual Y
+        _mips_i(0x23, 16, 13, 0x005C),   # t5=stale AFK blue at lower anchor
+        _mips_i(0x04, 13, 0, 5),          # only hide old AFK sprite if present
+        0,
+        _mips_i(0x28, 13, 0, 0x23),        # r54 suppress redundant lower panel
+        _mips_i(0x28, 13, 0, 0x27),
+        _mips_i(0x28, 13, 0, 0x2B),
+        _mips_i(0x28, 13, 0, 0x2F),
+        _mips_i(0x23, 29, 31, 12),       # return / native next resource setup
         _mips_i(0x09, 29, 29, 16),
-        _mips_i(0x0F, 0, 2, 0x4371),   # restore f12 for next resource
+        _mips_i(0x0F, 0, 2, 0x4371),
         _mips_mtc1(2, 12),
         _mips_r(31, 0, 0, 0, 0x08),
         0,
     )
-    blob = b"".join(struct.pack("<I", word) for word in words)
-    if len(blob) != COMPANION_ACTION_R53_BLUE_CREATE_SIZE:
-        raise AssertionError("L1 blue r53 create helper size drift")
-    return blob
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_ACTION_R53_BLUE_CREATE_SIZE:
+        raise AssertionError(f"L1 r54 single-blue constructor size drift: {len(code)}")
+    return code
 
 
 def _action_r53_blue_alpha_bytes(*, visible: bool) -> bytes:
-    """Replicate original L1 green vertex alpha and apply to blue sibling.
+    """Mirror L1 green alpha to its sole blue, keep old AFK blue hidden.
 
-    Hooked green sb executes inside the helper. The original next lw a0,2dc
-    occupies the caller JAL delay slot; v0/a0/v1/a1 remain untouched.
+    The native AFK 0x6A may be animated independently while a normal action
+    is visible. Suppress its per-vertex alpha on EACH green show/hide pass, not
+    only at new-blue creation, avoiding the two-window r53 regression.
     """
     source = 5 if visible else 0
     words = (
-        _mips_i(0x28, 2, source, 0x23),       # native green: sb alpha,0x23(v0)
-        _mips_i(0x23, 16, 12, COMPANION_ACTION_R53_BLUE_OFFSET),  # lw t4,slot
-        _mips_i(0x04, 12, 0, 3),            # if null skip
-        _mips_r(0, 3, 13, 2, 0x00),         # sll t5,v1,2 (delay)
-        _mips_r(12, 13, 12, 0, 0x21),       # addu t4,t4,t5
-        _mips_i(0x28, 12, source, 0x23),   # blue vertex alpha
+        _mips_i(0x28, 2, source, 0x23),       # displaced green sb
+        _mips_i(0x23, 16, 12, COMPANION_ACTION_R53_BLUE_OFFSET), # new sibling
+        _mips_i(0x04, 12, 0, 3),            # skip mirroring if absent
+        _mips_r(0, 3, 13, 2, 0x00),         # t5 = frame*4; delay slot
+        _mips_r(12, 13, 12, 0, 0x21),
+        _mips_i(0x28, 12, source, 0x23),   # mirror native green alpha
+        _mips_i(0x23, 16, 14, 0x005C),     # existing AFK 0x6A sprite
+        _mips_i(0x04, 14, 0, 2),           # skip if absent
+        _mips_r(14, 13, 14, 0, 0x21),       # old AFK frame*4
+        _mips_i(0x28, 14, 0, 0x23),        # old native blue alpha always zero
         _mips_r(31, 0, 0, 0, 0x08),
-        0,  # native MIPS jr delay slot
+        0,
     )
-    blob = b"".join(struct.pack("<I", word) for word in words)
-    if len(blob) != COMPANION_ACTION_R53_ALPHA_HOOK_SIZE:
-        raise AssertionError("L1 blue alpha helper size drift")
-    return blob
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_ACTION_R53_ALPHA_HOOK_SIZE:
+        raise AssertionError(f"L1 r54 single-blue alpha hook size drift: {len(code)}")
+    return code
 
 
 def _runtime_hook_bytes(
