@@ -205,7 +205,8 @@ COMPANION_AFK_WRAP_CELLS = 16
 COMPANION_AFK_LINE_STEP = 32.0
 COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION = 18.0
 # r55: conservative 3px bottom-only trim on blue for >2-row callouts.
-COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM = 3.0
+COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM = 6.0
+COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION = 9.0
 COMPANION_AFK_GREEN_BASE_HEIGHT = 80.0
 COMPANION_AFK_GREEN_BASE_PIVOT_Y = 77.0
 COMPANION_AFK_BLUE_BASE_HEIGHT = 56.0
@@ -511,6 +512,8 @@ def companion_afk_layout(lines: tuple[str, str]) -> CompanionAfkLayout:
         text1_y
         + COMPANION_AFK_LINE_STEP * len(line1_rows)
         - COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION * max(0, len(line2_rows) - 1)
+        - COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION
+        * max(0, len(line1_rows) - 1) * int(bool(line2_rows))
     )
     return CompanionAfkLayout(
         line1_rows=line1_rows,
@@ -969,58 +972,87 @@ def _afk_r52_pretext_hook_bytes(*, table_va: int) -> bytes:
 
 
 
-def _action_r53_blue_create_bytes() -> bytes:
-    """Reposition the sole *native* 0x6A sprite at the live action green.
+def _action_r53_blue_create_bytes(*, hook_va: int) -> bytes:
+    """Locate the ACTUAL visible native (group2,0x6A) sprite in the EE pool.
 
-    The original task+0x5C sprite is already animated and owns its lifetime.
-    r53/r54 created an extra 0x6A at +0x2F4, producing duplicate blue panels.
-    Do not allocate anything. Copy the existing green sprite's constructed
-    position and give the native blue the established 242.5 depth. Keep this
-    156-byte slot for relocation stability and patch only original owned code.
+    The L1 task +0x5C pointer is not the owner of the lower panel; r55 thus
+    repositioned no sprite. Native 0x107D60 stores group/resource at the live
+    sprite's +0x82/+0x84, with allocated flag +0x93 in the 512x0x94 pool at
+    0x007A5060. Select that resource directly. Reuse it; never allocate a
+    second blue panel. Save its pointer in our reserved RWX helper tail so
+    native L1 alpha transition hooks target this SAME instance.
     """
-    words = (
-        _mips_i(0x23, 16, 12, 0x005C),  # lw t4,0x5C(s0): native blue instance
-        _mips_i(0x04, 12, 0, 11),      # beq t4,zero,displaced next-resource setup
-        0,                             # delay
-        _mips_i(0x23, 16, 13, 0x02D8), # lw t5,green bubble
-        _mips_i(0x04, 13, 0, 8),       # beq t5,zero,displaced next-resource setup
+
+    state_va = hook_va + COMPANION_ACTION_R53_BLUE_CREATE_SIZE - 4
+    state_hi, state_lo = _split_address(state_va)
+    words = [
+        _mips_i(0x23, 16, 12, 0x02D8),  #  0: lw t4,green
+        _mips_i(0x0F, 0, 24, state_hi), #  1: lui t8,state
+        _mips_i(0x09, 24, 24, state_lo),#  2: addiu t8,t8,lo
+        _mips_i(0x2B, 24, 0, 0),        #  3: clear cached pointer
+        _mips_i(0x04, 12, 0, 29),       #  4: null green -> 34
         0,
-        _mips_i(0x23, 13, 14, 0x003C), # green X
-        _mips_i(0x2B, 12, 14, 0x003C), # native blue X
-        _mips_i(0x23, 13, 14, 0x0040), # green Y
-        _mips_i(0x2B, 12, 14, 0x0040), # native blue Y
-        _mips_i(0x0F, 0, 14, 0x4372),  # float 242.5 high
-        _mips_i(0x0D, 14, 14, 0x8000),
-        _mips_i(0x2B, 12, 14, 0x0068), # blue Z in speech layer
-        _mips_i(0x0F, 0, 2, 0x4371),   # displaced next-resource constant
-        _mips_mtc1(2, 12),             # displaced original mtc1 v0,f12
+        _mips_i(0x0F, 0, 13, 0x007A),  #  6: pool base
+        _mips_i(0x09, 13, 13, 0x5060),
+        _mips_i(0x09, 0, 14, 512),     #  8: pool slot count
+        _mips_i(0x24, 13, 15, 0x0093),#  9: active sprite?
+        _mips_i(0x04, 15, 0, 19),      # 10: inactive -> 30
+        0,
+        _mips_i(0x25, 13, 15, 0x0082),# 12: sprite group
+        _mips_i(0x09, 15, 15, -2),
+        _mips_i(0x05, 15, 0, 15),      # 14: not group2 -> 30
+        0,
+        _mips_i(0x25, 13, 15, 0x0084),# 16: resource id
+        _mips_i(0x09, 15, 15, -0x6A),
+        _mips_i(0x05, 15, 0, 11),      # 18: not 0x6a ->30
+        0,
+        _mips_i(0x23, 12, 15, 0x003C),# 20: actual green X
+        _mips_i(0x2B, 13, 15, 0x003C),# 21: native blue X
+        _mips_i(0x23, 12, 15, 0x0040),# 22: actual green Y
+        _mips_i(0x2B, 13, 15, 0x0040),# 23: native blue Y
+        _mips_i(0x0F, 0, 15, 0x4372), # 24: 242.5 float depth
+        _mips_i(0x0D, 15, 15, 0x8000),
+        _mips_i(0x2B, 13, 15, 0x0068),# 26: native blue depth
+        _mips_i(0x2B, 24, 13, 0),     # 27: cache *exact* instance
+        _mips_i(0x04, 0, 0, 5),       # 28: found -> 34
+        0,
+        _mips_i(0x09, 13, 13, 0x0094),# 30: next native pool slot
+        _mips_i(0x09, 14, 14, -1),
+        _mips_i(0x05, 14, 0, -24),     # 32: next -> index9
+        0,
+        _mips_i(0x0F, 0, 2, 0x4371),  # 34: displaced next constructor f12
+        _mips_mtc1(2, 12),
         _mips_r(31, 0, 0, 0, 0x08),
         0,
-    )
-    words += (0,) * ((COMPANION_ACTION_R53_BLUE_CREATE_SIZE // 4) - len(words))
+        0,                            # 38: reserved cached-pointer state
+    ]
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_R53_BLUE_CREATE_SIZE:
-        raise AssertionError("r55 native-blue reuse helper size drift")
+        raise AssertionError("r56 native pool scanner hook size drift")
     return code
 
 
-def _action_r53_blue_alpha_bytes(*, visible: bool) -> bytes:
-    """Synchronize original green vertex opacity to the ONE native blue."""
-    source = 5 if visible else 0
-    words = (
-        _mips_i(0x28, 2, source, 0x23),  # original green sb
-        _mips_i(0x23, 16, 12, 0x005C), # native blue sprite
-        _mips_i(0x04, 12, 0, 3),
-        _mips_r(0, 3, 13, 2, 0x00),   # delay: frame index *4
-        _mips_r(12, 13, 12, 0, 0x21),
-        _mips_i(0x28, 12, source, 0x23),
-        _mips_r(31, 0, 0, 0, 0x08),
-        0,
+def _action_r53_blue_alpha_bytes(*, visible: bool, create_va: int) -> bytes:
+    """Mirror native green alpha to exactly the sprite located by the scanner."""
+    state_hi, state_lo = _split_address(
+        create_va + COMPANION_ACTION_R53_BLUE_CREATE_SIZE - 4
     )
-    words += (0,) * ((COMPANION_ACTION_R53_ALPHA_HOOK_SIZE // 4) - len(words))
+    alpha_source = 5 if visible else 0
+    words = [
+        _mips_i(0x28, 2, alpha_source, 0x23), # displaced native green sb
+        _mips_i(0x0F, 0, 12, state_hi),
+        _mips_i(0x09, 12, 12, state_lo),
+        _mips_i(0x23, 12, 12, 0),           # native located blue pointer
+        _mips_i(0x04, 12, 0, 3),
+        _mips_r(0, 3, 13, 2, 0x00),          # frame*4 delay
+        _mips_r(12, 13, 12, 0, 0x21),
+        _mips_i(0x28, 12, alpha_source, 0x23),
+        _mips_r(31, 0, 0, 0, 0x08),
+        0,0,0,
+    ]
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_R53_ALPHA_HOOK_SIZE:
-        raise AssertionError("r55 native-blue reuse alpha hook size drift")
+        raise AssertionError("r56 native pool alpha hook size drift")
     return code
 
 
@@ -1672,9 +1704,9 @@ def finalize_companion_action_runtime_layout(
             _afk_r52_pretext_hook_bytes(table_va=afk_wrap_table_va),
             "companion AFK r53 preserved-text-args Y and stack spill",
         ),
-        (blue_create_va, _action_r53_blue_create_bytes(), "L1 r53 blue constructor"),
-        (blue_show_va, _action_r53_blue_alpha_bytes(visible=True), "L1 r53 blue show"),
-        (blue_hide_va, _action_r53_blue_alpha_bytes(visible=False), "L1 r53 blue hide"),
+        (blue_create_va, _action_r53_blue_create_bytes(hook_va=blue_create_va), "L1 r56 native sprite lookup"),
+        (blue_show_va, _action_r53_blue_alpha_bytes(visible=True, create_va=blue_create_va), "L1 r56 blue show"),
+        (blue_hide_va, _action_r53_blue_alpha_bytes(visible=False, create_va=blue_create_va), "L1 r56 blue hide"),
     )
     for payload_va, payload, owner in runtime_payloads:
         payload_file = installed.info.file_offset + (
