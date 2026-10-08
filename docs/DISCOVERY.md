@@ -705,3 +705,29 @@ The r49 geometry hook at the AFK pre-construction owner 0x66050 reads a 32-byte 
 The current 600-record corpus produces 1..6 total rows. Maximum delta is 72px, but the algorithm has no row-count constant. Its real upper bound is the game's own 0x1950A0 source-buffer guard: converted source length must remain below 0x1FE bytes. The encoder therefore fail-closes at 0x1FD source bytes rather than pretending to support infinite text.
 
 Compatibility trace: current English contains no token >16 cells, so every inserted line break replaces an existing space. Padding after the first NUL preserves every r48 relocation allocation size, which in turn preserves all 999 AFK pointer values and every older payload VA. The only newly appended runtime area is 19,496 bytes at the end of the prior translation payload: layout table VA `0x0094991C`, geometry-hook VA `0x0094E41C`, text-hook VA `0x0094E4D4`.
+
+
+## r50 runtime geometry correction: embedded AFK rows and blue consumer ownership
+
+The r49 runtime screenshots provide three independent observations that supersede the remaining r49 assumptions:
+
+1. Native raw-newline wrapping is valid: the first screenshot shows r49 breaking long English into multiple visual rows rather than overflowing horizontally.
+2. The **18px** difference between the original first/second AFK text-object baselines (313/331) is *not* a safe proxy for the visual advance of multiple rows rendered inside one object. In r49, later newline rows can descend below the blue/green body even when the first row is enclosed.
+3. Green and blue speech resources are not safely modeled as one global geometry. In the accepted L1 action screenshot the green action bubble is already in the desired upper band, while blue `0x6A` remains behind at its lower AFK presentation.
+
+r50 therefore treats placement and geometry as properties of the active **consumer**. AFK uses fixed 288px width and a runtime-calibrated 32px visual-row budget; L1 uses the already accepted 224px action geometry. Resource `0x6A` follows the same consumer switch rather than remaining permanently native-AFK-sized.
+
+The static AFK placement table exposes the lower anchor directly: green slot records `0x3F8E1C/0x3F8E30` and blue slot records `0x3F8E44/0x3F8E58` are all Y=381 in pristine Re:charge. r50 moves all four to Y=346, matching the safe vertical band already demonstrated by the L1 callout. Slot-1 blue X also changes 172->230; runtime AFK blue pivot-X follows 67/125, so effective body-left remains aligned with the corresponding green slot. Static metadata bytes themselves remain pristine.
+
+The record layout table remains 32 bytes per AFK record at the same translated VA. Its r50 values use:
+- `line_step = 32`
+- base green `height=80, pivotY=77`
+- base blue `height=56, pivotY=74/75/76`
+- base text baselines `278 / 310`
+- `delta = 32 * max(0,total_rows-2)`
+
+The AFK helper restores both layers together before construction. Green uses slot-selected metadata `0x00450AC4 + slot*0x30`; blue uses all three frames beginning at `0x00450B24`. Both receive native width 288, record-specific height/pivot-Y, and slot-specific pivot-X 67/125. Thus AFK remains slot-aware even though `0x6A` itself is a shared resource id.
+
+The L1 extension does the inverse immediately before normal action construction. Green receives width 224 and pivot-X 52/97; blue frames receive the same width 224, the current action's calculated height/pivot-Y and the same slot pivot-X. This is necessary because the r49 screenshot proves leaving `0x6A` untouched causes its tinted body to remain in the wrong size/location while green moves correctly.
+
+Compatibility result: r50 appends only 348 bytes and moves no prior translated VA. All 999 AFK structural pointers and all 999 relocated AFK C-string payloads are byte-identical to r49. The r49 text hook and native-newline payloads are also unchanged; r50 is geometry-only with respect to translated dialogue content. The classified r49->r50 common-prefix audit reports zero unexplained bytes.
