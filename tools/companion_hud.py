@@ -159,6 +159,13 @@ COMPANION_ACTION_R59_BLUE_RESOURCE_ID = 0x78
 COMPANION_ACTION_R59_BLUE_METADATA_VA = 0x004513F0
 COMPANION_ACTION_R59_BLUE_FRAME_STRIDE = 0x30
 COMPANION_ACTION_R59_BLUE_PRISTINE = (152.0, 32.0, -6.0, -1.0)
+# r60: native 0x78 construction occurs BEFORE the existing r59 geometry
+# handoff, which is why its original -1 Y pivot was cached and the blue fill
+# appears above the green bubble. Initialize all three frame geometries first.
+COMPANION_ACTION_R60_PRECONSTRUCT_KEY = "companion_action_r60_blue_preconstruct"
+COMPANION_ACTION_R60_PRECONSTRUCT_SIZE = 220
+COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA = 0x001666C8
+
 
 # r52 replaces both r51 runtime hooks with one AFK-only constructor fix.
 
@@ -1088,7 +1095,7 @@ def _afk_r52_pretext_hook_bytes(*, table_va: int) -> bytes:
 
 
 
-def _action_r53_blue_create_bytes(*, hook_va: int) -> bytes:
+def _action_r53_blue_create_bytes(*, hook_va: int, preconstruct_va: int) -> bytes:
     """Locate the ACTUAL visible native (group2,0x6A) sprite in the EE pool.
 
     The L1 task +0x5C pointer is not the owner of the lower panel; r55 thus
@@ -1138,13 +1145,92 @@ def _action_r53_blue_create_bytes(*, hook_va: int) -> bytes:
         0,
         _mips_i(0x0F, 0, 2, 0x4371),  # 34: displaced next constructor f12
         _mips_mtc1(2, 12),
-        _mips_r(31, 0, 0, 0, 0x08),
+        _j_word(preconstruct_va),   # r60 tail: pre-initialize native 0x78
         0,
         0,                            # 38: reserved cached-pointer state
     ]
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_R53_BLUE_CREATE_SIZE:
         raise AssertionError("r56 native pool scanner hook size drift")
+    return code
+
+
+
+def _action_r60_preconstruct_bytes(*, table_va: int) -> bytes:
+    """Initialize actual L1 group2/0x78 metadata BEFORE its native constructor.
+
+    The old r56 scanner also runs on three green-alpha callbacks. Only the
+    constructor call's RA=0x1666C8 (JAL at 0x1666C0 + 8) is allowed to update blue geometry; alpha
+    calls return without touching layout, and no AFK draw path enters here.
+    The native 0x78 constructor follows immediately at VA0x1666D8, while the
+    old r59 geometry handoff is too late (VA0x166724).
+    """
+
+    table_hi, table_lo = _split_address(table_va)
+    return_hi = COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA >> 16
+    return_lo = COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA & 0xFFFF
+    w = [
+        _mips_i(0x0F, 0, 24, return_hi),  #  0: t8 = original constructor RA
+        _mips_i(0x0D, 24, 24, return_lo),#  1
+        0,                              #  2: bne ra,t8,return (filled)
+        0,                              #  3: delay
+        _mips_i(0x09, 29, 29, -16),     #  4: stack frame
+        _mips_i(0x2B, 29, 31, 12),      #  5: preserve constructor RA
+        _mips_i(0x0D, 0, 4, COMPANION_ACTION_ID_KEY),
+        _jal_word(COMPANION_ACTION_ID_GETTER_VA),
+        0,
+        _mips_i(0x0C, 2, 2, 0xFFFF),    #  9: normalize action id
+        _mips_i(0x0E, 2, 2, COMPANION_ACTION_ID_KEY),
+        _mips_i(0x0B, 2, 3, len(COMPANION_ACTION_LAYOUTS)),
+        _mips_i(0x05, 3, 0, 2),          # valid action id -> continue
+        0,
+        _mips_r(0, 0, 2, 0, 0x21),       # otherwise select action0
+        _mips_r(0, 2, 3, 3, 0),          # id*8
+        _mips_r(0, 2, 8, 2, 0),          # id*4
+        _mips_r(3, 8, 3, 0, 0x21),       # id*12
+        _mips_i(0x0F, 0, 8, table_hi),
+        _mips_i(0x09, 8, 8, table_lo),
+        _mips_r(8, 3, 8, 0, 0x21),
+        _mips_i(0x23, 8, 10, 0),         # t2 = dynamic action height
+        _mips_i(0x23, 8, 11, 4),         # t3 = dynamic action pivotY
+        _mips_i(0x21, 16, 13, 0x02D0), # t5 = native slot
+        _mips_i(0x0B, 13, 14, 2),
+        _mips_i(0x05, 14, 0, 2),         # valid slot -> continue
+        0,
+        _mips_r(0, 0, 13, 0, 0x21),      # otherwise slot0
+        _mips_i(0x0F, 0, 15, 0x0045),
+        _mips_i(0x09, 15, 15, 0x13F4), # 0x78 frame0 width owner
+        _mips_i(0x0F, 0, 12, 0x4360),  # width 224.0
+        _mips_i(0x2B, 15, 12, 0x00),
+        _mips_i(0x2B, 15, 12, 0x30),
+        _mips_i(0x2B, 15, 12, 0x60),
+        _mips_i(0x2B, 15, 10, 0x04),
+        _mips_i(0x2B, 15, 10, 0x34),
+        _mips_i(0x2B, 15, 10, 0x64),
+        _mips_i(0x0F, 0, 12, 0x4250),  # slot0 pivotX 52
+        _mips_i(0x04, 13, 0, 2),
+        0,
+        _mips_i(0x0F, 0, 12, 0x42C2),  # slot1 pivotX 97
+        _mips_i(0x2B, 15, 12, 0x08),
+        _mips_i(0x2B, 15, 12, 0x38),
+        _mips_i(0x2B, 15, 12, 0x68),
+        _mips_i(0x2B, 15, 11, 0x0C),
+        _mips_i(0x2B, 15, 11, 0x3C),
+        _mips_i(0x2B, 15, 11, 0x6C),
+        _mips_i(0x23, 29, 31, 12),    # restore RA
+        _mips_i(0x09, 29, 29, 16),    # restore SP
+        _mips_i(0x0F, 0, 2, 0x4371),  # preserve displaced f12/constructor v0
+        _mips_mtc1(2, 12),
+        _mips_r(31, 0, 0, 0, 0x08),   # 52
+        0,
+        _mips_r(31, 0, 0, 0, 0x08),   # 53: alpha callback fast return
+        0,                            # 54: delay
+    ]
+    assert len(w) == COMPANION_ACTION_R60_PRECONSTRUCT_SIZE // 4, len(w)
+    w[2] = _mips_i(0x05, 31, 24, 53 - 3) # bne ra,t8 -> alpha return
+    code = b"".join(struct.pack("<I", word) for word in w)
+    if len(code) != COMPANION_ACTION_R60_PRECONSTRUCT_SIZE:
+        raise AssertionError("L1 preconstructor helper drift")
     return code
 
 
@@ -1742,6 +1828,7 @@ def finalize_companion_action_runtime_layout(
         ]
         action_r58_placement_va = installed.target_vas[COMPANION_ACTION_R58_POSITION_KEY]
         afk_r58_restore_va = installed.target_vas[COMPANION_AFK_R58_RESTORE_KEY]
+        action_r60_preconstruct_va = installed.target_vas[COMPANION_ACTION_R60_PRECONSTRUCT_KEY]
     except KeyError as exc:
         raise ValueError(f"companion action runtime payload is missing: {exc.args[0]}") from exc
 
@@ -1765,6 +1852,7 @@ def finalize_companion_action_runtime_layout(
         action_r50_panel_extension_va,
         action_r58_placement_va,
         afk_r58_restore_va,
+        action_r60_preconstruct_va,
     )
     if any(value & 3 for value in runtime_vas):
         raise ValueError(
@@ -1841,11 +1929,15 @@ def finalize_companion_action_runtime_layout(
             _afk_r52_pretext_hook_bytes(table_va=afk_wrap_table_va),
             "companion AFK r53 preserved-text-args Y and stack spill",
         ),
-        (blue_create_va, _action_r53_blue_create_bytes(hook_va=blue_create_va), "L1 r56 native sprite lookup"),
+        (blue_create_va, _action_r53_blue_create_bytes(
+            hook_va=blue_create_va, preconstruct_va=action_r60_preconstruct_va
+        ), "L1 r56 sprite lookup + r60 constructor tail"),
         (blue_show_va, _action_r53_blue_alpha_bytes(visible=True, create_va=blue_create_va), "L1 r56 blue show"),
         (blue_hide_va, _action_r53_blue_alpha_bytes(visible=False, create_va=blue_create_va), "L1 r56 blue hide"),
         (action_r58_placement_va, _action_r58_blue_placement_bytes(), "L1 r58 blue layout placement"),
         (afk_r58_restore_va, _afk_r58_restore_placement_bytes(), "AFK r58 layout restore"),
+        (action_r60_preconstruct_va, _action_r60_preconstruct_bytes(table_va=table_va),
+         "L1 r60 preconstruct native 0x78 geometry"),
     )
     for payload_va, payload, owner in runtime_payloads:
         payload_file = installed.info.file_offset + (
@@ -2089,6 +2181,7 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             (COMPANION_ACTION_R53_HIDE_KEY, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE),
             (COMPANION_ACTION_R58_POSITION_KEY, COMPANION_ACTION_R58_POSITION_SIZE),
             (COMPANION_AFK_R58_RESTORE_KEY, COMPANION_AFK_R58_RESTORE_SIZE),
+            (COMPANION_ACTION_R60_PRECONSTRUCT_KEY, COMPANION_ACTION_R60_PRECONSTRUCT_SIZE),
         )
     )
     return tuple(entries)

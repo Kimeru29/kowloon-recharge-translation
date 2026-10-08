@@ -111,6 +111,9 @@ from tools.companion_hud import (
     _afk_r52_pretext_hook_bytes,
     _action_r53_blue_create_bytes,
     _action_r53_blue_alpha_bytes,
+    COMPANION_ACTION_R60_PRECONSTRUCT_SIZE,
+    COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA,
+    _action_r60_preconstruct_bytes,
     COMPANION_ACTION_R58_POSITION_SIZE,
     COMPANION_AFK_R58_RESTORE_SIZE,
     COMPANION_ACTION_R58_PLACEMENT_X_VA,
@@ -860,9 +863,41 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     if create_site >> 26 != 3:
         return False
     create_va = (create_site & 0x03FFFFFF) << 2
+    scanner_file = p_offset + create_va - p_vaddr
+    if scanner_file < 0 or scanner_file + COMPANION_ACTION_R53_BLUE_CREATE_SIZE > len(raw):
+        return False
+    scanner_tail = struct.unpack_from("<I", raw, scanner_file + 36*4)[0]
+    if scanner_tail >> 26 != 2 or struct.unpack_from("<I", raw, scanner_file + 37*4)[0] != 0:
+        return False
+    preconstruct_va = (scanner_tail & 0x03FFFFFF) << 2
+    preconstruct_file = p_offset + preconstruct_va - p_vaddr
+    if (
+        preconstruct_file < 0
+        or preconstruct_file + COMPANION_ACTION_R60_PRECONSTRUCT_SIZE > p_offset + p_filesz
+        or preconstruct_file + COMPANION_ACTION_R60_PRECONSTRUCT_SIZE > len(raw)
+    ):
+        return False
+    # The accepted action layout table is already resolved later by r38's
+    # independent full layout check. Resolve its own r38 hook for this gate.
+    action_select = struct.unpack_from("<I", raw, 0x66724)[0]
+    if action_select >> 26 != 3:
+        return False
+    selector_file = p_offset + (((action_select & 0x03FFFFFF) << 2) - p_vaddr)
+    if selector_file < 0:
+        return False
+    select_hi, select_lo = struct.unpack_from("<2I", raw, selector_file + 14*4)
+    action_table_va = ((select_hi & 0xFFFF) << 16) + (
+        (select_lo & 0xFFFF) - (0x10000 if select_lo & 0x8000 else 0)
+    )
+    if (
+        raw[preconstruct_file:preconstruct_file + COMPANION_ACTION_R60_PRECONSTRUCT_SIZE]
+        != _action_r60_preconstruct_bytes(table_va=action_table_va)
+        or COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA != 0x001666C8
+    ):
+        return False
     for site, size, payload in (
         (0x66740, COMPANION_ACTION_R53_BLUE_CREATE_SIZE,
-         _action_r53_blue_create_bytes(hook_va=create_va)),
+         _action_r53_blue_create_bytes(hook_va=create_va, preconstruct_va=preconstruct_va)),
         (COMPANION_ACTION_R53_SHOW_SITE, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE,
          _action_r53_blue_alpha_bytes(visible=True, create_va=create_va)),
         *((site, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE,
