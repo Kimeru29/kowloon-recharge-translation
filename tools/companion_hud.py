@@ -163,6 +163,14 @@ COMPANION_ACTION_R53_SHOW_KEY = "companion_action_r53_blue_show"
 COMPANION_ACTION_R53_HIDE_KEY = "companion_action_r53_blue_hide"
 COMPANION_ACTION_R53_ALPHA_HOOK_SIZE = 80
 COMPANION_ACTION_R53_BLUE_OFFSET = 0x02F4
+# r58: original global 0x6A composition placement, distinct from an
+# individual native sprite's object X/Y (which r53-r57 changed ineffectively).
+COMPANION_ACTION_R58_POSITION_KEY = "companion_action_r58_blue_placement"
+COMPANION_ACTION_R58_POSITION_SIZE = 64
+COMPANION_AFK_R58_RESTORE_KEY = "companion_afk_r58_blue_restore"
+COMPANION_AFK_R58_RESTORE_SIZE = 112
+COMPANION_ACTION_R58_PLACEMENT_X_VA = 0x004F8DD0  # ELF file 0x3F8E50
+COMPANION_ACTION_R58_PLACEMENT_STRIDE = 20
 COMPANION_ACTION_R53_SHOW_SITE = 0x65A88
 COMPANION_ACTION_R53_HIDE_SITES = (0x65B40, 0x65C5C)
 COMPANION_ACTION_R53_BLUE_PREIMAGES = (
@@ -819,7 +827,7 @@ def _afk_wrap_text_hook_bytes(*, table_va: int) -> bytes:
     return code
 
 
-def _afk_r50_geometry_hook_bytes(*, table_va: int) -> bytes:
+def _afk_r50_geometry_hook_bytes(*, table_va: int, restore_va: int) -> bytes:
     """Apply r50 AFK geometry for the active record and companion slot.
 
     The green 0x68/0x69 layer and all three blue 0x6A animation frames receive
@@ -880,7 +888,7 @@ def _afk_r50_geometry_hook_bytes(*, table_va: int) -> bytes:
         _mips_i(0x2B, 14, 13, 0x6C),
         _mips_i(0x21, 16, 2, 0x0004),       # return: restore owner results
         _mips_r(0, 2, 3, 7, 0x00),
-        _mips_r(31, 0, 0, 0, 0x08),
+        _j_word(restore_va),                 # tail-jump: restore AFK placement
         0x00000000,
     )
     code = b"".join(struct.pack("<I", word) for word in words)
@@ -889,7 +897,7 @@ def _afk_r50_geometry_hook_bytes(*, table_va: int) -> bytes:
     return code
 
 
-def _action_r50_panel_extension_bytes() -> bytes:
+def _action_r50_panel_extension_bytes(*, placement_va: int) -> bytes:
     """Apply compact L1 geometry to green and blue speech layers together."""
 
     words = (
@@ -924,7 +932,7 @@ def _action_r50_panel_extension_bytes() -> bytes:
         _mips_i(0x23, 29, 31, 12),           # restore caller
         _mips_i(0x09, 29, 29, 16),
         _mips_i(0x09, 0, 4, 2),              # li a0,2
-        _mips_r(31, 0, 0, 0, 0x08),
+        _j_word(placement_va),               # r58: correct blue *placement*
         0x00000000,
         0x00000000,
     )
@@ -933,6 +941,85 @@ def _action_r50_panel_extension_bytes() -> bytes:
         raise AssertionError(f"companion action r50 panel extension drifted: {len(code)}")
     return code
 
+
+
+
+def _action_r58_blue_placement_bytes() -> bytes:
+    """Use native composition-placement XY, not stale sprite-pool transforms.
+
+    The L1 action hook executes after green construction. The compositor
+    renders 0x6A using the pair of static placement records shared with AFK.
+    Move just the active slot's blue X/Y to match the live action green origin.
+    AFK restores both placement records before constructing free-talk.
+    """
+    hi, lo = _split_address(COMPANION_ACTION_R58_PLACEMENT_X_VA)
+    words = (
+        _mips_i(0x23, 16, 12, 0x02D8),  # green object pointer
+        _mips_i(0x04, 12, 0, 11),       # absent -> jr ra at index13
+        0,
+        _mips_r(0, 13, 14, 4, 0x00),   # slot t5 * 16
+        _mips_r(0, 13, 15, 2, 0x00),   # slot t5 * 4
+        _mips_r(14, 15, 14, 0, 0x21), # slot * 20
+        _mips_i(0x0F, 0, 15, hi),
+        _mips_i(0x09, 15, 15, lo),
+        _mips_r(15, 14, 15, 0, 0x21),
+        _mips_i(0x23, 12, 14, 0x003C),  # green X
+        _mips_i(0x2B, 15, 14, 0x0000),  # blue layout X
+        _mips_i(0x23, 12, 14, 0x0040),  # green Y
+        _mips_i(0x2B, 15, 14, 0x0004),  # blue layout Y
+        _mips_r(31, 0, 0, 0, 0x08),
+        0,
+        0,
+    )
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_ACTION_R58_POSITION_SIZE:
+        raise AssertionError("r58 action compositor placement size drift")
+    return code
+
+
+def _afk_r58_restore_placement_bytes() -> bytes:
+    """Restore AFK 0x6A placement and keep >=4-row blue inside the border.
+
+    The action writes the shared blue compositor's static XY. Restore native
+    AFK values before free-talk is constructed. Only the selected green
+    resource's live height >=144 signals 4+ rows; shift the blue placement Y
+    up 2 units for those records, preserving <=3-row exact native Y=346.
+    """
+    hi, lo = _split_address(COMPANION_ACTION_R58_PLACEMENT_X_VA)
+    words = (
+        _mips_i(0x0F, 0, 12, hi),
+        _mips_i(0x09, 12, 12, lo),
+        _mips_i(0x0F, 0, 13, 0x432F), # 175.0
+        _mips_i(0x2B, 12, 13, 0),
+        _mips_i(0x0F, 0, 13, 0x4369), # 233.0
+        _mips_i(0x2B, 12, 13, 20),
+        _mips_i(0x21, 16, 13, 0x02F8), # native AFK companion slot
+        _mips_i(0x0B, 13, 14, 2), # sltiu slot,2
+        _mips_i(0x05, 14, 0, 2), # valid slot -> geometry
+        0,                        # safe branch delay
+        _mips_r(0, 0, 13, 0, 0x21), # invalid slot -> fallback slot0
+        _mips_r(0, 13, 14, 4, 0x00), # *16
+        _mips_r(0, 13, 15, 5, 0x00), # *32
+        _mips_r(14, 15, 14, 0, 0x21), # slot*48
+        _mips_i(0x0F, 0, 15, 0x0045),
+        _mips_i(0x09, 15, 15, 0x0AC8), # green frame0 height
+        _mips_r(15, 14, 15, 0, 0x21),
+        _mips_i(0x23, 15, 15, 0),  # loaded live green height bits
+        _mips_i(0x0F, 0, 14, 0x4310), # 144.0 float bits
+        _mips_r(15, 14, 15, 0, 0x2B), # sltu t7,t7,t6
+        _mips_i(0x0F, 0, 13, 0x43AC), # Y344 for >=4 rows
+        _mips_i(0x04, 15, 0, 2), # beq <144 false => keep 344
+        0,
+        _mips_i(0x0F, 0, 13, 0x43AD), # Y346 for <=3 rows
+        _mips_i(0x2B, 12, 13, 4),
+        _mips_i(0x2B, 12, 13, 24),
+        _mips_r(31, 0, 0, 0, 0x08),
+        0,
+    )
+    code=b"".join(struct.pack("<I",w) for w in words)
+    if len(code)!=COMPANION_AFK_R58_RESTORE_SIZE:
+        raise AssertionError("r58 AFK placement restore size drift")
+    return code
 
 
 def _afk_r52_pretext_hook_bytes(*, table_va: int) -> bytes:
@@ -1629,6 +1716,8 @@ def finalize_companion_action_runtime_layout(
         action_r50_panel_extension_va = installed.target_vas[
             COMPANION_ACTION_R50_PANEL_EXTENSION_KEY
         ]
+        action_r58_placement_va = installed.target_vas[COMPANION_ACTION_R58_POSITION_KEY]
+        afk_r58_restore_va = installed.target_vas[COMPANION_AFK_R58_RESTORE_KEY]
     except KeyError as exc:
         raise ValueError(f"companion action runtime payload is missing: {exc.args[0]}") from exc
 
@@ -1650,6 +1739,8 @@ def finalize_companion_action_runtime_layout(
         blue_hide_va,
         action_geometry_extension_va,
         action_r50_panel_extension_va,
+        action_r58_placement_va,
+        afk_r58_restore_va,
     )
     if any(value & 3 for value in runtime_vas):
         raise ValueError(
@@ -1713,12 +1804,12 @@ def finalize_companion_action_runtime_layout(
         ),
         (
             afk_r50_geometry_hook_va,
-            _afk_r50_geometry_hook_bytes(table_va=afk_wrap_table_va),
+            _afk_r50_geometry_hook_bytes(table_va=afk_wrap_table_va, restore_va=afk_r58_restore_va),
             "companion AFK r50 geometry hook",
         ),
         (
             action_r50_panel_extension_va,
-            _action_r50_panel_extension_bytes(),
+            _action_r50_panel_extension_bytes(placement_va=action_r58_placement_va),
             "companion action r50 panel extension",
         ),
         (
@@ -1729,6 +1820,8 @@ def finalize_companion_action_runtime_layout(
         (blue_create_va, _action_r53_blue_create_bytes(hook_va=blue_create_va), "L1 r56 native sprite lookup"),
         (blue_show_va, _action_r53_blue_alpha_bytes(visible=True, create_va=blue_create_va), "L1 r56 blue show"),
         (blue_hide_va, _action_r53_blue_alpha_bytes(visible=False, create_va=blue_create_va), "L1 r56 blue hide"),
+        (action_r58_placement_va, _action_r58_blue_placement_bytes(), "L1 r58 blue layout placement"),
+        (afk_r58_restore_va, _afk_r58_restore_placement_bytes(), "AFK r58 layout restore"),
     )
     for payload_va, payload, owner in runtime_payloads:
         payload_file = installed.info.file_offset + (
@@ -1970,6 +2063,8 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             (COMPANION_ACTION_R53_BLUE_CREATE_KEY, COMPANION_ACTION_R53_BLUE_CREATE_SIZE),
             (COMPANION_ACTION_R53_SHOW_KEY, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE),
             (COMPANION_ACTION_R53_HIDE_KEY, COMPANION_ACTION_R53_ALPHA_HOOK_SIZE),
+            (COMPANION_ACTION_R58_POSITION_KEY, COMPANION_ACTION_R58_POSITION_SIZE),
+            (COMPANION_AFK_R58_RESTORE_KEY, COMPANION_AFK_R58_RESTORE_SIZE),
         )
     )
     return tuple(entries)

@@ -104,6 +104,11 @@ from tools.companion_hud import (
     _afk_r52_pretext_hook_bytes,
     _action_r53_blue_create_bytes,
     _action_r53_blue_alpha_bytes,
+    COMPANION_ACTION_R58_POSITION_SIZE,
+    COMPANION_AFK_R58_RESTORE_SIZE,
+    COMPANION_ACTION_R58_PLACEMENT_X_VA,
+    _action_r58_blue_placement_bytes,
+    _afk_r58_restore_placement_bytes,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_RECORDS_PER_COMPANION,
@@ -615,7 +620,8 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         0xADEE0008, 0xADEE0038, 0xADEE0068,
         0xADEB000C, 0xADEB003C, 0xADEB006C,
         0x8FBF000C, 0x27BD0010, 0x24040002,
-        0x03E00008, 0x00000000, 0x00000000,
+        struct.unpack_from("<I", raw, action_geometry_file + 31*4)[0],
+        0x00000000, 0x00000000,
     ):
         return False
 
@@ -715,7 +721,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             0x8D8D000C, 0xADCD000C,
             0x8D8D0010, 0xADCD003C,
             0x8D8D0014, 0xADCD006C,
-            0x86020004, 0x000219C0, 0x03E00008, 0,
+            0x86020004, 0x000219C0, geometry_words[-2], 0,
         )
     ):
         return False
@@ -869,6 +875,52 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             COMPANION_ACTION_R53_SHOW_SITE,
             *COMPANION_ACTION_R53_HIDE_SITES,
         ) and struct.unpack_from("<I", raw, site + 4)[0] != 0x8E0402DC:
+            return False
+
+    # r58: the native 0x6A compositor placement, NOT the pool object fields,
+    # is changed during L1 and restored on the AFK construction path. Verify
+    # both dynamic tail-call edges and every instruction of the two new hooks.
+    def resolve_j(word: int) -> int:
+        if word >> 26 != 2:
+            return -1
+        return (word & 0x03FFFFFF) << 2
+
+    afk_geometry_site = struct.unpack_from("<I", raw, 0x66050)[0]
+    if afk_geometry_site >> 26 != 3:
+        return False
+    afk_geometry_va = (afk_geometry_site & 0x03FFFFFF) << 2
+    afk_geometry_file = p_offset + afk_geometry_va - p_vaddr
+    afk_tail = struct.unpack_from("<I", raw, afk_geometry_file + COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE - 8)[0]
+    afk_restore_va = resolve_j(afk_tail)
+
+    action_runtime_site = struct.unpack_from("<I", raw, 0x66724)[0]
+    if action_runtime_site >> 26 != 3:
+        return False
+    action_runtime_va = (action_runtime_site & 0x03FFFFFF) << 2
+    action_runtime_file = p_offset + action_runtime_va - p_vaddr
+    action_words = struct.unpack_from(f"<{COMPANION_ACTION_RUNTIME_HOOK_SIZE//4}I", raw, action_runtime_file)
+    ext_candidates = [resolve_j(word) for word in action_words if word >> 26 == 2]
+    if len(ext_candidates) != 1:
+        return False
+    action_ext_file = p_offset + ext_candidates[0] - p_vaddr
+    action_ext_words = struct.unpack_from(
+        f"<{COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE//4}I", raw, action_ext_file
+    )
+    action_placement_va = resolve_j(action_ext_words[-3])
+    if (
+        afk_restore_va < p_vaddr or action_placement_va < p_vaddr
+        or afk_restore_va + COMPANION_AFK_R58_RESTORE_SIZE > p_vaddr + p_filesz
+        or action_placement_va + COMPANION_ACTION_R58_POSITION_SIZE > p_vaddr + p_filesz
+        or action_ext_words[-4] != 0x24040002  # li a0,2
+        or struct.unpack_from("<I", raw, afk_geometry_file + COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE - 4)[0] != 0
+    ):
+        return False
+    for va, expected in (
+        (afk_restore_va, _afk_r58_restore_placement_bytes()),
+        (action_placement_va, _action_r58_blue_placement_bytes()),
+    ):
+        off = p_offset + va - p_vaddr
+        if raw[off:off + len(expected)] != expected:
             return False
 
     # Complete-corpus generic invariant: every wrapped visual row is <=16 cells,
