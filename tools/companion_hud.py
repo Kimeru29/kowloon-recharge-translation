@@ -165,6 +165,12 @@ COMPANION_ACTION_R59_BLUE_PRISTINE = (152.0, 32.0, -6.0, -1.0)
 COMPANION_ACTION_R60_PRECONSTRUCT_KEY = "companion_action_r60_blue_preconstruct"
 COMPANION_ACTION_R60_PRECONSTRUCT_SIZE = 220
 COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA = 0x001666C8
+# r61: correct residual ~2-game-unit right and ~1-game-unit upward alignment
+# on the actual native group2/0x78 object. No changes to accepted AFK.
+COMPANION_ACTION_R61_LIVE_OFFSET_KEY = "companion_action_r61_blue_live_xy"
+COMPANION_ACTION_R61_LIVE_OFFSET_SIZE = 96
+COMPANION_ACTION_R61_BLUE_SHIFT_X = -2.0
+COMPANION_ACTION_R61_BLUE_SHIFT_Y = 1.0
 
 
 # r52 replaces both r51 runtime hooks with one AFK-only constructor fix.
@@ -975,7 +981,7 @@ def _action_r50_panel_extension_bytes(*, placement_va: int) -> bytes:
 
 
 
-def _action_r58_blue_placement_bytes() -> bytes:
+def _action_r58_blue_placement_bytes(*, tail_va: int) -> bytes:
     """Use native composition-placement XY, not stale sprite-pool transforms.
 
     The L1 action hook executes after green construction. The compositor
@@ -998,13 +1004,55 @@ def _action_r58_blue_placement_bytes() -> bytes:
         _mips_i(0x2B, 15, 14, 0x0000),  # blue layout X
         _mips_i(0x23, 12, 14, 0x0040),  # green Y
         _mips_i(0x2B, 15, 14, 0x0004),  # blue layout Y
-        _mips_r(31, 0, 0, 0, 0x08),
+        _j_word(tail_va),                   # r61: align actual id0x78 instance
         0,
         0,
     )
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_R58_POSITION_SIZE:
         raise AssertionError("r58 action compositor placement size drift")
+    return code
+
+
+
+def _action_r61_live_blue_xy_bytes() -> bytes:
+    """Match live L1 id0x78 tint to green with a minimal independent nudge.
+
+    The previous r58 compositor handoff ends here (still intact for parity).
+    L1 already constructed both real native sprite objects; touch ONLY the
+    real id0x78 at task+0x2E0, not AFK's separate 0x6A or shared metadata.
+    Shift X left 2 game units and Y down 1; cache the result in the live
+    object's world XY fields used by the renderer. Preserve F0/F2 and SP.
+    """
+    words=(
+        _mips_i(0x23,16,12,0x02D8),         # 0: green native object
+        _mips_i(0x23,16,14,0x02E0),         # 1: true L1 blue id0x78
+        _mips_i(0x04,12,0,19),             # 2: no green -> return index22
+        0,
+        _mips_i(0x04,14,0,17),             # 4: no blue -> return index22
+        0,
+        _mips_i(0x09,29,29,-16),           # 6: preserve FPU temporaries
+        _mips_i(0x39,29,0,0),              # 7: swc1 f0,0(sp)
+        _mips_i(0x39,29,2,4),              # 8: swc1 f2,4(sp)
+        _mips_i(0x31,12,0,0x003C),         # 9: lwc1 f0,green X
+        _mips_i(0x0F,0,15,0x4000),         # 10: 2.0f bit pattern
+        _mips_mtc1(15,2),                  # 11: mtc1 t7,f2
+        0x46020001,                        # 12: sub.s f0,f0,f2
+        _mips_i(0x39,14,0,0x003C),         # 13: swc1 f0,blue X
+        _mips_i(0x31,12,0,0x0040),         # 14: lwc1 f0,green Y
+        _mips_i(0x0F,0,15,0x3F80),         # 15: 1.0f
+        _mips_mtc1(15,2),                  # 16
+        0x46020000,                        # 17: add.s f0,f0,f2
+        _mips_i(0x39,14,0,0x0040),         # 18: swc1 f0,blue Y
+        _mips_i(0x31,29,2,4),              # 19: restore F2
+        _mips_i(0x31,29,0,0),              # 20: restore F0
+        _mips_i(0x09,29,29,16),            # 21
+        _mips_r(31,0,0,0,0x08),            # 22: return
+        0,                                 # 23: delay
+    )
+    code=b"".join(struct.pack("<I",word) for word in words)
+    if len(code)!=COMPANION_ACTION_R61_LIVE_OFFSET_SIZE:
+        raise AssertionError("r61 live L1 tint nudge drift")
     return code
 
 
@@ -1829,6 +1877,7 @@ def finalize_companion_action_runtime_layout(
         action_r58_placement_va = installed.target_vas[COMPANION_ACTION_R58_POSITION_KEY]
         afk_r58_restore_va = installed.target_vas[COMPANION_AFK_R58_RESTORE_KEY]
         action_r60_preconstruct_va = installed.target_vas[COMPANION_ACTION_R60_PRECONSTRUCT_KEY]
+        action_r61_live_offset_va = installed.target_vas[COMPANION_ACTION_R61_LIVE_OFFSET_KEY]
     except KeyError as exc:
         raise ValueError(f"companion action runtime payload is missing: {exc.args[0]}") from exc
 
@@ -1853,6 +1902,7 @@ def finalize_companion_action_runtime_layout(
         action_r58_placement_va,
         afk_r58_restore_va,
         action_r60_preconstruct_va,
+        action_r61_live_offset_va,
     )
     if any(value & 3 for value in runtime_vas):
         raise ValueError(
@@ -1934,10 +1984,14 @@ def finalize_companion_action_runtime_layout(
         ), "L1 r56 sprite lookup + r60 constructor tail"),
         (blue_show_va, _action_r53_blue_alpha_bytes(visible=True, create_va=blue_create_va), "L1 r56 blue show"),
         (blue_hide_va, _action_r53_blue_alpha_bytes(visible=False, create_va=blue_create_va), "L1 r56 blue hide"),
-        (action_r58_placement_va, _action_r58_blue_placement_bytes(), "L1 r58 blue layout placement"),
+        (action_r58_placement_va, _action_r58_blue_placement_bytes(
+            tail_va=action_r61_live_offset_va
+        ), "L1 r58 blue layout placement + r61 tail"),
         (afk_r58_restore_va, _afk_r58_restore_placement_bytes(), "AFK r58 layout restore"),
         (action_r60_preconstruct_va, _action_r60_preconstruct_bytes(table_va=table_va),
          "L1 r60 preconstruct native 0x78 geometry"),
+        (action_r61_live_offset_va, _action_r61_live_blue_xy_bytes(),
+         "L1 r61 live id0x78 alignment"),
     )
     for payload_va, payload, owner in runtime_payloads:
         payload_file = installed.info.file_offset + (
@@ -2182,6 +2236,7 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             (COMPANION_ACTION_R58_POSITION_KEY, COMPANION_ACTION_R58_POSITION_SIZE),
             (COMPANION_AFK_R58_RESTORE_KEY, COMPANION_AFK_R58_RESTORE_SIZE),
             (COMPANION_ACTION_R60_PRECONSTRUCT_KEY, COMPANION_ACTION_R60_PRECONSTRUCT_SIZE),
+            (COMPANION_ACTION_R61_LIVE_OFFSET_KEY, COMPANION_ACTION_R61_LIVE_OFFSET_SIZE),
         )
     )
     return tuple(entries)
