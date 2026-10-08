@@ -149,15 +149,14 @@ COMPANION_AFK_R50_GEOMETRY_HOOK_KEY = "companion_afk_r50_geometry_hook"
 COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE = 212
 COMPANION_ACTION_R50_PANEL_EXTENSION_KEY = "companion_action_r50_panel_extension"
 COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE = 136
-# r51 fixes the two remaining ownership gaps without moving any r50 payload:
-# AFK Y is injected before the specialized constructor (post-object writes were
-# not honored at runtime), and L1 finally instantiates a real blue 0x6A layer.
-COMPANION_AFK_R51_PRETEXT_HOOK_KEY = "companion_afk_r51_pretext_hook"
-COMPANION_AFK_R51_PRETEXT_HOOK_SIZE = 80
-COMPANION_ACTION_R51_BLUE_CREATE_HOOK_KEY = "companion_action_r51_blue_create_hook"
-COMPANION_ACTION_R51_BLUE_CREATE_HOOK_SIZE = 72
-COMPANION_ACTION_R51_BLUE_OBJECT_OFFSET = 0x02F4
-COMPANION_ACTION_R51_BLUE_DEPTH = 242.5
+# r52 replaces both r51 runtime hooks with one AFK-only constructor fix.
+COMPANION_AFK_R52_PRETEXT_HOOK_KEY = "companion_afk_r52_pretext_hook"
+COMPANION_AFK_R52_PRETEXT_HOOK_SIZE = 84
+COMPANION_AFK_R52_PRETEXT_PREIMAGES = (
+    (0x66250, 0x44807000), (0x66254, 0x3C024375),
+    (0x66320, 0x44807000), (0x66324, 0x3C024375),
+)
+COMPANION_AFK_R52_PRETEXT_PATCH_OFFSETS = (0x66250, 0x66320)
 COMPANION_AFK_FIRST_RECORD_INDEX = 0x259
 COMPANION_AFK_TEXT_STYLE_CELL_WIDTH = 16.0
 COMPANION_AFK_TEXT_BODY_WIDTH = 288.0
@@ -214,17 +213,6 @@ COMPANION_AFK_SCALE_PREIMAGES: tuple[tuple[int, int], ...] = (
     (0x66288, 0x8602000A),  # lh v0,0x0a(s0)
     (0x66354, 0xAE02002C),  # line 2: sw v0,0x2c(s0)
     (0x66358, 0x24020078),  # li v0,0x78
-)
-COMPANION_AFK_R51_PRETEXT_PREIMAGES: tuple[tuple[int, int], ...] = (
-    (0x66250, 0x44807000),  # line 1: mtc1 zero,f14
-    (0x66254, 0x3C024375),  # line 1: lui v0,245.0 (JAL delay slot)
-    (0x66320, 0x44807000),  # line 2: mtc1 zero,f14
-    (0x66324, 0x3C024375),  # line 2: lui v0,245.0 (JAL delay slot)
-)
-COMPANION_ACTION_R51_BLUE_CREATE_PREIMAGES: tuple[tuple[int, int], ...] = (
-    (0x66668, 0x0C06850C),  # jal text-object destroy for pristine unused +0x2F4
-    (0x66740, 0x3C024371),  # following resource: lui v0,241.0
-    (0x66744, 0x44826000),  # mtc1 v0,f12
 )
 COMPANION_AFK_RUNTIME_PATCH_OFFSETS = (
     0x66050,
@@ -901,70 +889,43 @@ def _action_r50_panel_extension_bytes() -> bytes:
     return code
 
 
-def _afk_r51_pretext_hook_bytes(*, table_va: int) -> bytes:
-    """Load record-specific AFK Y into f13 before the text constructor.
 
-    r49/r50 attempted to move the returned object after construction, but
-    runtime proved that path does not control the rendered text position.
-    Constructor f13 is the authoritative Y owner and is stored as object +0x18.
+def _afk_r52_pretext_hook_bytes(*, table_va: int) -> bytes:
+    """Bind AFK Y to both native constructor inputs before text creation.
+
+    Unlike r51, keep the caller's stack-spilled f13 (sp+0x1a4) synchronized.
+    All non-AFK records continue with the original value. This never creates
+    an independent group-2 sprite or alters L1 ownership/lifecycle.
     """
 
     table_hi, table_lo = _split_address(table_va)
     line1_return_va = 0x001661D8
     words = (
-        _mips_mtc1(0, 14),                   # preserve mtc1 zero,f14 owner
-        _mips_i(0x21, 16, 8, 0x0004),       # lh t0,4(s0): record index
+        _mips_mtc1(0, 14),                    # displaced mtc1 zero,f14
+        _mips_i(0x21, 16, 8, 0x0004),        # lh t0,4(s0): AFK record
         _mips_i(0x09, 8, 8, -COMPANION_AFK_FIRST_RECORD_INDEX),
         _mips_i(0x0B, 8, 9, COMPANION_AFK_RECORD_COUNT),
-        _mips_i(0x04, 9, 0, 13),             # invalid -> native f13 / return
+        _mips_i(0x04, 9, 0, 14),            # non-AFK -> return, no stack change
         0x00000000,
-        _mips_r(0, 8, 8, 5, 0x00),           # layout index * 32
+        _mips_r(0, 8, 8, 5, 0x00),          # index * 32
         _mips_i(0x0F, 0, 9, table_hi),
         _mips_i(0x09, 9, 9, table_lo),
         _mips_r(9, 8, 9, 0, 0x21),
         _mips_i(0x0F, 0, 10, line1_return_va >> 16),
         _mips_i(0x0D, 10, 10, line1_return_va & 0xFFFF),
-        _mips_i(0x05, 31, 10, 4),            # line2 -> table +28
+        _mips_i(0x05, 31, 10, 4),           # line2 -> +28
         0x00000000,
-        _mips_i(0x31, 9, 13, 24),            # lwc1 f13,line1_y
-        _mips_i(0x04, 0, 0, 2),              # -> return
+        _mips_i(0x31, 9, 13, 24),           # lwc1 f13,line1_y
+        _mips_i(0x04, 0, 0, 2),             # join spill/return
         0x00000000,
-        _mips_i(0x31, 9, 13, 28),            # lwc1 f13,line2_y
-        _mips_r(31, 0, 0, 0, 0x08),
-        0x00000000,
-    )
-    code = b"".join(struct.pack("<I", word) for word in words)
-    if len(code) != COMPANION_AFK_R51_PRETEXT_HOOK_SIZE:
-        raise AssertionError(f"companion AFK r51 pretext hook drifted: {len(code)}")
-    return code
-
-
-def _action_r51_blue_create_hook_bytes() -> bytes:
-    """Instantiate the compact blue 0x6A L1 layer and bind it to task+0x2F4."""
-
-    words = (
-        _mips_i(0x37, 29, 6, 0x0178),        # ld a2,0x178(sp): green X/Y anchor
-        _mips_i(0x09, 29, 29, -16),          # local nested-call frame
-        _mips_i(0x2B, 29, 31, 12),           # save ra
-        _mips_i(0x0F, 0, 2, 0x4372),         # 242.5f: between green 243/text 242
-        _mips_i(0x0D, 2, 2, 0x8000),
-        _mips_mtc1(2, 12),                    # f12 = blue depth
-        _mips_i(0x09, 0, 4, 2),              # a0 = group 2
-        _mips_i(0x09, 0, 5, 0x006A),         # a1 = resource 0x6A
-        _mips_r(0, 0, 7, 0, 0x21),           # a3 = 0
-        _jal_word(0x00107D60),                # resource constructor
-        0x00000000,
-        _mips_i(0x2B, 16, 2, COMPANION_ACTION_R51_BLUE_OBJECT_OFFSET),
-        _mips_i(0x23, 29, 31, 12),            # restore caller
-        _mips_i(0x09, 29, 29, 16),
-        _mips_i(0x0F, 0, 2, 0x4371),         # restore next resource f12=241
-        _mips_mtc1(2, 12),
-        _mips_r(31, 0, 0, 0, 0x08),
+        _mips_i(0x31, 9, 13, 28),           # lwc1 f13,line2_y
+        _mips_i(0x39, 29, 13, 0x01A4),     # swc1 f13,0x1a4(sp): native spill
+        _mips_r(31, 0, 0, 0, 0x08),         # jr ra
         0x00000000,
     )
     code = b"".join(struct.pack("<I", word) for word in words)
-    if len(code) != COMPANION_ACTION_R51_BLUE_CREATE_HOOK_SIZE:
-        raise AssertionError(f"companion action r51 blue hook drifted: {len(code)}")
+    if len(code) != COMPANION_AFK_R52_PRETEXT_HOOK_SIZE:
+        raise AssertionError(f"companion AFK r52 pretext hook drifted: {len(code)}")
     return code
 
 
@@ -1509,17 +1470,12 @@ def finalize_companion_action_runtime_layout(
         afk_wrap_geometry_hook_va = installed.target_vas[COMPANION_AFK_WRAP_GEOMETRY_HOOK_KEY]
         afk_wrap_text_hook_va = installed.target_vas[COMPANION_AFK_WRAP_TEXT_HOOK_KEY]
         afk_r50_geometry_hook_va = installed.target_vas[COMPANION_AFK_R50_GEOMETRY_HOOK_KEY]
+        afk_r52_pretext_hook_va = installed.target_vas[COMPANION_AFK_R52_PRETEXT_HOOK_KEY]
         action_geometry_extension_va = installed.target_vas[
             COMPANION_ACTION_GEOMETRY_EXTENSION_KEY
         ]
         action_r50_panel_extension_va = installed.target_vas[
             COMPANION_ACTION_R50_PANEL_EXTENSION_KEY
-        ]
-        afk_r51_pretext_hook_va = installed.target_vas[
-            COMPANION_AFK_R51_PRETEXT_HOOK_KEY
-        ]
-        action_r51_blue_create_hook_va = installed.target_vas[
-            COMPANION_ACTION_R51_BLUE_CREATE_HOOK_KEY
         ]
     except KeyError as exc:
         raise ValueError(f"companion action runtime payload is missing: {exc.args[0]}") from exc
@@ -1536,10 +1492,9 @@ def finalize_companion_action_runtime_layout(
         afk_wrap_geometry_hook_va,
         afk_wrap_text_hook_va,
         afk_r50_geometry_hook_va,
+        afk_r52_pretext_hook_va,
         action_geometry_extension_va,
         action_r50_panel_extension_va,
-        afk_r51_pretext_hook_va,
-        action_r51_blue_create_hook_va,
     )
     if any(value & 3 for value in runtime_vas):
         raise ValueError(
@@ -1612,14 +1567,9 @@ def finalize_companion_action_runtime_layout(
             "companion action r50 panel extension",
         ),
         (
-            afk_r51_pretext_hook_va,
-            _afk_r51_pretext_hook_bytes(table_va=afk_wrap_table_va),
-            "companion AFK r51 pre-constructor Y hook",
-        ),
-        (
-            action_r51_blue_create_hook_va,
-            _action_r51_blue_create_hook_bytes(),
-            "companion action r51 blue-layer constructor",
+            afk_r52_pretext_hook_va,
+            _afk_r52_pretext_hook_bytes(table_va=afk_wrap_table_va),
+            "companion AFK r52 pre-constructor Y and stack spill",
         ),
     )
     for payload_va, payload, owner in runtime_payloads:
@@ -1638,8 +1588,7 @@ def finalize_companion_action_runtime_layout(
         ("AFK geometry", COMPANION_AFK_GEOMETRY_PREIMAGES),
         ("AFK alpha", COMPANION_AFK_ALPHA_PREIMAGES),
         ("AFK scale", COMPANION_AFK_SCALE_PREIMAGES),
-        ("AFK r51 pretext", COMPANION_AFK_R51_PRETEXT_PREIMAGES),
-        ("L1 r51 blue create", COMPANION_ACTION_R51_BLUE_CREATE_PREIMAGES),
+        ("AFK r52 pretext", COMPANION_AFK_R52_PRETEXT_PREIMAGES),
     ):
         for offset, expected in preimages:
             actual = struct.unpack_from("<I", result, offset)[0]
@@ -1654,15 +1603,15 @@ def finalize_companion_action_runtime_layout(
     # speaking slot. Preserve the original sll v1,v0,7 in the JAL delay slot.
     struct.pack_into("<I", result, 0x66050, _jal_word(afk_r50_geometry_hook_va))
 
-    # r51 injects record-specific Y through constructor f13, the owner the
-    # renderer actually honors. Keep the original lui v0,245.0 in each JAL
-    # delay slot; the helper also reproduces the displaced mtc1 zero,f14.
-    struct.pack_into("<I", result, 0x66250, _jal_word(afk_r51_pretext_hook_va))
-    struct.pack_into("<I", result, 0x66320, _jal_word(afk_r51_pretext_hook_va))
+    # r52 supplies record Y through BOTH f13 and the native stack argument.
+    # r51 did not update sp+0x1a4 and independently created a persistent blue
+    # sprite; neither r51 L1 callsite nor its destructor change is retained.
+    struct.pack_into("<I", result, 0x66250, _jal_word(afk_r52_pretext_hook_va))
+    struct.pack_into("<I", result, 0x66320, _jal_word(afk_r52_pretext_hook_va))
 
-    # Retain the historical r49/r50 post-construction hook for binary/runtime
-    # compatibility; it writes the same layout Y and native X scale, but r51 no
-    # longer relies on it as the authoritative positioning path.
+    # Keep constructor alpha at native 1.0. After each AFK text object is
+    # created, place it at the record-specific Y and force horizontal scale to
+    # 1.0; wrapping rather than squeezing now guarantees the fixed-width bound.
     struct.pack_into("<I", result, 0x66284, _jal_word(afk_wrap_text_hook_va))
     struct.pack_into("<I", result, 0x66288, 0xAE020028)  # sw v0,0x28(s0)
     struct.pack_into("<I", result, 0x66354, _jal_word(afk_wrap_text_hook_va))
@@ -1680,14 +1629,6 @@ def finalize_companion_action_runtime_layout(
     # layout selector. Keep li a0,2 in the JAL delay slot.
     struct.pack_into("<I", result, 0x66724, _jal_word(hook_va))
     struct.pack_into("<I", result, 0x66728, 0x24040002)
-
-    # r51 finally constructs the compact blue 0x6A layer after the green L1
-    # bubble. task+0x2F4 is an otherwise-unused lifecycle-owned handle. Retype
-    # its cleanup from the text destructor to the same sprite/resource destructor
-    # used by the other 0x107D60 objects, then populate it from the new helper.
-    struct.pack_into("<I", result, 0x66668, _jal_word(0x00108650))
-    struct.pack_into("<I", result, 0x66740, _jal_word(action_r51_blue_create_hook_va))
-    struct.pack_into("<I", result, 0x66744, 0x3C024371)  # delay: lui v0,241.0
 
     # The selector stores slot-aware text-X and per-action text-Y floats in
     # relocated RWX state. Replace both old immediate-float constructions with
@@ -1843,23 +1784,14 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             ),
         )
     )
-    # r51 appends only two executable helpers. Every r50 data/code VA remains
-    # stable, including the 600-record wrap layout table and both r50 geometry
-    # owners.
-    entries.extend(
-        (
-            RelocatedText(
-                key=COMPANION_AFK_R51_PRETEXT_HOOK_KEY,
-                encoded=b"\x00" * COMPANION_AFK_R51_PRETEXT_HOOK_SIZE,
-                pointer_offsets=(),
-                alignment=4,
-            ),
-            RelocatedText(
-                key=COMPANION_ACTION_R51_BLUE_CREATE_HOOK_KEY,
-                encoded=b"\x00" * COMPANION_ACTION_R51_BLUE_CREATE_HOOK_SIZE,
-                pointer_offsets=(),
-                alignment=4,
-            ),
+    # r52 is append-only after the complete r50 payload. Never instantiate
+    # L1 resource 0x6A until its native visibility owner has been proven.
+    entries.append(
+        RelocatedText(
+            key=COMPANION_AFK_R52_PRETEXT_HOOK_KEY,
+            encoded=b"\x00" * COMPANION_AFK_R52_PRETEXT_HOOK_SIZE,
+            pointer_offsets=(),
+            alignment=4,
         )
     )
     return tuple(entries)

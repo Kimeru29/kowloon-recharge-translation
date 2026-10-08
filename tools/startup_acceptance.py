@@ -63,7 +63,6 @@ from tools.companion_hud import (
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE,
     COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE,
-    COMPANION_ACTION_R51_BLUE_CREATE_HOOK_SIZE,
     COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
     COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS,
     COMPANION_AFK_PANEL_FRAME_COUNT,
@@ -93,7 +92,7 @@ from tools.companion_hud import (
     COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE,
     COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
     COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE,
-    COMPANION_AFK_R51_PRETEXT_HOOK_SIZE,
+    COMPANION_AFK_R52_PRETEXT_HOOK_SIZE,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_RECORDS_PER_COMPANION,
@@ -786,81 +785,43 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     ):
         return False
 
-    # r51 fixes AFK text ownership at the constructor boundary: f13 is loaded
-    # from the same 600-record layout table before 0x1950A0 runs. The original
-    # 245.0 f15 materialization stays in each JAL delay slot.
+
+    # r51 runtime regression: its independent L1 0x6A sprite continued drawing
+    # while the native green bubble was hidden. r52 must keep the proven r50
+    # action lifecycle entirely intact and change AFK constructor inputs only.
     pretext_jal_1 = struct.unpack_from("<I", raw, 0x66250)[0]
     pretext_jal_2 = struct.unpack_from("<I", raw, 0x66320)[0]
     if (
         pretext_jal_1 != pretext_jal_2
-        or pretext_jal_1 >> 26 != 0x03
+        or pretext_jal_1 >> 26 != 3
         or struct.unpack_from("<I", raw, 0x66254)[0] != 0x3C024375
         or struct.unpack_from("<I", raw, 0x66324)[0] != 0x3C024375
+        or struct.unpack_from("<I", raw, 0x66668)[0] != 0x0C06850C
+        or struct.unpack_from("<I", raw, 0x66740)[0] != 0x3C024371
+        or struct.unpack_from("<I", raw, 0x66744)[0] != 0x44826000
     ):
         return False
     pretext_va = (pretext_jal_1 & 0x03FFFFFF) << 2
     pretext_rel = pretext_va - p_vaddr
-    if (
-        pretext_rel < 0
-        or pretext_rel + COMPANION_AFK_R51_PRETEXT_HOOK_SIZE > p_filesz
-    ):
+    if pretext_rel < 0 or pretext_rel + COMPANION_AFK_R52_PRETEXT_HOOK_SIZE > p_filesz:
         return False
     pretext_words = struct.unpack_from(
-        f"<{COMPANION_AFK_R51_PRETEXT_HOOK_SIZE // 4}I",
-        raw,
-        p_offset + pretext_rel,
+        f"<{COMPANION_AFK_R52_PRETEXT_HOOK_SIZE // 4}I",
+        raw, p_offset + pretext_rel
     )
     if (
-        pretext_words[:7]
-        != (
+        pretext_words[:7] != (
             0x44807000, 0x86080004, 0x2508FDA7, 0x2D090258,
-            0x1120000D, 0, 0x00084140,
+            0x1120000E, 0, 0x00084140,
         )
         or pretext_words[7] & 0xFFFF0000 != 0x3C090000
         or pretext_words[8] & 0xFFFF0000 != 0x25290000
-        or pretext_words[9:]
-        != (
-            0x01284821, 0x3C0A0016, 0x354A61D8, 0x17EA0004,
-            0, 0xC52D0018, 0x10000002, 0,
-            0xC52D001C, 0x03E00008, 0,
+        or _materialized_va(pretext_words[7], pretext_words[8]) != afk_layout_table_va
+        or pretext_words[9:] != (
+            0x01284821, 0x3C0A0016, 0x354A61D8, 0x17EA0004, 0,
+            0xC52D0018, 0x10000002, 0, 0xC52D001C,
+            0xE7AD01A4, 0x03E00008, 0,
         )
-        or _materialized_va(pretext_words[7], pretext_words[8])
-        != afk_layout_table_va
-    ):
-        return False
-
-    # r50 resized blue 0x6A for L1 but never instantiated it. r51 creates the
-    # layer at the green-bubble anchor, puts it between green/text in Z, stores
-    # it in task+0x2F4, and retypes that slot's cleanup to the sprite destructor.
-    if struct.unpack_from("<I", raw, 0x66668)[0] != 0x0C042194:
-        return False
-    blue_jal = struct.unpack_from("<I", raw, 0x66740)[0]
-    if (
-        blue_jal >> 26 != 0x03
-        or struct.unpack_from("<I", raw, 0x66744)[0] != 0x3C024371
-        or struct.unpack_from("<I", raw, 0x66748)[0] != 0x24040002
-    ):
-        return False
-    blue_va = (blue_jal & 0x03FFFFFF) << 2
-    blue_rel = blue_va - p_vaddr
-    if (
-        blue_rel < 0
-        or blue_rel + COMPANION_ACTION_R51_BLUE_CREATE_HOOK_SIZE > p_filesz
-    ):
-        return False
-    if struct.unpack_from(
-        f"<{COMPANION_ACTION_R51_BLUE_CREATE_HOOK_SIZE // 4}I",
-        raw,
-        p_offset + blue_rel,
-    ) != (
-        0xDFA60178, 0x27BDFFF0, 0xAFBF000C,
-        0x3C024372, 0x34428000, 0x44826000,
-        0x24040002, 0x2405006A, 0x00003821,
-        0x0C041F58, 0,
-        0xAE0202F4,
-        0x8FBF000C, 0x27BD0010,
-        0x3C024371, 0x44826000,
-        0x03E00008, 0,
     ):
         return False
 
