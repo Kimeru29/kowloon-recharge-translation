@@ -66,6 +66,13 @@ from tools.companion_hud import (
     COMPANION_AFK_BLUE_BASE_HEIGHT,
     COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM,
     COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM,
+    COMPANION_AFK_R59_FOUR_ROW_BLUE_BOTTOM_TRIM,
+    COMPANION_AFK_R59_FOUR_ROW_TEXT_TOP_PADDING,
+    COMPANION_AFK_ANCHOR_Y,
+    COMPANION_ACTION_R59_BLUE_RESOURCE_ID,
+    COMPANION_ACTION_R59_BLUE_METADATA_VA,
+    COMPANION_ACTION_R59_BLUE_FRAME_STRIDE,
+    COMPANION_ACTION_R59_BLUE_PRISTINE,
     COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION,
     COMPANION_AFK_BLUE_BASE_PIVOT_Y,
     COMPANION_AFK_TEXT1_BASE_Y,
@@ -563,24 +570,30 @@ class CompanionHudTests(unittest.TestCase):
                 trim = (
                     (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
                     + (COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM if total_rows >= 4 else 0.0)
+                    + (COMPANION_AFK_R59_FOUR_ROW_BLUE_BOTTOM_TRIM if total_rows >= 4 else 0.0)
                 )
                 self.assertEqual(COMPANION_AFK_BLUE_BASE_HEIGHT + delta - trim, layout.blue_height)
                 self.assertEqual(3.0, layout.green_height - layout.green_pivot_y)
-                self.assertEqual(
-                    COMPANION_AFK_TEXT1_BASE_Y - delta,
-                    layout.text1_y,
+                green_top_y = COMPANION_AFK_ANCHOR_Y - layout.green_pivot_y
+                native_inset = COMPANION_AFK_TEXT1_BASE_Y - (
+                    COMPANION_AFK_ANCHOR_Y - COMPANION_AFK_GREEN_BASE_PIVOT_Y
                 )
+                extra_inset = COMPANION_AFK_R59_FOUR_ROW_TEXT_TOP_PADDING if total_rows >= 4 else 0.0
+                self.assertEqual(green_top_y + native_inset + extra_inset, layout.text1_y)
+                # The text remains attached to the GREEN frame, regardless of
+                # the independent blue height or AFK-specific placement.
+                self.assertEqual(native_inset + extra_inset, layout.text1_y - green_top_y)
                 if layout.line2_rows:
                     last_row_y = layout.text2_y + COMPANION_AFK_LINE_STEP * (len(layout.line2_rows) - 1)
                 else:
                     last_row_y = layout.text1_y + COMPANION_AFK_LINE_STEP * (len(layout.line1_rows) - 1)
-                self.assertLessEqual(last_row_y, COMPANION_AFK_TEXT2_BASE_Y)
+                self.assertLessEqual(last_row_y, COMPANION_AFK_TEXT2_BASE_Y + extra_inset)
                 if total_rows >= 2:
                     # The r53 32px *bubble* budget is deliberately retained,
                     # but the second text object's internal glyph rows should
                     # not receive the same 32px spacing twice.
                     self.assertEqual(
-                        COMPANION_AFK_TEXT2_BASE_Y
+                        COMPANION_AFK_TEXT2_BASE_Y + extra_inset
                         - COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION
                         * max(0, len(layout.line2_rows) - 1)
                         - COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION
@@ -619,11 +632,11 @@ class CompanionHudTests(unittest.TestCase):
         long_afk = COMPANION_AFK_LAYOUTS[487]
         self.assertEqual(("Ruins and people", "both"), long_afk.line1_rows)
         self.assertEqual(("grow richer with", "age."), long_afk.line2_rows)
-        self.assertEqual(214.0, long_afk.text1_y)
-        self.assertEqual(251.0, long_afk.text2_y)
+        self.assertEqual(220.0, long_afk.text1_y)
+        self.assertEqual(257.0, long_afk.text2_y)
         self.assertEqual(144.0, long_afk.green_height)
-        self.assertEqual(108.0, long_afk.blue_height)
-        self.assertEqual(269.0, long_afk.text2_y + COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION)
+        self.assertEqual(105.0, long_afk.blue_height)
+        self.assertEqual(275.0, long_afk.text2_y + COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION)
         short_afk = COMPANION_AFK_LAYOUTS[480]
         self.assertEqual(("Come now, this", "way."), short_afk.line1_rows)
         self.assertEqual(56.0, short_afk.blue_height)
@@ -635,6 +648,36 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(("X" * 16, "X" * 16, "X" * 8), wrap_companion_afk_text("X" * 40))
         self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
+
+    def test_r59_action_uses_actual_native_0x78_blue_resource(self) -> None:
+        # Original H_TalkBuddyTask actually constructs resource 0x78 at
+        # VA0x1666D8, task+0x2E0, sharing the 0x178(sp) XY of the green bubble.
+        # r53-r58 exclusively targeted 0x6A (AFK) and left this frame metadata
+        # unchanged, explaining the unchanged displaced lower L1 panel.
+        resource_record = 0x380AF0 + 8 * COMPANION_ACTION_R59_BLUE_RESOURCE_ID
+        va, count = struct.unpack_from('<II', RAW, resource_record)
+        self.assertEqual((COMPANION_ACTION_R59_BLUE_METADATA_VA, 3), (va,count))
+        native_off = va - _ELF_MAIN_VADDR + _ELF_MAIN_FILE_OFFSET
+        self.assertEqual(COMPANION_ACTION_R59_BLUE_PRISTINE,
+                         struct.unpack_from('<4f', RAW, native_off + 4))
+        for frame in range(3):
+            self.assertEqual(152.0, struct.unpack_from('<f', RAW, native_off + 4 + frame * COMPANION_ACTION_R59_BLUE_FRAME_STRIDE)[0])
+        # Group2/0x78 is created at the same coordinates as the green sprite.
+        result = build_early_ui_elf(RAW)
+        _type, p_offset, p_va, _paddr, _size, _mem, _flags, _align = struct.unpack_from('<8I', result, 0x54)
+        action_hook = struct.unpack_from('<I', result, 0x66724)[0]
+        hook_va = (action_hook & 0x03FFFFFF) << 2
+        hook_words = struct.unpack_from('<47I', result, p_offset + hook_va - p_va)
+        ext_va = (hook_words[-5] & 0x03FFFFFF) << 2
+        ext_off = p_offset + ext_va - p_va
+        ext_words = struct.unpack_from('<34I', result, ext_off)
+        self.assertEqual(0x25EF13F4, ext_words[14])
+        self.assertNotIn(0x25EF0B24, ext_words)
+        self.assertEqual((0xADEC0000,0xADEC0030,0xADEC0060), ext_words[16:19])
+        tampered = bytearray(result)
+        tampered[ext_off+14*4] ^= 1
+        check = next(c for c in verify_startup_elf(bytes(tampered)) if c['name']=='companion_hud_layout')
+        self.assertFalse(check['ok'])
 
     def test_r58_native_blue_compositor_placement_and_afk_restore(self) -> None:
         # Native global 0x6A X/Y placement records are written from the L1
@@ -850,7 +893,7 @@ class CompanionHudTests(unittest.TestCase):
                 0x3C0E4360, 0xADEE0000,       # green width 224
                 0x3C0E4250, 0x11A00002, 0x00000000,
                 0x3C0E42C2, 0xADEE0008,       # green pivot-X 52 / 97
-                0x3C0F0045, 0x25EF0B24,       # blue frame0 geometry
+                0x3C0F0045, 0x25EF13F4,       # blue frame0 geometry
                 0x3C0C4360,
                 0xADEC0000, 0xADEC0030, 0xADEC0060,  # blue width 224
                 0xADEA0004, 0xADEA0034, 0xADEA0064,  # blue height = action

@@ -90,6 +90,13 @@ from tools.companion_hud import (
     COMPANION_AFK_BLUE_BASE_HEIGHT,
     COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM,
     COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM,
+    COMPANION_AFK_R59_FOUR_ROW_BLUE_BOTTOM_TRIM,
+    COMPANION_AFK_R59_FOUR_ROW_TEXT_TOP_PADDING,
+    COMPANION_AFK_ANCHOR_Y,
+    COMPANION_ACTION_R59_BLUE_RESOURCE_ID,
+    COMPANION_ACTION_R59_BLUE_METADATA_VA,
+    COMPANION_ACTION_R59_BLUE_FRAME_STRIDE,
+    COMPANION_ACTION_R59_BLUE_PRISTINE,
     COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION,
     COMPANION_AFK_BLUE_BASE_PIVOT_Y,
     COMPANION_AFK_TEXT1_BASE_Y,
@@ -614,7 +621,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         0x3C0E4360, 0xADEE0000,
         0x3C0E4250, 0x11A00002, 0x00000000,
         0x3C0E42C2, 0xADEE0008,
-        0x3C0F0045, 0x25EF0B24, 0x3C0C4360,
+        0x3C0F0045, 0x25EF13F4, 0x3C0C4360,
         0xADEC0000, 0xADEC0030, 0xADEC0060,
         0xADEA0004, 0xADEA0034, 0xADEA0064,
         0xADEE0008, 0xADEE0038, 0xADEE0068,
@@ -942,8 +949,14 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
                 COMPANION_AFK_BLUE_BASE_HEIGHT + delta
                 - (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
                 - (COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM if total_rows >= 4 else 0.0)
+                - (COMPANION_AFK_R59_FOUR_ROW_BLUE_BOTTOM_TRIM if total_rows >= 4 else 0.0)
             )
-            or layout.text1_y != COMPANION_AFK_TEXT1_BASE_Y - delta
+            or layout.text1_y != (
+                COMPANION_AFK_ANCHOR_Y - layout.green_pivot_y
+                + COMPANION_AFK_TEXT1_BASE_Y
+                - (COMPANION_AFK_ANCHOR_Y - COMPANION_AFK_GREEN_BASE_PIVOT_Y)
+                + (COMPANION_AFK_R59_FOUR_ROW_TEXT_TOP_PADDING if total_rows >= 4 else 0.0)
+            )
             or layout.text2_y != (
                 layout.text1_y
                 + COMPANION_AFK_LINE_STEP * len(layout.line1_rows)
@@ -965,6 +978,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
                     COMPANION_AFK_BLUE_BASE_HEIGHT - base
                     - (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
                     - (COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM if total_rows >= 4 else 0.0)
+                    - (COMPANION_AFK_R59_FOUR_ROW_BLUE_BOTTOM_TRIM if total_rows >= 4 else 0.0)
                 )
             ):
                 return False

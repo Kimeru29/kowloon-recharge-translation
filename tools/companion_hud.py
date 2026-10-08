@@ -153,6 +153,13 @@ COMPANION_AFK_R50_GEOMETRY_HOOK_KEY = "companion_afk_r50_geometry_hook"
 COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE = 212
 COMPANION_ACTION_R50_PANEL_EXTENSION_KEY = "companion_action_r50_panel_extension"
 COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE = 136
+# r59: 0x78 (task+0x2E0) is the ACTUAL native L1 blue background.
+# r53-r58 erroneously manipulated the AFK-only resource 0x6A.
+COMPANION_ACTION_R59_BLUE_RESOURCE_ID = 0x78
+COMPANION_ACTION_R59_BLUE_METADATA_VA = 0x004513F0
+COMPANION_ACTION_R59_BLUE_FRAME_STRIDE = 0x30
+COMPANION_ACTION_R59_BLUE_PRISTINE = (152.0, 32.0, -6.0, -1.0)
+
 # r52 replaces both r51 runtime hooks with one AFK-only constructor fix.
 
 # r53: L1 blue object uses the existing unused task+0x2F4 sprite slot,
@@ -217,6 +224,10 @@ COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM = 6.0
 COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION = 9.0
 # r57: only the observed >=4-row overflow needs further blue bottom reduction.
 COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM = 6.0
+# r59: keep extra glyph padding attached to the outer GREEN border only.
+COMPANION_AFK_R59_FOUR_ROW_BLUE_BOTTOM_TRIM = 3.0
+COMPANION_AFK_R59_FOUR_ROW_TEXT_TOP_PADDING = 6.0
+
 COMPANION_AFK_GREEN_BASE_HEIGHT = 80.0
 COMPANION_AFK_GREEN_BASE_PIVOT_Y = 77.0
 COMPANION_AFK_BLUE_BASE_HEIGHT = 56.0
@@ -514,8 +525,21 @@ def companion_afk_layout(lines: tuple[str, str]) -> CompanionAfkLayout:
     blue_bottom_trim = (
         (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
         + (COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM if total_rows >= 4 else 0.0)
+        + (COMPANION_AFK_R59_FOUR_ROW_BLUE_BOTTOM_TRIM if total_rows >= 4 else 0.0)
     )
-    text1_y = COMPANION_AFK_TEXT1_BASE_Y - extra_height
+    # Anchor glyphs to the GREEN bubble's top, never to the variable blue
+    # panel. The original native two-row top margin is 9 game units; 4+ rows
+    # need 6 extra units to preserve visibly comfortable glyph clearance.
+    green_pivot_y = COMPANION_AFK_GREEN_BASE_PIVOT_Y + extra_height
+    green_top_y = COMPANION_AFK_ANCHOR_Y - green_pivot_y
+    base_text_inset = (
+        COMPANION_AFK_TEXT1_BASE_Y
+        - (COMPANION_AFK_ANCHOR_Y - COMPANION_AFK_GREEN_BASE_PIVOT_Y)
+    )
+    text1_y = (
+        green_top_y + base_text_inset
+        + (COMPANION_AFK_R59_FOUR_ROW_TEXT_TOP_PADDING if total_rows >= 4 else 0.0)
+    )
     # The first and second native text objects are independent, and embedded
     # newlines advance at ~18 game units on the tested four-row AFK callout.
     # r50's 32-unit conservative BUBBLE budget remains unchanged, but applying
@@ -915,7 +939,7 @@ def _action_r50_panel_extension_bytes(*, placement_va: int) -> bytes:
         _mips_i(0x0F, 0, 14, 0x42C2),       # slot1 pivot-X 97
         _mips_i(0x2B, 15, 14, 8),           # green pivot-X
         _mips_i(0x0F, 0, 15, 0x0045),
-        _mips_i(0x09, 15, 15, 0x0B24),      # blue frame0 width
+        _mips_i(0x09, 15, 15, 0x13F4),      # REAL L1 blue 0x78 frame0 width
         _mips_i(0x0F, 0, 12, 0x4360),       # 224.0
         _mips_i(0x2B, 15, 12, 0x00),
         _mips_i(0x2B, 15, 12, 0x30),
