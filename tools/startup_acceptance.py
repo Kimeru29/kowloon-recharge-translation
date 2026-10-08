@@ -89,6 +89,7 @@ from tools.companion_hud import (
     COMPANION_AFK_GREEN_BASE_PIVOT_Y,
     COMPANION_AFK_BLUE_BASE_HEIGHT,
     COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM,
+    COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM,
     COMPANION_AFK_R56_SECOND_OBJECT_GAP_CORRECTION,
     COMPANION_AFK_BLUE_BASE_PIVOT_Y,
     COMPANION_AFK_TEXT1_BASE_Y,
@@ -888,6 +889,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             or layout.blue_height != (
                 COMPANION_AFK_BLUE_BASE_HEIGHT + delta
                 - (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
+                - (COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM if total_rows >= 4 else 0.0)
             )
             or layout.text1_y != COMPANION_AFK_TEXT1_BASE_Y - delta
             or layout.text2_y != (
@@ -910,6 +912,7 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
                 or layout.blue_height - pivot != (
                     COMPANION_AFK_BLUE_BASE_HEIGHT - base
                     - (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
+                    - (COMPANION_AFK_R57_FOUR_ROW_EXTRA_BOTTOM_TRIM if total_rows >= 4 else 0.0)
                 )
             ):
                 return False
