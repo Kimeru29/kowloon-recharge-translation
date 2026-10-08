@@ -204,6 +204,8 @@ COMPANION_AFK_WRAP_CELLS = 16
 # advance. r50 sizes every row with that renderer-owned step.
 COMPANION_AFK_LINE_STEP = 32.0
 COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION = 18.0
+# r55: conservative 3px bottom-only trim on blue for >2-row callouts.
+COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM = 3.0
 COMPANION_AFK_GREEN_BASE_HEIGHT = 80.0
 COMPANION_AFK_GREEN_BASE_PIVOT_Y = 77.0
 COMPANION_AFK_BLUE_BASE_HEIGHT = 56.0
@@ -498,6 +500,7 @@ def companion_afk_layout(lines: tuple[str, str]) -> CompanionAfkLayout:
 
     total_rows = len(line1_rows) + len(line2_rows)
     extra_height = COMPANION_AFK_LINE_STEP * max(0, total_rows - 2)
+    blue_bottom_trim = COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0
     text1_y = COMPANION_AFK_TEXT1_BASE_Y - extra_height
     # The first and second native text objects are independent, and embedded
     # newlines advance at ~18 game units on the tested four-row AFK callout.
@@ -514,7 +517,7 @@ def companion_afk_layout(lines: tuple[str, str]) -> CompanionAfkLayout:
         line2_rows=line2_rows,
         green_height=COMPANION_AFK_GREEN_BASE_HEIGHT + extra_height,
         green_pivot_y=COMPANION_AFK_GREEN_BASE_PIVOT_Y + extra_height,
-        blue_height=COMPANION_AFK_BLUE_BASE_HEIGHT + extra_height,
+        blue_height=COMPANION_AFK_BLUE_BASE_HEIGHT + extra_height - blue_bottom_trim,
         blue_pivot_y=tuple(
             value + extra_height for value in COMPANION_AFK_BLUE_BASE_PIVOT_Y
         ),
@@ -967,88 +970,57 @@ def _afk_r52_pretext_hook_bytes(*, table_va: int) -> bytes:
 
 
 def _action_r53_blue_create_bytes() -> bytes:
-    """One L1 blue: match live green position, hide stale AFK blue sibling.
+    """Reposition the sole *native* 0x6A sprite at the live action green.
 
-    Both sprite constructors initially use stack+0x178. Crucially, this alone
-    failed visually in r53. The native resource owner at 0x107F88-0x107F94
-    stores the actual post-construction sprite X/Y at +0x3C/+0x40, so copy
-    those fields from the ALREADY-CREATED L1 green +0x2D8 sprite. The older
-    AFK 0x6A at task+0x5C is separately created and left at its old anchor;
-    zero its four vertex-alpha bytes during L1 and let AFK rebuild it during
-    the subsequent native AFK lifecycle. Never allocate a SECOND blue object.
+    The original task+0x5C sprite is already animated and owns its lifetime.
+    r53/r54 created an extra 0x6A at +0x2F4, producing duplicate blue panels.
+    Do not allocate anything. Copy the existing green sprite's constructed
+    position and give the native blue the established 242.5 depth. Keep this
+    156-byte slot for relocation stability and patch only original owned code.
     """
     words = (
-        _mips_i(0x37, 29, 6, 0x0178),       # ld a2,0x178(sp): native caller XY
-        _mips_i(0x09, 29, 29, -16),
-        _mips_i(0x2B, 29, 31, 12),
-        _mips_i(0x0F, 0, 2, 0x4372),        # 242.5 behind green 243
-        _mips_i(0x0D, 2, 2, 0x8000),
-        _mips_mtc1(2, 12),
-        _mips_i(0x09, 0, 4, 2),
-        _mips_i(0x09, 0, 5, 0x006A),
-        _mips_r(0, 0, 7, 0, 0x21),
-        _jal_word(0x00107D60),
+        _mips_i(0x23, 16, 12, 0x005C),  # lw t4,0x5C(s0): native blue instance
+        _mips_i(0x04, 12, 0, 11),      # beq t4,zero,displaced next-resource setup
+        0,                             # delay
+        _mips_i(0x23, 16, 13, 0x02D8), # lw t5,green bubble
+        _mips_i(0x04, 13, 0, 8),       # beq t5,zero,displaced next-resource setup
         0,
-        _mips_i(0x2B, 16, 2, COMPANION_ACTION_R53_BLUE_OFFSET),
-        _mips_i(0x23, 16, 12, COMPANION_ACTION_R53_BLUE_OFFSET), # t4=new L1 blue
-        _mips_i(0x04, 12, 0, 19),          # no sprite -> preserve old
-        0,
-        _mips_i(0x28, 12, 0, 0x23),        # four initially hidden vertices
-        _mips_i(0x28, 12, 0, 0x27),
-        _mips_i(0x28, 12, 0, 0x2B),
-        _mips_i(0x28, 12, 0, 0x2F),
-        _mips_i(0x23, 16, 13, 0x02D8),   # t5=green live object
-        _mips_i(0x04, 13, 0, 5),          # no green -> preserve copied XY
-        0,
-        _mips_i(0x31, 13, 0, 0x003C),    # lwc1 f0,green actual X
-        _mips_i(0x39, 12, 0, 0x003C),    # swc1 f0,blue actual X
-        _mips_i(0x31, 13, 1, 0x0040),    # lwc1 f1,green actual Y
-        _mips_i(0x39, 12, 1, 0x0040),    # swc1 f1,blue actual Y
-        _mips_i(0x23, 16, 13, 0x005C),   # t5=stale AFK blue at lower anchor
-        _mips_i(0x04, 13, 0, 5),          # only hide old AFK sprite if present
-        0,
-        _mips_i(0x28, 13, 0, 0x23),        # r54 suppress redundant lower panel
-        _mips_i(0x28, 13, 0, 0x27),
-        _mips_i(0x28, 13, 0, 0x2B),
-        _mips_i(0x28, 13, 0, 0x2F),
-        _mips_i(0x23, 29, 31, 12),       # return / native next resource setup
-        _mips_i(0x09, 29, 29, 16),
-        _mips_i(0x0F, 0, 2, 0x4371),
-        _mips_mtc1(2, 12),
+        _mips_i(0x23, 13, 14, 0x003C), # green X
+        _mips_i(0x2B, 12, 14, 0x003C), # native blue X
+        _mips_i(0x23, 13, 14, 0x0040), # green Y
+        _mips_i(0x2B, 12, 14, 0x0040), # native blue Y
+        _mips_i(0x0F, 0, 14, 0x4372),  # float 242.5 high
+        _mips_i(0x0D, 14, 14, 0x8000),
+        _mips_i(0x2B, 12, 14, 0x0068), # blue Z in speech layer
+        _mips_i(0x0F, 0, 2, 0x4371),   # displaced next-resource constant
+        _mips_mtc1(2, 12),             # displaced original mtc1 v0,f12
         _mips_r(31, 0, 0, 0, 0x08),
         0,
     )
+    words += (0,) * ((COMPANION_ACTION_R53_BLUE_CREATE_SIZE // 4) - len(words))
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_R53_BLUE_CREATE_SIZE:
-        raise AssertionError(f"L1 r54 single-blue constructor size drift: {len(code)}")
+        raise AssertionError("r55 native-blue reuse helper size drift")
     return code
 
 
 def _action_r53_blue_alpha_bytes(*, visible: bool) -> bytes:
-    """Mirror L1 green alpha to its sole blue, keep old AFK blue hidden.
-
-    The native AFK 0x6A may be animated independently while a normal action
-    is visible. Suppress its per-vertex alpha on EACH green show/hide pass, not
-    only at new-blue creation, avoiding the two-window r53 regression.
-    """
+    """Synchronize original green vertex opacity to the ONE native blue."""
     source = 5 if visible else 0
     words = (
-        _mips_i(0x28, 2, source, 0x23),       # displaced green sb
-        _mips_i(0x23, 16, 12, COMPANION_ACTION_R53_BLUE_OFFSET), # new sibling
-        _mips_i(0x04, 12, 0, 3),            # skip mirroring if absent
-        _mips_r(0, 3, 13, 2, 0x00),         # t5 = frame*4; delay slot
+        _mips_i(0x28, 2, source, 0x23),  # original green sb
+        _mips_i(0x23, 16, 12, 0x005C), # native blue sprite
+        _mips_i(0x04, 12, 0, 3),
+        _mips_r(0, 3, 13, 2, 0x00),   # delay: frame index *4
         _mips_r(12, 13, 12, 0, 0x21),
-        _mips_i(0x28, 12, source, 0x23),   # mirror native green alpha
-        _mips_i(0x23, 16, 14, 0x005C),     # existing AFK 0x6A sprite
-        _mips_i(0x04, 14, 0, 2),           # skip if absent
-        _mips_r(14, 13, 14, 0, 0x21),       # old AFK frame*4
-        _mips_i(0x28, 14, 0, 0x23),        # old native blue alpha always zero
+        _mips_i(0x28, 12, source, 0x23),
         _mips_r(31, 0, 0, 0, 0x08),
         0,
     )
+    words += (0,) * ((COMPANION_ACTION_R53_ALPHA_HOOK_SIZE // 4) - len(words))
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_R53_ALPHA_HOOK_SIZE:
-        raise AssertionError(f"L1 r54 single-blue alpha hook size drift: {len(code)}")
+        raise AssertionError("r55 native-blue reuse alpha hook size drift")
     return code
 
 
@@ -1742,11 +1714,9 @@ def finalize_companion_action_runtime_layout(
     struct.pack_into("<I", result, 0x66250, _jal_word(afk_r52_pretext_hook_va))
     struct.pack_into("<I", result, 0x66320, _jal_word(afk_r52_pretext_hook_va))
 
-    # r53 blue is a sibling L1 object, not a permanent independent overlay.
-    # Both cleanup paths must use the sprite destructor, and all three native
-    # vertex-alpha animation loops must update it whenever green changes.
-    for site in (0x66668, 0x66DD4):
-        struct.pack_into("<I", result, site, _jal_word(0x00108650))
+    # r55 reuses the native AFK 0x6A sprite during L1 actions. Never allocate
+    # a duplicate at +0x2F4, and restore the pristine +0x2F4 text destructor.
+    # The original +0x5C native sprite is owned/cleaned by the AFK task.
     struct.pack_into("<I", result, 0x66740, _jal_word(blue_create_va))
     struct.pack_into("<I", result, 0x66744, 0x3C024371)
     struct.pack_into("<I", result, COMPANION_ACTION_R53_SHOW_SITE, _jal_word(blue_show_va))

@@ -64,6 +64,7 @@ from tools.companion_hud import (
     COMPANION_AFK_GREEN_BASE_HEIGHT,
     COMPANION_AFK_GREEN_BASE_PIVOT_Y,
     COMPANION_AFK_BLUE_BASE_HEIGHT,
+    COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM,
     COMPANION_AFK_BLUE_BASE_PIVOT_Y,
     COMPANION_AFK_TEXT1_BASE_Y,
     COMPANION_AFK_TEXT2_BASE_Y,
@@ -552,7 +553,8 @@ class CompanionHudTests(unittest.TestCase):
                 self.assertTrue(all(1 <= len(row) <= COMPANION_AFK_WRAP_CELLS for row in rows))
                 self.assertEqual(COMPANION_AFK_GREEN_BASE_HEIGHT + delta, layout.green_height)
                 self.assertEqual(COMPANION_AFK_GREEN_BASE_PIVOT_Y + delta, layout.green_pivot_y)
-                self.assertEqual(COMPANION_AFK_BLUE_BASE_HEIGHT + delta, layout.blue_height)
+                trim = COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0
+                self.assertEqual(COMPANION_AFK_BLUE_BASE_HEIGHT + delta - trim, layout.blue_height)
                 self.assertEqual(3.0, layout.green_height - layout.green_pivot_y)
                 self.assertEqual(
                     COMPANION_AFK_TEXT1_BASE_Y - delta,
@@ -582,7 +584,7 @@ class CompanionHudTests(unittest.TestCase):
                 )
                 for base, pivot in zip(COMPANION_AFK_BLUE_BASE_PIVOT_Y, layout.blue_pivot_y, strict=True):
                     self.assertEqual(base + delta, pivot)
-                    self.assertEqual(COMPANION_AFK_BLUE_BASE_HEIGHT - base, layout.blue_height - pivot)
+                    self.assertEqual(COMPANION_AFK_BLUE_BASE_HEIGHT - base - trim, layout.blue_height - pivot)
 
                 for source in source_lines:
                     if not source:
@@ -604,10 +606,11 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(214.0, long_afk.text1_y)
         self.assertEqual(260.0, long_afk.text2_y)
         self.assertEqual(144.0, long_afk.green_height)
-        self.assertEqual(120.0, long_afk.blue_height)
+        self.assertEqual(117.0, long_afk.blue_height)
         self.assertEqual(278.0, long_afk.text2_y + COMPANION_AFK_R54_SECOND_OBJECT_ROW_CORRECTION)
         short_afk = COMPANION_AFK_LAYOUTS[480]
         self.assertEqual(("Come now, this", "way."), short_afk.line1_rows)
+        self.assertEqual(56.0, short_afk.blue_height)
         self.assertEqual(278.0, short_afk.text1_y)
         self.assertFalse(short_afk.line2_rows)
 
@@ -637,41 +640,45 @@ class CompanionHudTests(unittest.TestCase):
                 self.assertNotIn(rt, (8, 9, 10, 11))
             if opcode == 0 and (word & 0x3F) in (0x00, 0x21):
                 self.assertNotIn(rd, (8, 9, 10, 11))
-        # New L1 blue = one constructor (jal 0x107D60), aligned to the
-        # constructed green sprite via the real +0x3C/+0x40 XY fields; native
-        # AFK blue at +0x5C is hidden instead of drawn as a second rectangle.
+        # r55 does not allocate a second blue resource. The green +0x2D8
+        # sprite supplies its already-constructed world XY to the existing
+        # native blue +0x5C; no task+0x2F4 sprite is created.
         new_jal = struct.unpack_from("<I", result, 0x66740)[0]
         new_va = (new_jal & 0x03FFFFFF) << 2
         create_offset = p_offset + new_va - p_vaddr
         create_words = struct.unpack_from("<39I", result, create_offset)
-        self.assertEqual(1, create_words.count(0x0C041F58))  # sole new blue resource
-        self.assertEqual(0x8E0D02D8, create_words[19])  # real green instance
-        self.assertEqual(0xC5A0003C, create_words[22])  # live green X
-        self.assertEqual(0xE580003C, create_words[23])  # write new blue X
-        self.assertEqual(0xC5A10040, create_words[24])  # live green Y
-        self.assertEqual(0xE5810040, create_words[25])  # write new blue Y
-        self.assertEqual(0x8E0D005C, create_words[26])  # old AFK blue
-        self.assertEqual((0xA1A00023, 0xA1A00027, 0xA1A0002B, 0xA1A0002F), create_words[29:33])
+        self.assertNotIn(0x0C041F58, create_words)   # no jal native constructor
+        self.assertEqual(0x8E0C005C, create_words[0])  # reuse AFK blue
+        self.assertEqual(0x8E0D02D8, create_words[3])  # green live instance
+        self.assertEqual(0x8DAE003C, create_words[6])  # green actual X
+        self.assertEqual(0xAD8E003C, create_words[7])  # native blue X
+        self.assertEqual(0x8DAE0040, create_words[8])  # green actual Y
+        self.assertEqual(0xAD8E0040, create_words[9])  # native blue Y
+        self.assertEqual(0xAD8E0068, create_words[12]) # native blue depth
+        self.assertEqual(0x3C024371, create_words[13]) # caller f12 preserved
+        self.assertEqual(0x44826000, create_words[14])
+        self.assertEqual(0x1180000B, create_words[1])  # null native blue
+        self.assertEqual(0x11A00008, create_words[4])  # null green
         for alpha_site in (0x65A88, 0x65B40, 0x65C5C):
             jal = struct.unpack_from("<I", result, alpha_site)[0]
             va = (jal & 0x03FFFFFF) << 2
             words = struct.unpack_from("<12I", result, p_offset + va - p_vaddr)
-            self.assertEqual(0x8E0E005C, words[6])  # suppress old blue
-            self.assertEqual(0xA1C00023, words[9])  # alpha=0 per vertex
+            self.assertEqual(0x8E0C005C, words[1])  # only existing native blue
+            self.assertEqual(words[0] & 0xFFFF, words[5] & 0xFFFF)
+            self.assertEqual(0xA1850023 if alpha_site == 0x65A88 else 0xA1800023, words[5])
         for off in (0x66668, 0x66DD4):
-            self.assertEqual(0x0C042194, struct.unpack_from("<I", result, off)[0])
+            self.assertEqual(0x0C06850C, struct.unpack_from("<I", result, off)[0])
         for owner, offset in (
             ("AFK Y spill", helper_file + 72),
             ("AFK preserved register", helper_file + 4),
             ("AFK constructor owner", 0x66250),
             ("L1 blue creation", 0x66740),
-            ("L1 live green XY", create_offset + 22 * 4),
-            ("L1 native AFK blue suppression", create_offset + 29 * 4),
-            ("L1 old blue alpha synchronization", create_offset + 26 * 4),
+            ("L1 live green XY", create_offset + 6 * 4),
+            ("L1 live green Y", create_offset + 8 * 4),
+            ("L1 native blue depth", create_offset + 12 * 4),
             ("L1 visibility show", 0x65A88),
             ("L1 visibility hide", 0x65B40),
             ("L1 fade hide", 0x65C5C),
-            ("L1 second destructor", 0x66DD4),
         ):
             with self.subTest(owner=owner):
                 tampered = bytearray(result)
