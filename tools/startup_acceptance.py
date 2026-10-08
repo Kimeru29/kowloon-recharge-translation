@@ -114,6 +114,10 @@ from tools.companion_hud import (
     COMPANION_ACTION_R60_PRECONSTRUCT_SIZE,
     COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA,
     _action_r60_preconstruct_bytes,
+    COMPANION_ACTION_R61_LIVE_OFFSET_SIZE,
+    COMPANION_ACTION_R61_BLUE_SHIFT_X,
+    COMPANION_ACTION_R61_BLUE_SHIFT_Y,
+    _action_r61_live_blue_xy_bytes,
     COMPANION_ACTION_R58_POSITION_SIZE,
     COMPANION_AFK_R58_RESTORE_SIZE,
     COMPANION_ACTION_R58_PLACEMENT_X_VA,
@@ -957,9 +961,22 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         or struct.unpack_from("<I", raw, afk_geometry_file + COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE - 4)[0] != 0
     ):
         return False
+    placement_file = p_offset + action_placement_va - p_vaddr
+    placement_tail = struct.unpack_from("<I", raw, placement_file + 13*4)[0]
+    if placement_tail >> 26 != 2 or struct.unpack_from("<I",raw,placement_file+14*4)[0] != 0:
+        return False
+    live_va = resolve_j(placement_tail)
+    if (
+        live_va < p_vaddr
+        or live_va + COMPANION_ACTION_R61_LIVE_OFFSET_SIZE > p_vaddr+p_filesz
+        or COMPANION_ACTION_R61_BLUE_SHIFT_X != -2.0
+        or COMPANION_ACTION_R61_BLUE_SHIFT_Y != 1.0
+    ):
+        return False
     for va, expected in (
         (afk_restore_va, _afk_r58_restore_placement_bytes()),
-        (action_placement_va, _action_r58_blue_placement_bytes()),
+        (action_placement_va, _action_r58_blue_placement_bytes(tail_va=live_va)),
+        (live_va, _action_r61_live_blue_xy_bytes()),
     ):
         off = p_offset + va - p_vaddr
         if raw[off:off + len(expected)] != expected:

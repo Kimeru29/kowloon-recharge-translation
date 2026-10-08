@@ -85,6 +85,10 @@ from tools.companion_hud import (
     COMPANION_ACTION_R60_PRECONSTRUCT_SIZE,
     COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA,
     _action_r60_preconstruct_bytes,
+    COMPANION_ACTION_R61_LIVE_OFFSET_SIZE,
+    COMPANION_ACTION_R61_BLUE_SHIFT_X,
+    COMPANION_ACTION_R61_BLUE_SHIFT_Y,
+    _action_r61_live_blue_xy_bytes,
     COMPANION_ACTION_R58_POSITION_SIZE,
     COMPANION_AFK_R58_RESTORE_SIZE,
     COMPANION_ACTION_R58_PLACEMENT_X_VA,
@@ -653,6 +657,46 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
 
+    def test_r61_l1_id78_subpixel_alignment_does_not_touch_afk(self) -> None:
+        elf=build_early_ui_elf(RAW)
+        _,off,va,_,_,_,_,_=struct.unpack_from("<8I",elf,0x54)
+        call=struct.unpack_from("<I",elf,0x66724)[0]
+        self.assertEqual(3,call>>26)
+        action=off+((call&0x03FFFFFF)<<2)-va
+        aw=struct.unpack_from("<47I",elf,action)
+        tails=[w for w in aw if w>>26==2]
+        self.assertEqual(1,len(tails))
+        ext=off+((tails[0]&0x03FFFFFF)<<2)-va
+        extw=struct.unpack_from("<34I",elf,ext)
+        self.assertEqual(2,extw[-3]>>26)
+        placement=off+((extw[-3]&0x03FFFFFF)<<2)-va
+        jw=struct.unpack_from("<I",elf,placement+13*4)[0]
+        self.assertEqual(2,jw>>26)
+        live=off+((jw&0x03FFFFFF)<<2)-va
+        words=struct.unpack_from("<24I",elf,live)
+        self.assertEqual(-2.0,COMPANION_ACTION_R61_BLUE_SHIFT_X)
+        self.assertEqual(1.0,COMPANION_ACTION_R61_BLUE_SHIFT_Y)
+        self.assertEqual(0x8E0C02D8, words[0])   # green native object
+        self.assertEqual(0x8E0E02E0, words[1])   # real L1 id0x78
+        self.assertEqual((0x11800013,0,0x11C00011,0),words[2:6]) # null-safe
+        self.assertEqual(0xE7A00000,words[7])   # save native f0
+        self.assertEqual(0xE7A20004,words[8])   # save native f2
+        self.assertEqual(0x3C0F4000,words[10])  # subtract 2.0f
+        self.assertEqual(0x46020001,words[12])  # sub.s
+        self.assertEqual(0xE5C0003C,words[13])  # native blue X only
+        self.assertEqual(0x3C0F3F80,words[15])  # add 1.0f
+        self.assertEqual(0x46020000,words[17])  # add.s
+        self.assertEqual(0xE5C00040,words[18])  # native blue Y only
+        self.assertEqual((0xC7A20004,0xC7A00000,0x27BD0010),words[19:22])
+        self.assertEqual((0x03E00008,0),words[22:24])
+        for n in (0,1,2,4,7,8,10,12,13,15,17,18,19,20,22):
+            with self.subTest(tamper_word=n):
+                modified=bytearray(elf)
+                modified[live+n*4]^=1
+                check=next(x for x in verify_startup_elf(bytes(modified))
+                           if x["name"]=="companion_hud_layout")
+                self.assertFalse(check["ok"])
+
     def test_r60_l1_preconstructs_blue_geometry_before_native_0x78(self) -> None:
         elf = build_early_ui_elf(RAW)
         _, segment_offset, segment_va, _, size, _, _, _ = struct.unpack_from("<8I", elf, 0x54)
@@ -787,8 +831,18 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(0x24040002, ext_words[-4])
         self.assertEqual(2, ext_words[-3] >> 26)
         placement = p_offset + ((ext_words[-3] & 0x03FFFFFF) << 2) - p_va
-        self.assertEqual(_action_r58_blue_placement_bytes(),
-                         elf[placement:placement + COMPANION_ACTION_R58_POSITION_SIZE])
+        tail = struct.unpack_from("<I", elf, placement + 13*4)[0]
+        self.assertEqual(2, tail >> 26)
+        live_va = (tail & 0x03FFFFFF) << 2
+        live_file = p_offset + live_va - p_va
+        self.assertEqual(
+            _action_r58_blue_placement_bytes(tail_va=live_va),
+            elf[placement:placement + COMPANION_ACTION_R58_POSITION_SIZE],
+        )
+        self.assertEqual(
+            _action_r61_live_blue_xy_bytes(),
+            elf[live_file:live_file + COMPANION_ACTION_R61_LIVE_OFFSET_SIZE],
+        )
         # Exact data consumer is ELF file 0x3F8E50 (VA 0x4F8DD0),
         # consecutive slot records have 20-byte stride.
         self.assertEqual(0x004F8DD0, COMPANION_ACTION_R58_PLACEMENT_X_VA)
