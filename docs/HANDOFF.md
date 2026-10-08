@@ -512,3 +512,16 @@ Blue `0x6A` is now explicitly consumer-specific. The new 212-byte AFK helper app
 r50 is append-only relative to r49: +348 bytes exactly. The old r49 geometry/text hooks, visibility hook, historical action extension and all translated VAs remain at their previous addresses. The 600-record layout table VA is unchanged and only its vertical values are recalculated. All 999 AFK pointer words and all 999 relocated AFK text payloads are byte-identical to r49. Binary classification accounts for every changed common-prefix byte.
 
 Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r50.iso`; SHA-256 `2ec30aeb6738666a62faa643332166ebf5bd578e9729b366d706ce22f922459e`; pre/post-ROFS ELF `38001ec73c0ad2236090bf636c2e466d5ae814d166396874be72c3b6aee02e15` / `3010b80d910c96b9ad3ca439b7e151e5432bb7ebbfd460fc3bca0ad2f307c57e`. Focused suite **39/39**, both full suites **251 tests**, final-image acceptance **155/155**, deterministic repeat ISO byte-for-byte identical. Runtime proof remains pending. Do not launch PCSX2 automatically.
+
+
+### v11-r51 AFK constructor Y + real L1 blue layer
+
+r50 runtime proves its green/blue AFK geometry is correct, but AFK text still renders below the composition. The same screenshots prove the L1 path has correct green bubble/text geometry yet no blue tint at all. r51 fixes those as ownership problems rather than changing r50 geometry again.
+
+For AFK, the post-construction text-object Y write used by r49/r50 is no longer trusted. The specialized free-talk constructor already receives Y in `f13`, and the generic text constructor stores that value as object `+0x18`. r51 therefore reads the existing r50 600-record layout table **before** each `0x1950A0` call and loads line1/line2 Y into `f13`. The helper is shared by both rows, validates the Re:charge record index, and preserves the displaced native f14/f15 setup. All wrapping, translated strings, record geometry and table values are unchanged.
+
+For L1, r50's metadata-only blue fix could not render because the normal action path never constructs resource `0x6A`. r51 creates a real blue object after the green `0x68/0x69` object using the exact same packed X/Y anchor and depth 242.5 between green=243 and text=242. The handle uses task `+0x2F4`, an otherwise-unused lifecycle-owned slot. Its pristine text destructor is retyped to the resource destructor `0x108650`, so teardown matches the new object type without expanding task state.
+
+The two r51 helpers append 152 bytes total and move no r50 payload address. Direct r50->r51 audit reports only 21 changed bytes across five classified old-code ranges; the complete old r50 translation segment, all 999 AFK pointers, all translated text payloads and all r50 geometry/layout payloads are byte-identical.
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r51.iso`, SHA-256 `b5b35d4eb853571db507ab68d086f786a2b886c544997e5d9232a58d13df480f`; pre/post-ROFS ELF `24393d12330f293f7f2082694579f43893ce09927e6208eece0ac3fa0683fe0c` / `de23bbc9ee89cd72892795dea5954c464b6b20d6ef025f79ab80a26b6a5a1f31`; focused **41/41**; full suites **253 tests** each; final acceptance **155/155**; repeat ISO byte-for-byte identical. Runtime proof of final text containment and L1 blue rendering remains pending.
