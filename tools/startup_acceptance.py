@@ -88,6 +88,7 @@ from tools.companion_hud import (
     COMPANION_AFK_GREEN_BASE_HEIGHT,
     COMPANION_AFK_GREEN_BASE_PIVOT_Y,
     COMPANION_AFK_BLUE_BASE_HEIGHT,
+    COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM,
     COMPANION_AFK_BLUE_BASE_PIVOT_Y,
     COMPANION_AFK_TEXT1_BASE_Y,
     COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE,
@@ -832,9 +833,12 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     # show/hide writes at the original three native sites and destroys the
     # resource on both L1 exit paths.
     if (
-        any(struct.unpack_from("<I", raw, site)[0] != 0x0C042194
+        any(struct.unpack_from("<I", raw, site)[0] != 0x0C06850C
             for site in (0x66668, 0x66DD4))
         or struct.unpack_from("<I", raw, 0x66744)[0] != 0x3C024371
+        or 0x0C041F58 in struct.unpack_from("<39I", raw,
+            p_offset + (((struct.unpack_from("<I", raw, 0x66740)[0]
+                          & 0x03FFFFFF) << 2) - p_vaddr))
     ):
         return False
     for site, size, payload in (
@@ -875,7 +879,10 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         if (
             layout.green_height != COMPANION_AFK_GREEN_BASE_HEIGHT + delta
             or layout.green_pivot_y != COMPANION_AFK_GREEN_BASE_PIVOT_Y + delta
-            or layout.blue_height != COMPANION_AFK_BLUE_BASE_HEIGHT + delta
+            or layout.blue_height != (
+                COMPANION_AFK_BLUE_BASE_HEIGHT + delta
+                - (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
+            )
             or layout.text1_y != COMPANION_AFK_TEXT1_BASE_Y - delta
             or layout.text2_y != (
                 layout.text1_y
@@ -891,7 +898,10 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         ):
             if (
                 pivot != base + delta
-                or layout.blue_height - pivot != COMPANION_AFK_BLUE_BASE_HEIGHT - base
+                or layout.blue_height - pivot != (
+                    COMPANION_AFK_BLUE_BASE_HEIGHT - base
+                    - (COMPANION_AFK_R55_MULTILINE_BLUE_BOTTOM_TRIM if total_rows > 2 else 0.0)
+                )
             ):
                 return False
         for source in source_lines:
