@@ -268,36 +268,6 @@ class StartupAcceptanceTests(unittest.TestCase):
                 )
                 self.assertFalse(check["ok"])
 
-    def test_r51_companion_pretext_and_l1_blue_payloads_fail_closed(self) -> None:
-        translated = build_early_ui_elf(RAW)
-        _ptype, p_offset, p_vaddr, _paddr, _p_filesz, _memsz, _flags, _align = struct.unpack_from(
-            "<IIIIIIII", translated, 0x54
-        )
-        pretext_jal = struct.unpack_from("<I", translated, 0x66250)[0]
-        blue_jal = struct.unpack_from("<I", translated, 0x66740)[0]
-        pretext_file = p_offset + (((pretext_jal & 0x03FFFFFF) << 2) - p_vaddr)
-        blue_file = p_offset + (((blue_jal & 0x03FFFFFF) << 2) - p_vaddr)
-
-        for owner, offset in (
-            ("afk_pretext_call1", 0x66250),
-            ("afk_pretext_delay1", 0x66254),
-            ("afk_pretext_call2", 0x66320),
-            ("afk_pretext_delay2", 0x66324),
-            ("l1_blue_cleanup", 0x66668),
-            ("l1_blue_call", 0x66740),
-            ("l1_blue_delay", 0x66744),
-            ("afk_pretext_payload", pretext_file),
-            ("l1_blue_payload", blue_file),
-        ):
-            with self.subTest(owner=owner):
-                tampered = bytearray(translated)
-                tampered[offset] ^= 1
-                check = next(
-                    check for check in verify_startup_elf(bytes(tampered))
-                    if check["name"] == "companion_hud_layout"
-                )
-                self.assertFalse(check["ok"])
-
     def test_hant_runtime_layout_acceptance_fails_closed_on_style_or_chrome_drift(self) -> None:
         translated = build_early_ui_elf(RAW)
         cases = (

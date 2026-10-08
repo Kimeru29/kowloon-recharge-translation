@@ -732,15 +732,10 @@ The L1 extension does the inverse immediately before normal action construction.
 
 Compatibility result: r50 appends only 348 bytes and moves no prior translated VA. All 999 AFK structural pointers and all 999 relocated AFK C-string payloads are byte-identical to r49. The r49 text hook and native-newline payloads are also unchanged; r50 is geometry-only with respect to translated dialogue content. The classified r49->r50 common-prefix audit reports zero unexplained bytes.
 
+## r51 runtime rejection; r52 AFK constructor stack ownership
 
-## r51 ownership trace: constructor Y and missing L1 0x6A object
+Pablo's r51 PCSX2 screenshots show a permanent blue-tinted rectangle before and after the intended callout, with dynamic sizing and missing AFK English text. This is a confirmed runtime regression; r51's static tests were not sufficient. The independently-created L1 group-2/0x6A object was kept at task+0x2F4 and destroyed at task teardown, with no proof it shared the native green bubble's animation/visibility state. r52 restores the entire r50 L1 create/destroy path. The missing compact L1 tint remains open pending proof of the actual visibility owner.
 
-The r50 screenshots distinguish geometry from object ownership. AFK green+blue sizing/placement is visually correct, yet text remains below the bubble. L1 green/text are correct, yet no blue tint appears. This means further metadata tuning would address neither defect.
+The AFK caller computes Y in COP1 f13 and spills it with swc1 f13,0x1A4(sp) at file offsets 0x661FC and 0x662D0. r51's pre-constructor hook changed f13 but left the caller's native stack argument unchanged. r52 replaces it with an append-only 84-byte hook, called at 0x66250/0x66320, reading the unchanged per-record r50 Y from the 600-record 32-byte layout table. The same new value goes to f13 and sp+0x1A4; native f14 and f15 setup are preserved. This is a testable hypothesis, not a runtime-certified repair.
 
-AFK specialized text construction proves the authoritative vertical owner. Caller `f13` flows through `0x1950A0` into generic constructor `0x188AD0`, which stores it at text-object `+0x18`. r49/r50 instead changed `+0x18` after construction; runtime shows that write does not control final rendering. r51 hooks immediately before the two specialized constructors at file `0x66250/0x66320`, indexes the same r50 layout table, and supplies line Y through `f13`. The original `mtc1 zero,f14` semantics are reproduced inside the helper and the original 245.0 f15 materialization remains in each JAL delay slot.
-
-The normal L1 path has only one speech-layer resource construction: r37+ changes pristine group2/resource0x18 into green `0x68/0x69`. No `0x6A` construction follows. Therefore r50's compact 0x6A metadata was necessary but insufficient. r51 inserts a real resource0x6A construction immediately after green, before the next native resource setup, using the already-packed green X/Y at stack +0x178. Depth 242.5 places blue between green Z=243 and text Z=242.
-
-Task `+0x2F4` is a safe storage slot because the normal L1 path never populates it, while lifecycle cleanup already tests/clears it. Pristine cleanup calls text destructor `0x1A1430`; because r51 stores a sprite/resource object there, the single cleanup JAL is changed to resource destructor `0x108650`, matching the existing 0x107D60-created handles at +0x2D4/+0x2D8/+0x2E4.
-
-Compatibility is append-only: the two new helpers occupy exactly 80+72 bytes after all r50 payloads. No r50 translated address moves; the whole old translation segment compares byte-for-byte identical. This ownership split should be preserved in future changes: AFK text Y belongs at constructor f13, and L1 blue visibility requires an actual 0x6A object, not only metadata.
+Freeze all r50 AFK green/blue geometry, action geometry, 999 AFK structural pointers, translated text bytes, wrapping and accepted unrelated UI. Do not launch PCSX2 automatically.

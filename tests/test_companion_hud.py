@@ -35,8 +35,6 @@ from tools.companion_hud import (
     COMPANION_ACTION_RUNTIME_PREIMAGES,
     COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE,
     COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE,
-    COMPANION_ACTION_R51_BLUE_CREATE_HOOK_SIZE,
-    COMPANION_ACTION_R51_BLUE_OBJECT_OFFSET,
     COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
     COMPANION_ACTION_VISIBILITY_PREIMAGES,
     COMPANION_AFK_PANEL_FRAME_COUNT,
@@ -71,7 +69,7 @@ from tools.companion_hud import (
     COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE,
     COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
     COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE,
-    COMPANION_AFK_R51_PRETEXT_HOOK_SIZE,
+    COMPANION_AFK_R52_PRETEXT_HOOK_SIZE,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_TABLE_OFFSET,
@@ -91,6 +89,7 @@ from tools.companion_hud import (
 )
 from tools.dungeon_ui import DUNGEON_ACTION_LABELS, DUNGEON_ITEM_NAMES
 from tools.early_ui import build_early_ui_elf
+from tools.startup_acceptance import verify_startup_elf
 from tools.localization import encode_ps2_english
 
 
@@ -586,106 +585,41 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(("X" * 16, "X" * 16, "X" * 8), wrap_companion_afk_text("X" * 40))
         self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
-    def test_r51_afk_constructor_y_and_l1_blue_layer_are_runtime_owned(self) -> None:
-        result = build_early_ui_elf(RAW)
-        _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, _flags, _align = struct.unpack_from(
-            "<IIIIIIII", result, 0x54
-        )
 
-        # Runtime proved post-construction +0x18 writes were not authoritative.
-        # Both specialized AFK constructors now load record Y into f13 before
-        # 0x1950A0 while preserving the native f14/f15/alpha setup.
-        pretext_jal_1 = struct.unpack_from("<I", result, 0x66250)[0]
-        pretext_jal_2 = struct.unpack_from("<I", result, 0x66320)[0]
-        self.assertEqual(pretext_jal_1, pretext_jal_2)
-        self.assertEqual(0x03, pretext_jal_1 >> 26)
+    def test_r52_afk_stack_and_register_y_is_fail_closed_and_l1_reverted(self) -> None:
+        result = build_early_ui_elf(RAW)
+        _, p_offset, p_vaddr, _, p_filesz, _, _, _ = struct.unpack_from("<IIIIIIII", result, 0x54)
+        first = struct.unpack_from("<I", result, 0x66250)[0]
+        second = struct.unpack_from("<I", result, 0x66320)[0]
+        self.assertEqual(first, second)
+        self.assertEqual(3, first >> 26)
         self.assertEqual(0x3C024375, struct.unpack_from("<I", result, 0x66254)[0])
         self.assertEqual(0x3C024375, struct.unpack_from("<I", result, 0x66324)[0])
+        helper_va = (first & 0x03FFFFFF) << 2
+        self.assertGreaterEqual(helper_va, p_vaddr)
+        self.assertLessEqual(helper_va + COMPANION_AFK_R52_PRETEXT_HOOK_SIZE, p_vaddr + p_filesz)
+        helper_file = p_offset + helper_va - p_vaddr
+        words = struct.unpack_from(f"<{COMPANION_AFK_R52_PRETEXT_HOOK_SIZE // 4}I", result, helper_file)
+        self.assertEqual((0xC52D0018, 0x10000002, 0, 0xC52D001C, 0xE7AD01A4, 0x03E00008, 0), words[-7:])
 
-        pretext_va = (pretext_jal_1 & 0x03FFFFFF) << 2
-        self.assertGreaterEqual(pretext_va, p_vaddr)
-        self.assertLessEqual(pretext_va + COMPANION_AFK_R51_PRETEXT_HOOK_SIZE, p_vaddr + p_filesz)
-        pretext_file = p_offset + pretext_va - p_vaddr
-        pretext_words = struct.unpack_from(
-            f"<{COMPANION_AFK_R51_PRETEXT_HOOK_SIZE // 4}I",
-            result,
-            pretext_file,
-        )
-        self.assertEqual(
-            (
-                0x44807000, 0x86080004, 0x2508FDA7, 0x2D090258,
-                0x1120000D, 0x00000000, 0x00084140,
-            ),
-            pretext_words[:7],
-        )
-        self.assertEqual(0x3C090000, pretext_words[7] & 0xFFFF0000)
-        self.assertEqual(0x25290000, pretext_words[8] & 0xFFFF0000)
-        self.assertEqual(
-            (
-                0x01284821, 0x3C0A0016, 0x354A61D8, 0x17EA0004,
-                0x00000000, 0xC52D0018, 0x10000002, 0x00000000,
-                0xC52D001C, 0x03E00008, 0x00000000,
-            ),
-            pretext_words[9:],
-        )
-        hi = pretext_words[7] & 0xFFFF
-        lo = pretext_words[8] & 0xFFFF
-        if lo & 0x8000:
-            lo -= 0x10000
-        layout_table_va = ((hi << 16) + lo) & 0xFFFFFFFF
-        layout_table_file = p_offset + layout_table_va - p_vaddr
-        expected_layout_table = b"".join(
-            struct.pack(
-                "<8f",
-                layout.green_height,
-                layout.green_pivot_y,
-                layout.blue_height,
-                *layout.blue_pivot_y,
-                layout.text1_y,
-                layout.text2_y,
-            )
-            for layout in COMPANION_AFK_LAYOUTS
-        )
-        self.assertEqual(
-            expected_layout_table,
-            result[layout_table_file:layout_table_file + len(expected_layout_table)],
-        )
+        # r51's independently created sprite caused the persistent blue window.
+        # No L1 object creation/destructor patch is legal until native
+        # animation/visibility ownership is proven by runtime tests.
+        self.assertEqual(0x0C06850C, struct.unpack_from("<I", result, 0x66668)[0])
+        self.assertEqual(0x3C024371, struct.unpack_from("<I", result, 0x66740)[0])
+        self.assertEqual(0x44826000, struct.unpack_from("<I", result, 0x66744)[0])
 
-        # r50 only resized 0x6A metadata; no L1 0x6A object existed. r51 creates
-        # one at the exact green-bubble X/Y anchor and stores it in task+0x2F4.
-        # That repurposed slot is cleaned with the sprite destructor, not its
-        # pristine text-object destructor.
-        self.assertEqual(0x0C042194, struct.unpack_from("<I", result, 0x66668)[0])
-        blue_jal = struct.unpack_from("<I", result, 0x66740)[0]
-        self.assertEqual(0x03, blue_jal >> 26)
-        self.assertEqual(0x3C024371, struct.unpack_from("<I", result, 0x66744)[0])
-        self.assertEqual(0x24040002, struct.unpack_from("<I", result, 0x66748)[0])
-        blue_va = (blue_jal & 0x03FFFFFF) << 2
-        self.assertGreaterEqual(blue_va, p_vaddr)
-        self.assertLessEqual(
-            blue_va + COMPANION_ACTION_R51_BLUE_CREATE_HOOK_SIZE,
-            p_vaddr + p_filesz,
-        )
-        blue_file = p_offset + blue_va - p_vaddr
-        blue_words = struct.unpack_from(
-            f"<{COMPANION_ACTION_R51_BLUE_CREATE_HOOK_SIZE // 4}I",
-            result,
-            blue_file,
-        )
-        self.assertEqual(
-            (
-                0xDFA60178, 0x27BDFFF0, 0xAFBF000C,
-                0x3C024372, 0x34428000, 0x44826000,  # depth 242.5
-                0x24040002, 0x2405006A, 0x00003821,
-                0x0C041F58, 0x00000000,              # 0x107D60 constructor
-                0xAE0202F4,                           # task+0x2F4
-                0x8FBF000C, 0x27BD0010,
-                0x3C024371, 0x44826000,              # restore f12=241
-                0x03E00008, 0x00000000,
-            ),
-            blue_words,
-        )
-        self.assertEqual(0x02F4, COMPANION_ACTION_R51_BLUE_OBJECT_OFFSET)
+        for owner, offset in (
+            ("AFK stack argument", helper_file + 18 * 4),
+            ("AFK line2 Y", helper_file + 17 * 4),
+            ("AFK constructor hook", 0x66250),
+            ("L1 r50 construction", 0x66740),
+        ):
+            with self.subTest(owner=owner):
+                altered = bytearray(result)
+                altered[offset] ^= 1
+                check = next(c for c in verify_startup_elf(bytes(altered)) if c["name"] == "companion_hud_layout")
+                self.assertFalse(check["ok"])
 
     def test_r38_runtime_selector_keeps_body_stable_and_points_tail_at_active_slot(self) -> None:
         result = build_early_ui_elf(RAW)
