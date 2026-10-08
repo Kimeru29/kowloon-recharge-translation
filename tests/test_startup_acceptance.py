@@ -233,7 +233,7 @@ class StartupAcceptanceTests(unittest.TestCase):
                 )
                 self.assertFalse(check["ok"])
 
-    def test_r49_companion_wrap_payloads_fail_closed(self) -> None:
+    def test_r50_companion_wrap_and_panel_payloads_fail_closed(self) -> None:
         translated = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, _p_filesz, _memsz, _flags, _align = struct.unpack_from(
             "<IIIIIIII", translated, 0x54

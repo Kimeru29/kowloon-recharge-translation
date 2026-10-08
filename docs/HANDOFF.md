@@ -499,3 +499,16 @@ Current corpus row-count distribution is 44/162/166/179/47/2 records for 1/2/3/4
 r49 is append-compatible with r48: +19,496 bytes = 19,200-byte layout table +184 geometry hook +112 text hook. Old r48 payload VAs/content stay intact. The common-prefix audit found 16,622 changed bytes across 1,328 ranges, all classified as one segment-size word, three callsite retargets, or wrapped AFK payload bytes; no unknown ranges.
 
 Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r49.iso`, SHA-256 `6fdcc8b7c4fe5e004c448a77b007cb39085f2d79eb6ac486ce01f791dd465321`; pre/post-ROFS ELF `084f09b0be4f181626fe4cf9205b939ba3368b3b178c75bb0ceacb4edf362e0e` / `c499b25f1142d9f4c4ae9791443cb20f38ccfa62d3335869f45e4279f2fe07bf`; focused suite **39/39**; both complete suites execute **251 tests**; final-image acceptance **155/155**; repeat ISO byte-for-byte identical. Runtime proof of multiline rendering/upward growth remains pending. Do not launch PCSX2 automatically.
+
+
+### v11-r50 AFK anchor/multiline and L1 blue-panel correction
+
+Pablo runtime-tested r49. Native multiline breaks are visibly active and horizontal overflow is materially improved, but long records still expose later rows below the AFK body. The whole AFK callout also remains low enough to collide with the left status HUD. Separately, normal L1 shows the accepted compact green action bubble in the correct upper band while the blue `0x6A` tint stays behind at the old AFK geometry/position.
+
+r50 keeps r49's <=16-cell wrapping and translated payloads unchanged, but replaces the r49 18px vertical budget with a runtime-calibrated **32px** embedded-row budget. AFK placement moves from Y=381 to **Y=346** for both green and blue layers. Base text baselines are now 278/310. Record-specific height/pivot-Y still grow together, so every additional row extends the callout upward while preserving the lower edge/tail relationship.
+
+Blue `0x6A` is now explicitly consumer-specific. The new 212-byte AFK helper applies 288px width, record-specific height/pivot-Y and slot-specific pivot-X 67/125 to both the green slot resource and all three blue frames. The new 136-byte L1 extension applies 224px width, action-specific height/pivot-Y and slot-specific pivot-X 52/97 to green and all three blue frames. This should make the tint fill whichever speech bubble is active instead of lagging behind at AFK geometry.
+
+r50 is append-only relative to r49: +348 bytes exactly. The old r49 geometry/text hooks, visibility hook, historical action extension and all translated VAs remain at their previous addresses. The 600-record layout table VA is unchanged and only its vertical values are recalculated. All 999 AFK pointer words and all 999 relocated AFK text payloads are byte-identical to r49. Binary classification accounts for every changed common-prefix byte.
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r50.iso`; SHA-256 `2ec30aeb6738666a62faa643332166ebf5bd578e9729b366d706ce22f922459e`; pre/post-ROFS ELF `38001ec73c0ad2236090bf636c2e466d5ae814d166396874be72c3b6aee02e15` / `3010b80d910c96b9ad3ca439b7e151e5432bb7ebbfd460fc3bca0ad2f307c57e`. Focused suite **39/39**, both full suites **251 tests**, final-image acceptance **155/155**, deterministic repeat ISO byte-for-byte identical. Runtime proof remains pending. Do not launch PCSX2 automatically.

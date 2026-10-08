@@ -62,6 +62,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PATCH_OFFSETS,
     COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE,
+    COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE,
     COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
     COMPANION_ACTION_VISIBILITY_PATCH_OFFSETS,
     COMPANION_AFK_PANEL_FRAME_COUNT,
@@ -72,6 +73,8 @@ from tools.companion_hud import (
     COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET,
     COMPANION_AFK_PANEL_TARGET_GEOMETRIES,
     COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
+    COMPANION_AFK_GREEN_PLACEMENT_OFFSETS,
+    COMPANION_AFK_GREEN_TARGET_PLACEMENTS,
     COMPANION_AFK_EMPTY_VA,
     COMPANION_AFK_EXPECTED_LIVE_FIELDS,
     COMPANION_AFK_GEOMETRY_HOOK_SIZE,
@@ -88,6 +91,7 @@ from tools.companion_hud import (
     COMPANION_AFK_TEXT1_BASE_Y,
     COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE,
     COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
+    COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_RECORDS_PER_COMPANION,
@@ -508,15 +512,15 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             return False
         if struct.unpack_from("<ffff", raw, frame_offset + 4) != target:
             return False
-    for placement_offset, target in zip(
-        COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
-        COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
-        strict=True,
+    for offsets, targets in (
+        (COMPANION_AFK_GREEN_PLACEMENT_OFFSETS, COMPANION_AFK_GREEN_TARGET_PLACEMENTS),
+        (COMPANION_AFK_PANEL_PLACEMENT_OFFSETS, COMPANION_AFK_PANEL_TARGET_PLACEMENTS),
     ):
-        if placement_offset + 20 > len(raw):
-            return False
-        if struct.unpack_from("<IIfff", raw, placement_offset) != target:
-            return False
+        for placement_offset, target in zip(offsets, targets, strict=True):
+            if placement_offset + 20 > len(raw):
+                return False
+            if struct.unpack_from("<IIfff", raw, placement_offset) != target:
+                return False
 
     # Both resources are the proven sibling pair and produce only a 13px body
     # shift while the companion anchors themselves remain 58px apart.
@@ -579,12 +583,12 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     action_geometry_rel = action_geometry_va - p_vaddr
     if (
         action_geometry_rel < 0
-        or action_geometry_rel + COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE > p_filesz
+        or action_geometry_rel + COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE > p_filesz
     ):
         return False
     action_geometry_file = p_offset + action_geometry_rel
     if struct.unpack_from(
-        f"<{COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE // 4}I",
+        f"<{COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE // 4}I",
         raw,
         action_geometry_file,
     ) != (
@@ -593,8 +597,13 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         0x3C0E4360, 0xADEE0000,
         0x3C0E4250, 0x11A00002, 0x00000000,
         0x3C0E42C2, 0xADEE0008,
+        0x3C0F0045, 0x25EF0B24, 0x3C0C4360,
+        0xADEC0000, 0xADEC0030, 0xADEC0060,
+        0xADEA0004, 0xADEA0034, 0xADEA0064,
+        0xADEE0008, 0xADEE0038, 0xADEE0068,
+        0xADEB000C, 0xADEB003C, 0xADEB006C,
         0x8FBF000C, 0x27BD0010, 0x24040002,
-        0x03E00008, 0x00000000,
+        0x03E00008, 0x00000000, 0x00000000,
     ):
         return False
 
@@ -652,10 +661,9 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             lo -= 0x10000
         return ((hi << 16) + lo) & 0xFFFFFFFF
 
-    # r49 keeps AFK width fixed at 288 and derives all vertical geometry from
-    # a 600-record wrapped-row table. Both green slot resources and all three
-    # blue animation frames grow upward by increasing height and pivot-Y
-    # together; X pivots and bottom/tail relationships stay native.
+    # r50 keeps AFK width fixed at 288 but makes the blue layer slot-aware.
+    # Green and all three blue frames receive the same record-specific height
+    # growth; both layers remain anchored in the safe L1 vertical band.
     afk_geometry_jal = struct.unpack_from("<I", raw, 0x66050)[0]
     if (
         afk_geometry_jal >> 26 != 0x03
@@ -666,18 +674,18 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     afk_geometry_rel = afk_geometry_va - p_vaddr
     if (
         afk_geometry_rel < 0
-        or afk_geometry_rel + COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE > p_filesz
+        or afk_geometry_rel + COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE > p_filesz
     ):
         return False
     geometry_words = struct.unpack_from(
-        f"<{COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE // 4}I",
+        f"<{COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE // 4}I",
         raw,
         p_offset + afk_geometry_rel,
     )
     if (
         geometry_words[:10] != (
-            0x86020004, 0x2448FDA7, 0x2D090258, 0x11200026, 0,
-            0x860A02F8, 0x2D490002, 0x11200022, 0, 0x00085940,
+            0x86020004, 0x2448FDA7, 0x2D090258, 0x1120002D, 0,
+            0x860A02F8, 0x2D490002, 0x11200029, 0, 0x00085940,
         )
         or geometry_words[10] & 0xFFFF0000 != 0x3C0C0000
         or geometry_words[11] & 0xFFFF0000 != 0x258C0000
@@ -688,11 +696,13 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
             0x8D8F0000, 0xADCF0004,
             0x8D8F0004, 0xADCF000C,
             0x3C0F4286, 0x11400002, 0, 0x3C0F42FA, 0xADCF0008,
-            0x3C0E0045, 0x25CE0B28,
-            0x8D8F0008, 0xADCF0000, 0xADCF0030, 0xADCF0060,
-            0x8D8F000C, 0xADCF0008,
-            0x8D8F0010, 0xADCF0038,
-            0x8D8F0014, 0xADCF0068,
+            0x3C0E0045, 0x25CE0B24,
+            0x3C0D4390, 0xADCD0000, 0xADCD0030, 0xADCD0060,
+            0x8D8D0008, 0xADCD0004, 0xADCD0034, 0xADCD0064,
+            0xADCF0008, 0xADCF0038, 0xADCF0068,
+            0x8D8D000C, 0xADCD000C,
+            0x8D8D0010, 0xADCD003C,
+            0x8D8D0014, 0xADCD006C,
             0x86020004, 0x000219C0, 0x03E00008, 0,
         )
     ):
@@ -1129,7 +1139,7 @@ def verify_startup_elf(raw: bytes) -> list[dict[str, Any]]:
         _check(
             "companion_hud_layout",
             _verify_companion_hud_layout(raw),
-            "companion action/AFK shared bubble is not using the r49 fixed-width multiline and upward-growth runtime",
+            "companion action/AFK shared bubble is not using the r50 anchored multiline and consumer-specific blue-panel runtime",
         )
     )
     heap_break_ok = (

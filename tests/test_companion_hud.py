@@ -34,6 +34,7 @@ from tools.companion_hud import (
     COMPANION_ACTION_RUNTIME_HOOK_SIZE,
     COMPANION_ACTION_RUNTIME_PREIMAGES,
     COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE,
+    COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE,
     COMPANION_ACTION_VISIBILITY_HOOK_SIZE,
     COMPANION_ACTION_VISIBILITY_PREIMAGES,
     COMPANION_AFK_PANEL_FRAME_COUNT,
@@ -46,6 +47,9 @@ from tools.companion_hud import (
     COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET,
     COMPANION_AFK_PANEL_TARGET_GEOMETRIES,
     COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
+    COMPANION_AFK_GREEN_PLACEMENT_OFFSETS,
+    COMPANION_AFK_GREEN_PRISTINE_PLACEMENTS,
+    COMPANION_AFK_GREEN_TARGET_PLACEMENTS,
     COMPANION_AFK_EMPTY_VA,
     COMPANION_AFK_EXPECTED_LIVE_FIELDS,
     COMPANION_AFK_MAX_CHARS,
@@ -61,8 +65,10 @@ from tools.companion_hud import (
     COMPANION_AFK_BLUE_BASE_HEIGHT,
     COMPANION_AFK_BLUE_BASE_PIVOT_Y,
     COMPANION_AFK_TEXT1_BASE_Y,
+    COMPANION_AFK_TEXT2_BASE_Y,
     COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE,
     COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
+    COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_TABLE_OFFSET,
@@ -290,12 +296,12 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_action(COMPANION_ACTION_LABELS[24].english).count(b"\x0a"))
         self.assertNotIn(b"\x0a", encode_companion_action(COMPANION_ACTION_LABELS[25].english))
 
-    def test_r46_afk_panel_preserves_native_geometry_and_placements(self) -> None:
+    def test_r50_afk_panel_keeps_metadata_pristine_but_moves_composition_up(self) -> None:
         result = patch_companion_afk_layout(RAW)
 
-        # r46 is deliberately validation-only after r45 made the blue panel
-        # disappear at runtime. Every native 0x6A byte must remain pristine.
-        self.assertEqual(RAW, result)
+        # r50 still never bakes resized 0x6A metadata into the static ELF.
+        # Only the four structured AFK placement records move to the accepted
+        # L1 vertical band; slot-1 blue also follows its companion X anchor.
         self.assertEqual(
             (COMPANION_AFK_PANEL_METADATA_VA, COMPANION_AFK_PANEL_FRAME_COUNT),
             struct.unpack_from("<II", result, COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET),
@@ -307,12 +313,38 @@ class CompanionHudTests(unittest.TestCase):
             )
             self.assertEqual(expected, struct.unpack_from("<ffff", result, frame_offset + 4))
 
-        for offset, expected in zip(
-            COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
-            COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS,
-            strict=True,
+        for offsets, expected_targets in (
+            (COMPANION_AFK_GREEN_PLACEMENT_OFFSETS, COMPANION_AFK_GREEN_TARGET_PLACEMENTS),
+            (COMPANION_AFK_PANEL_PLACEMENT_OFFSETS, COMPANION_AFK_PANEL_TARGET_PLACEMENTS),
         ):
-            self.assertEqual(expected, struct.unpack_from("<IIfff", result, offset))
+            for offset, expected in zip(offsets, expected_targets, strict=True):
+                self.assertEqual(expected, struct.unpack_from("<IIfff", result, offset))
+
+        # Every byte outside the explicitly owned placement dwords stays pristine.
+        expected_changed = set()
+        for offset, pristine, target in (
+            *zip(
+                COMPANION_AFK_GREEN_PLACEMENT_OFFSETS,
+                COMPANION_AFK_GREEN_PRISTINE_PLACEMENTS,
+                COMPANION_AFK_GREEN_TARGET_PLACEMENTS,
+                strict=True,
+            ),
+            *zip(
+                COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
+                COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS,
+                COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
+                strict=True,
+            ),
+        ):
+            before = struct.pack("<IIfff", *pristine)
+            after = struct.pack("<IIfff", *target)
+            expected_changed.update(
+                offset + i for i, (a, b) in enumerate(zip(before, after, strict=True)) if a != b
+            )
+        actual_changed = {
+            i for i, (a, b) in enumerate(zip(RAW, result, strict=True)) if a != b
+        }
+        self.assertEqual(expected_changed, actual_changed)
 
         owner_bytes = struct.pack("<II", 2, 0x6A)
         owners = tuple(
@@ -339,12 +371,16 @@ class CompanionHudTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "AFK panel metadata drifted"):
                     patch_companion_afk_layout(bytes(tampered))
 
-        for offset in COMPANION_AFK_PANEL_PLACEMENT_OFFSETS:
-            with self.subTest(placement=hex(offset)):
-                tampered = bytearray(RAW)
-                tampered[offset + 8] ^= 1
-                with self.assertRaisesRegex(ValueError, "AFK panel placement drifted"):
-                    patch_companion_afk_layout(bytes(tampered))
+        for owner, offsets in (
+            ("green", COMPANION_AFK_GREEN_PLACEMENT_OFFSETS),
+            ("blue", COMPANION_AFK_PANEL_PLACEMENT_OFFSETS),
+        ):
+            for offset in offsets:
+                with self.subTest(owner=owner, placement=hex(offset)):
+                    tampered = bytearray(RAW)
+                    tampered[offset + 8] ^= 1
+                    with self.assertRaisesRegex(ValueError, rf"AFK {owner} placement drifted"):
+                        patch_companion_afk_layout(bytes(tampered))
 
     def test_r46_keeps_r45_visibility_hook_for_native_afk_states_11_through_13(self) -> None:
         result = build_early_ui_elf(RAW)
@@ -385,7 +421,7 @@ class CompanionHudTests(unittest.TestCase):
             words,
         )
 
-    def test_r49_afk_wrap_is_generic_and_grows_upward(self) -> None:
+    def test_r50_afk_wrap_is_generic_anchored_and_grows_upward(self) -> None:
         result = build_early_ui_elf(RAW)
         _ptype, p_offset, p_vaddr, _paddr, p_filesz, _memsz, _flags, _align = struct.unpack_from(
             "<IIIIIIII", result, 0x54
@@ -424,25 +460,29 @@ class CompanionHudTests(unittest.TestCase):
             self.assertEqual(0x3C023F80, struct.unpack_from("<I", result, lui_offset)[0])
             self.assertEqual(0x44828000, struct.unpack_from("<I", result, mtc1_offset)[0])
 
-        # r49 geometry is selected per AFK record before resource construction.
+        # r50 geometry is selected per AFK record and companion slot before
+        # construction. Green and all three blue frames receive the same height
+        # growth; blue pivot-X follows slot 0/1 instead of remaining slot-0-only.
         geometry_jal = struct.unpack_from("<I", result, 0x66050)[0]
         self.assertEqual(0x03, geometry_jal >> 26)
         self.assertEqual(0x000219C0, struct.unpack_from("<I", result, 0x66054)[0])
         geometry_va = (geometry_jal & 0x03FFFFFF) << 2
         geometry_file = p_offset + geometry_va - p_vaddr
         geometry_words = struct.unpack_from(
-            f"<{COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE // 4}I", result, geometry_file
+            f"<{COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE // 4}I", result, geometry_file
         )
-        self.assertEqual(COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE // 4, len(geometry_words))
-        self.assertEqual((0x86020004, 0x2448FDA7, 0x2D090258, 0x11200026), geometry_words[:4])
-        self.assertEqual(0x860A02F8, geometry_words[5])  # slot 0/1
+        self.assertEqual(COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE // 4, len(geometry_words))
+        self.assertEqual((0x86020004, 0x2448FDA7, 0x2D090258, 0x1120002D), geometry_words[:4])
+        self.assertEqual((0x860A02F8, 0x2D490002, 0x11200029), geometry_words[5:8])
         self.assertEqual(0x00085940, geometry_words[9])  # record * 32
         self.assertEqual(0x3C0C0000, geometry_words[10] & 0xFFFF0000)
         self.assertEqual(0x258C0000, geometry_words[11] & 0xFFFF0000)
-        self.assertEqual(0x3C0F4390, geometry_words[19])  # width is always 288
-        self.assertEqual(0xADCF0000, geometry_words[20])
+        self.assertEqual(0x3C0F4390, geometry_words[19])  # green width 288
         self.assertEqual(0x3C0F4286, geometry_words[25])  # slot0 pivot X 67
         self.assertEqual(0x3C0F42FA, geometry_words[28])  # slot1 pivot X 125
+        self.assertEqual(0x25CE0B24, geometry_words[31])  # blue frame0 width field
+        self.assertEqual(0x3C0D4390, geometry_words[32])  # blue width 288
+        self.assertEqual((0xADCF0008, 0xADCF0038, 0xADCF0068), geometry_words[40:43])
         self.assertEqual((0x86020004, 0x000219C0, 0x03E00008, 0), geometry_words[-4:])
 
         hi = geometry_words[10] & 0xFFFF
@@ -519,9 +559,9 @@ class CompanionHudTests(unittest.TestCase):
                     last_row_y = layout.text2_y + COMPANION_AFK_LINE_STEP * (len(layout.line2_rows) - 1)
                 else:
                     last_row_y = layout.text1_y + COMPANION_AFK_LINE_STEP * (len(layout.line1_rows) - 1)
-                self.assertLessEqual(last_row_y, 331.0)
+                self.assertLessEqual(last_row_y, COMPANION_AFK_TEXT2_BASE_Y)
                 if total_rows >= 2:
-                    self.assertEqual(331.0, last_row_y)
+                    self.assertEqual(COMPANION_AFK_TEXT2_BASE_Y, last_row_y)
                 for base, pivot in zip(COMPANION_AFK_BLUE_BASE_PIVOT_Y, layout.blue_pivot_y, strict=True):
                     self.assertEqual(base + delta, pivot)
                     self.assertEqual(COMPANION_AFK_BLUE_BASE_HEIGHT - base, layout.blue_height - pivot)
@@ -595,7 +635,7 @@ class CompanionHudTests(unittest.TestCase):
         extension_va = (hook_words[-5] & 0x03FFFFFF) << 2
         extension_file = p_offset + extension_va - p_vaddr
         extension_words = struct.unpack_from(
-            f"<{COMPANION_ACTION_GEOMETRY_EXTENSION_SIZE // 4}I",
+            f"<{COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE // 4}I",
             result,
             extension_file,
         )
@@ -603,11 +643,17 @@ class CompanionHudTests(unittest.TestCase):
             (
                 0x000D7100, 0x000D7940, 0x01CF7021,
                 0x3C0F0045, 0x25EF0AC4, 0x01EE7821,
-                0x3C0E4360, 0xADEE0000,       # width 224
+                0x3C0E4360, 0xADEE0000,       # green width 224
                 0x3C0E4250, 0x11A00002, 0x00000000,
-                0x3C0E42C2, 0xADEE0008,       # pivot-X 52 / 97
+                0x3C0E42C2, 0xADEE0008,       # green pivot-X 52 / 97
+                0x3C0F0045, 0x25EF0B24,       # blue frame0 geometry
+                0x3C0C4360,
+                0xADEC0000, 0xADEC0030, 0xADEC0060,  # blue width 224
+                0xADEA0004, 0xADEA0034, 0xADEA0064,  # blue height = action
+                0xADEE0008, 0xADEE0038, 0xADEE0068,  # blue pivot-X
+                0xADEB000C, 0xADEB003C, 0xADEB006C,  # blue pivot-Y
                 0x8FBF000C, 0x27BD0010, 0x24040002,
-                0x03E00008, 0x00000000,
+                0x03E00008, 0x00000000, 0x00000000,
             ),
             extension_words,
         )

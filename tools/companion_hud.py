@@ -52,11 +52,32 @@ COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS = (
     (2, 0x6A, 246.0, 172.0, 381.0),
     (2, 0x6A, 246.0, 172.0, 381.0),
 )
-COMPANION_AFK_PANEL_TARGET_PLACEMENTS = COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS
-# r46 intentionally writes no 0x6A geometry/placement bytes. Keep a separate
-# validation-owner inventory so final-image acceptance still fails closed if
-# native AFK panel data drifts.
-COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS: tuple[int, ...] = ()
+# r50 moves both AFK slots to the accepted L1 vertical anchor. Slot 1's blue
+# placement also follows the slot-1 X anchor; runtime pivot-X then keeps the
+# blue body aligned with the matching green 0x68/0x69 consumer.
+COMPANION_AFK_ANCHOR_Y = 346.0
+COMPANION_AFK_PANEL_TARGET_PLACEMENTS = (
+    (2, 0x6A, 246.0, 172.0, COMPANION_AFK_ANCHOR_Y),
+    (2, 0x6A, 246.0, 230.0, COMPANION_AFK_ANCHOR_Y),
+)
+COMPANION_AFK_GREEN_PLACEMENT_OFFSETS = (0x3F8E1C, 0x3F8E30)
+COMPANION_AFK_GREEN_PRISTINE_PLACEMENTS = (
+    (2, 0x68, 249.0, 172.0, 381.0),
+    (2, 0x69, 249.0, 230.0, 381.0),
+)
+COMPANION_AFK_GREEN_TARGET_PLACEMENTS = (
+    (2, 0x68, 249.0, 172.0, COMPANION_AFK_ANCHOR_Y),
+    (2, 0x69, 249.0, 230.0, COMPANION_AFK_ANCHOR_Y),
+)
+# Exact dword owners modified by the r50 placement patch: green Y for both
+# slots, blue Y for both slots, plus slot-1 blue X.
+COMPANION_AFK_PANEL_LAYOUT_PATCH_OFFSETS: tuple[int, ...] = (
+    0x3F8E2C,
+    0x3F8E40,
+    0x3F8E54,
+    0x3F8E64,
+    0x3F8E68,
+)
 COMPANION_AFK_PANEL_VALIDATION_OFFSETS = (
     COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET,
     0x350BA4, 0x350BAC, 0x350BB0,
@@ -122,6 +143,12 @@ COMPANION_AFK_WRAP_GEOMETRY_HOOK_KEY = "companion_afk_wrap_geometry_hook"
 COMPANION_AFK_WRAP_GEOMETRY_HOOK_SIZE = 184
 COMPANION_AFK_WRAP_TEXT_HOOK_KEY = "companion_afk_wrap_text_hook"
 COMPANION_AFK_WRAP_TEXT_HOOK_SIZE = 112
+# r50 appends complete consumer-specific geometry owners. The r49 hooks remain
+# allocated at their historical VAs for binary stability.
+COMPANION_AFK_R50_GEOMETRY_HOOK_KEY = "companion_afk_r50_geometry_hook"
+COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE = 212
+COMPANION_ACTION_R50_PANEL_EXTENSION_KEY = "companion_action_r50_panel_extension"
+COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE = 136
 COMPANION_AFK_FIRST_RECORD_INDEX = 0x259
 COMPANION_AFK_TEXT_STYLE_CELL_WIDTH = 16.0
 COMPANION_AFK_TEXT_BODY_WIDTH = 288.0
@@ -140,13 +167,18 @@ COMPANION_AFK_TEXT_SAFE_CELLS = (
 # wrapped rows grow both bubble layers upward while their bottom/tail anchors
 # stay fixed.
 COMPANION_AFK_WRAP_CELLS = 16
-COMPANION_AFK_LINE_STEP = 18.0
+# r49 used the 18px distance between the two *separate* native AFK objects as
+# the newline advance. Runtime proves embedded 0xFF0E rows use a 32px visual
+# advance. r50 sizes every row with that renderer-owned step.
+COMPANION_AFK_LINE_STEP = 32.0
 COMPANION_AFK_GREEN_BASE_HEIGHT = 80.0
 COMPANION_AFK_GREEN_BASE_PIVOT_Y = 77.0
 COMPANION_AFK_BLUE_BASE_HEIGHT = 56.0
 COMPANION_AFK_BLUE_BASE_PIVOT_Y = (74.0, 75.0, 76.0)
-COMPANION_AFK_TEXT1_BASE_Y = 313.0
-COMPANION_AFK_TEXT2_BASE_Y = 331.0
+# Move text with the 381 -> 346 resource-anchor correction. The first row sits
+# at 278 and a second row at 310; extra rows extend upward only.
+COMPANION_AFK_TEXT1_BASE_Y = 278.0
+COMPANION_AFK_TEXT2_BASE_Y = 310.0
 # 0x1950A0 rejects converted strings whose source length is >=0x1FE. The
 # current corpus is far below this, but keep generic wrapping fail-closed at the
 # engine's own hard capacity instead of silently overflowing its 0x1FE buffer.
@@ -734,6 +766,121 @@ def _afk_wrap_text_hook_bytes(*, table_va: int) -> bytes:
     return code
 
 
+def _afk_r50_geometry_hook_bytes(*, table_va: int) -> bytes:
+    """Apply r50 AFK geometry for the active record and companion slot.
+
+    The green 0x68/0x69 layer and all three blue 0x6A animation frames receive
+    the same record-specific height growth. Width stays 288. Blue pivot-X now
+    follows the active slot (67/125), matching the r50 slot-aware placement.
+    """
+
+    table_hi, table_lo = _split_address(table_va)
+    words = (
+        _mips_i(0x21, 16, 2, 0x0004),       # lh v0,4(s0): record index
+        _mips_i(0x09, 2, 8, -COMPANION_AFK_FIRST_RECORD_INDEX),
+        _mips_i(0x0B, 8, 9, COMPANION_AFK_RECORD_COUNT),
+        _mips_i(0x04, 9, 0, 45),            # invalid record -> return
+        0x00000000,
+        _mips_i(0x21, 16, 10, 0x02F8),      # lh t2,0x2f8(s0): slot 0/1
+        _mips_i(0x0B, 10, 9, 2),
+        _mips_i(0x04, 9, 0, 41),            # invalid slot -> return
+        0x00000000,
+        _mips_r(0, 8, 11, 5, 0x00),         # sll t3,t0,5: layout * 32
+        _mips_i(0x0F, 0, 12, table_hi),
+        _mips_i(0x09, 12, 12, table_lo),
+        _mips_r(12, 11, 12, 0, 0x21),       # t4 = layout record
+        _mips_r(0, 10, 13, 4, 0x00),        # slot*16
+        _mips_r(0, 10, 14, 5, 0x00),        # slot*32
+        _mips_r(13, 14, 13, 0, 0x21),       # t5 = slot*48
+        _mips_i(0x0F, 0, 14, 0x0045),
+        _mips_i(0x09, 14, 14, 0x0AC4),      # green slot0 width field
+        _mips_r(14, 13, 14, 0, 0x21),
+        _mips_i(0x0F, 0, 15, 0x4390),       # 288.0
+        _mips_i(0x2B, 14, 15, 0),           # green width
+        _mips_i(0x23, 12, 15, 0),           # green height
+        _mips_i(0x2B, 14, 15, 4),
+        _mips_i(0x23, 12, 15, 4),           # green pivot-Y
+        _mips_i(0x2B, 14, 15, 12),
+        _mips_i(0x0F, 0, 15, 0x4286),       # slot0 pivot-X 67
+        _mips_i(0x04, 10, 0, 2),
+        0x00000000,
+        _mips_i(0x0F, 0, 15, 0x42FA),       # slot1 pivot-X 125
+        _mips_i(0x2B, 14, 15, 8),           # green pivot-X
+        _mips_i(0x0F, 0, 14, 0x0045),
+        _mips_i(0x09, 14, 14, 0x0B24),      # blue frame0 width field
+        _mips_i(0x0F, 0, 13, 0x4390),       # 288.0
+        _mips_i(0x2B, 14, 13, 0x00),
+        _mips_i(0x2B, 14, 13, 0x30),
+        _mips_i(0x2B, 14, 13, 0x60),
+        _mips_i(0x23, 12, 13, 8),            # blue height
+        _mips_i(0x2B, 14, 13, 0x04),
+        _mips_i(0x2B, 14, 13, 0x34),
+        _mips_i(0x2B, 14, 13, 0x64),
+        _mips_i(0x2B, 14, 15, 0x08),         # blue pivot-X slot-aware
+        _mips_i(0x2B, 14, 15, 0x38),
+        _mips_i(0x2B, 14, 15, 0x68),
+        _mips_i(0x23, 12, 13, 12),           # blue frame0 pivot-Y
+        _mips_i(0x2B, 14, 13, 0x0C),
+        _mips_i(0x23, 12, 13, 16),           # blue frame1 pivot-Y
+        _mips_i(0x2B, 14, 13, 0x3C),
+        _mips_i(0x23, 12, 13, 20),           # blue frame2 pivot-Y
+        _mips_i(0x2B, 14, 13, 0x6C),
+        _mips_i(0x21, 16, 2, 0x0004),       # return: restore owner results
+        _mips_r(0, 2, 3, 7, 0x00),
+        _mips_r(31, 0, 0, 0, 0x08),
+        0x00000000,
+    )
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE:
+        raise AssertionError(f"companion AFK r50 geometry hook drifted: {len(code)}")
+    return code
+
+
+def _action_r50_panel_extension_bytes() -> bytes:
+    """Apply compact L1 geometry to green and blue speech layers together."""
+
+    words = (
+        _mips_r(0, 13, 14, 4, 0x00),        # slot*16
+        _mips_r(0, 13, 15, 5, 0x00),        # slot*32
+        _mips_r(14, 15, 14, 0, 0x21),       # t6 = slot*48
+        _mips_i(0x0F, 0, 15, 0x0045),
+        _mips_i(0x09, 15, 15, 0x0AC4),      # green slot0 width
+        _mips_r(15, 14, 15, 0, 0x21),
+        _mips_i(0x0F, 0, 14, 0x4360),       # 224.0
+        _mips_i(0x2B, 15, 14, 0),           # green width
+        _mips_i(0x0F, 0, 14, 0x4250),       # slot0 pivot-X 52
+        _mips_i(0x04, 13, 0, 2),
+        0x00000000,
+        _mips_i(0x0F, 0, 14, 0x42C2),       # slot1 pivot-X 97
+        _mips_i(0x2B, 15, 14, 8),           # green pivot-X
+        _mips_i(0x0F, 0, 15, 0x0045),
+        _mips_i(0x09, 15, 15, 0x0B24),      # blue frame0 width
+        _mips_i(0x0F, 0, 12, 0x4360),       # 224.0
+        _mips_i(0x2B, 15, 12, 0x00),
+        _mips_i(0x2B, 15, 12, 0x30),
+        _mips_i(0x2B, 15, 12, 0x60),
+        _mips_i(0x2B, 15, 10, 0x04),         # action-specific height
+        _mips_i(0x2B, 15, 10, 0x34),
+        _mips_i(0x2B, 15, 10, 0x64),
+        _mips_i(0x2B, 15, 14, 0x08),         # slot-aware pivot-X
+        _mips_i(0x2B, 15, 14, 0x38),
+        _mips_i(0x2B, 15, 14, 0x68),
+        _mips_i(0x2B, 15, 11, 0x0C),         # action-specific pivot-Y
+        _mips_i(0x2B, 15, 11, 0x3C),
+        _mips_i(0x2B, 15, 11, 0x6C),
+        _mips_i(0x23, 29, 31, 12),           # restore caller
+        _mips_i(0x09, 29, 29, 16),
+        _mips_i(0x09, 0, 4, 2),              # li a0,2
+        _mips_r(31, 0, 0, 0, 0x08),
+        0x00000000,
+        0x00000000,
+    )
+    code = b"".join(struct.pack("<I", word) for word in words)
+    if len(code) != COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE:
+        raise AssertionError(f"companion action r50 panel extension drifted: {len(code)}")
+    return code
+
+
 def _runtime_hook_bytes(
     *,
     table_va: int,
@@ -1084,7 +1231,7 @@ def validate_companion_hud_source(raw: bytes) -> None:
 
 
 def patch_companion_afk_layout(raw: bytes) -> bytes:
-    """Validate native Re:charge AFK panel ownership without changing geometry."""
+    """Validate AFK speech placement ownership and move the composition upward."""
 
     metadata_va, metadata_count = struct.unpack_from(
         "<II", raw, COMPANION_AFK_PANEL_RESOURCE_TABLE_OFFSET
@@ -1128,21 +1275,38 @@ def patch_companion_afk_layout(raw: bytes) -> bytes:
                 f"frame={frame_index}, expected {expected!r}, got {actual!r}"
             )
 
-    for placement_offset, expected in zip(
-        COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
-        COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS,
-        strict=True,
-    ):
-        actual = struct.unpack_from("<IIfff", raw, placement_offset)
-        if actual != expected:
-            raise ValueError(
-                "companion AFK panel placement drifted: "
-                f"{placement_offset:#x}: expected {expected!r}, got {actual!r}"
-            )
+    placement_specs = (
+        (
+            COMPANION_AFK_GREEN_PLACEMENT_OFFSETS,
+            COMPANION_AFK_GREEN_PRISTINE_PLACEMENTS,
+            COMPANION_AFK_GREEN_TARGET_PLACEMENTS,
+            "green",
+        ),
+        (
+            COMPANION_AFK_PANEL_PLACEMENT_OFFSETS,
+            COMPANION_AFK_PANEL_PRISTINE_PLACEMENTS,
+            COMPANION_AFK_PANEL_TARGET_PLACEMENTS,
+            "blue",
+        ),
+    )
+    out = bytearray(raw)
+    for offsets, pristine, targets, owner in placement_specs:
+        for placement_offset, expected, replacement in zip(
+            offsets, pristine, targets, strict=True
+        ):
+            actual = struct.unpack_from("<IIfff", raw, placement_offset)
+            if actual != expected:
+                raise ValueError(
+                    f"companion AFK {owner} placement drifted: "
+                    f"{placement_offset:#x}: expected {expected!r}, got {actual!r}"
+                )
+            struct.pack_into("<IIfff", out, placement_offset, *replacement)
 
-    # r45 proved that writing these values is unsafe even when static geometry
-    # checks pass. r46 deliberately returns the native bytes unchanged.
-    return raw
+    # r50 changes only the four structured placement records here. Geometry is
+    # still runtime consumer-specific: AFK restores native-width blue/green
+    # metadata, while the L1 path applies compact geometry immediately before
+    # drawing its callout.
+    return bytes(out)
 
 
 def patch_companion_action_layout(raw: bytes) -> bytes:
@@ -1257,8 +1421,12 @@ def finalize_companion_action_runtime_layout(
         afk_wrap_table_va = installed.target_vas[COMPANION_AFK_WRAP_LAYOUT_TABLE_KEY]
         afk_wrap_geometry_hook_va = installed.target_vas[COMPANION_AFK_WRAP_GEOMETRY_HOOK_KEY]
         afk_wrap_text_hook_va = installed.target_vas[COMPANION_AFK_WRAP_TEXT_HOOK_KEY]
+        afk_r50_geometry_hook_va = installed.target_vas[COMPANION_AFK_R50_GEOMETRY_HOOK_KEY]
         action_geometry_extension_va = installed.target_vas[
             COMPANION_ACTION_GEOMETRY_EXTENSION_KEY
+        ]
+        action_r50_panel_extension_va = installed.target_vas[
+            COMPANION_ACTION_R50_PANEL_EXTENSION_KEY
         ]
     except KeyError as exc:
         raise ValueError(f"companion action runtime payload is missing: {exc.args[0]}") from exc
@@ -1274,7 +1442,9 @@ def finalize_companion_action_runtime_layout(
         afk_wrap_table_va,
         afk_wrap_geometry_hook_va,
         afk_wrap_text_hook_va,
+        afk_r50_geometry_hook_va,
         action_geometry_extension_va,
+        action_r50_panel_extension_va,
     )
     if any(value & 3 for value in runtime_vas):
         raise ValueError(
@@ -1285,7 +1455,7 @@ def finalize_companion_action_runtime_layout(
     hook = _runtime_hook_bytes(
         table_va=table_va,
         state_va=state_va,
-        geometry_extension_va=action_geometry_extension_va,
+        geometry_extension_va=action_r50_panel_extension_va,
     )
     hook_file = installed.info.file_offset + (hook_va - installed.info.segment_vaddr)
     if hook_file < 0 or hook_file + len(hook) > len(result):
@@ -1336,6 +1506,16 @@ def finalize_companion_action_runtime_layout(
             _afk_wrap_text_hook_bytes(table_va=afk_wrap_table_va),
             "companion AFK wrap text hook",
         ),
+        (
+            afk_r50_geometry_hook_va,
+            _afk_r50_geometry_hook_bytes(table_va=afk_wrap_table_va),
+            "companion AFK r50 geometry hook",
+        ),
+        (
+            action_r50_panel_extension_va,
+            _action_r50_panel_extension_bytes(),
+            "companion action r50 panel extension",
+        ),
     )
     for payload_va, payload, owner in runtime_payloads:
         payload_file = installed.info.file_offset + (
@@ -1362,10 +1542,10 @@ def finalize_companion_action_runtime_layout(
                     f"{offset:#x}: expected {expected:#010x}, got {actual:#010x}"
                 )
 
-    # r49 owns AFK geometry per record. Width and X pivots remain native while
-    # wrapped-row count grows both green and blue layers upward. Preserve the
-    # original sll v1,v0,7 in the JAL delay slot; the helper restores v0/v1.
-    struct.pack_into("<I", result, 0x66050, _jal_word(afk_wrap_geometry_hook_va))
+    # r50 owns AFK geometry per record and slot. Width remains native 288px;
+    # height follows the 32px multiline budget and blue pivot-X now follows the
+    # speaking slot. Preserve the original sll v1,v0,7 in the JAL delay slot.
+    struct.pack_into("<I", result, 0x66050, _jal_word(afk_r50_geometry_hook_va))
 
     # Keep constructor alpha at native 1.0. After each AFK text object is
     # created, place it at the record-specific Y and force horizontal scale to
@@ -1518,6 +1698,25 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             RelocatedText(
                 key=COMPANION_AFK_WRAP_TEXT_HOOK_KEY,
                 encoded=b"\x00" * COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
+                pointer_offsets=(),
+                alignment=4,
+            ),
+        )
+    )
+    # r50 remains append-only relative to r49. These complete consumer-specific
+    # geometry helpers replace only runtime call targets; every historical
+    # translated payload keeps its r49 VA.
+    entries.extend(
+        (
+            RelocatedText(
+                key=COMPANION_AFK_R50_GEOMETRY_HOOK_KEY,
+                encoded=b"\x00" * COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE,
+                pointer_offsets=(),
+                alignment=4,
+            ),
+            RelocatedText(
+                key=COMPANION_ACTION_R50_PANEL_EXTENSION_KEY,
+                encoded=b"\x00" * COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE,
                 pointer_offsets=(),
                 alignment=4,
             ),
