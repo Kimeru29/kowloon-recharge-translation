@@ -85,6 +85,11 @@ from tools.companion_hud import (
     COMPANION_ACTION_R60_PRECONSTRUCT_SIZE,
     COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA,
     _action_r60_preconstruct_bytes,
+    _action_r62_inset_layout_table_bytes,
+    COMPANION_ACTION_R62_INSET_X,
+    COMPANION_ACTION_R62_INSET_TOP,
+    COMPANION_ACTION_R62_INSET_BOTTOM,
+    COMPANION_ACTION_R62_INSET_WIDTH,
     COMPANION_ACTION_R61_LIVE_OFFSET_SIZE,
     COMPANION_ACTION_R61_BLUE_SHIFT_X,
     COMPANION_ACTION_R61_BLUE_SHIFT_Y,
@@ -657,43 +662,45 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
 
-    def test_r61_l1_id78_subpixel_alignment_does_not_touch_afk(self) -> None:
+    def test_r62_blue_inset_is_inside_green_for_all_31_actions_and_both_slots(self) -> None:
+        # Constructor geometry, not a postconstruct XY write, defines bounds.
+        blue_bytes=_action_r62_inset_layout_table_bytes()
+        self.assertEqual(len(COMPANION_ACTION_LAYOUTS)*12,len(blue_bytes))
+        for action_id,green in enumerate(COMPANION_ACTION_LAYOUTS):
+            blue_height,blue_pivot_y,_=struct.unpack_from("<fff",blue_bytes,12*action_id)
+            with self.subTest(action=action_id):
+                self.assertEqual(green.height-4.0,blue_height)
+                self.assertEqual(green.pivot_y-2.0,blue_pivot_y)
+                for slot,green_pivot_x in ((0,52.0),(1,97.0)):
+                    blue_pivot_x=green_pivot_x-2.0
+                    green_left=-green_pivot_x
+                    blue_left=-blue_pivot_x
+                    green_top=-green.pivot_y
+                    blue_top=-blue_pivot_y
+                    self.assertEqual(2.0,blue_left-green_left)
+                    self.assertEqual(2.0,blue_top-green_top)
+                    self.assertEqual(2.0,(green_left+224.0)-(blue_left+220.0))
+                    self.assertEqual(2.0,(green_top+green.height)-(blue_top+blue_height))
+
+    def test_r62_l1_blue_preconstructor_retains_metadata_until_native_draw(self) -> None:
         elf=build_early_ui_elf(RAW)
         _,off,va,_,_,_,_,_=struct.unpack_from("<8I",elf,0x54)
-        call=struct.unpack_from("<I",elf,0x66724)[0]
-        self.assertEqual(3,call>>26)
-        action=off+((call&0x03FFFFFF)<<2)-va
-        aw=struct.unpack_from("<47I",elf,action)
-        tails=[w for w in aw if w>>26==2]
-        self.assertEqual(1,len(tails))
-        ext=off+((tails[0]&0x03FFFFFF)<<2)-va
-        extw=struct.unpack_from("<34I",elf,ext)
-        self.assertEqual(2,extw[-3]>>26)
-        placement=off+((extw[-3]&0x03FFFFFF)<<2)-va
-        jw=struct.unpack_from("<I",elf,placement+13*4)[0]
-        self.assertEqual(2,jw>>26)
-        live=off+((jw&0x03FFFFFF)<<2)-va
-        words=struct.unpack_from("<24I",elf,live)
-        self.assertEqual(-2.0,COMPANION_ACTION_R61_BLUE_SHIFT_X)
-        self.assertEqual(1.0,COMPANION_ACTION_R61_BLUE_SHIFT_Y)
-        self.assertEqual(0x8E0C02D8, words[0])   # green native object
-        self.assertEqual(0x8E0E02E0, words[1])   # real L1 id0x78
-        self.assertEqual((0x11800013,0,0x11C00011,0),words[2:6]) # null-safe
-        self.assertEqual(0xE7A00000,words[7])   # save native f0
-        self.assertEqual(0xE7A20004,words[8])   # save native f2
-        self.assertEqual(0x3C0F4000,words[10])  # subtract 2.0f
-        self.assertEqual(0x46020001,words[12])  # sub.s
-        self.assertEqual(0xE5C0003C,words[13])  # native blue X only
-        self.assertEqual(0x3C0F3F80,words[15])  # add 1.0f
-        self.assertEqual(0x46020000,words[17])  # add.s
-        self.assertEqual(0xE5C00040,words[18])  # native blue Y only
-        self.assertEqual((0xC7A20004,0xC7A00000,0x27BD0010),words[19:22])
-        self.assertEqual((0x03E00008,0),words[22:24])
-        for n in (0,1,2,4,7,8,10,12,13,15,17,18,19,20,22):
-            with self.subTest(tamper_word=n):
-                modified=bytearray(elf)
-                modified[live+n*4]^=1
-                check=next(x for x in verify_startup_elf(bytes(modified))
+        selector_jal=struct.unpack_from("<I",elf,0x66724)[0]
+        action=off+((selector_jal&0x03FFFFFF)<<2)-va
+        action_words=struct.unpack_from("<47I",elf,action)
+        targets=[w for w in action_words if w>>26==2]
+        self.assertEqual(1,len(targets))
+        ext=off+((targets[0]&0x03FFFFFF)<<2)-va
+        ext_words=struct.unpack_from("<34I",elf,ext)
+        self.assertEqual((0,)*12,ext_words[16:28])
+        self.assertEqual(2,ext_words[-3]>>26)
+        place=off+((ext_words[-3]&0x03FFFFFF)<<2)-va
+        self.assertEqual(0x03E00008,struct.unpack_from("<I",elf,place+13*4)[0])
+        for index in (16,17,18,19,20,21,22,23,24,25,26,27):
+            with self.subTest(no_late_blue_store=index):
+                tampered=bytearray(elf)
+                tampered[ext+4*index]^=1
+                check=next(x for x in verify_startup_elf(bytes(tampered))
                            if x["name"]=="companion_hud_layout")
                 self.assertFalse(check["ok"])
 
@@ -714,11 +721,21 @@ class CompanionHudTests(unittest.TestCase):
         sel = struct.unpack_from("<47I", elf, selector)
         hi, lo = sel[14] & 0xFFFF, sel[15] & 0xFFFF
         layout_va = (hi << 16) + lo - (0x10000 if lo & 0x8000 else 0)
+        words = struct.unpack_from("<55I", elf, pre_file)
+        blue_table_va = ((words[18]&0xFFFF)<<16) + (
+            (words[19]&0xFFFF) - (0x10000 if words[19]&0x8000 else 0)
+        )
+        self.assertNotEqual(layout_va,blue_table_va)
+        blue_table_off=segment_offset+blue_table_va-segment_va
+        expected_blue_table=_action_r62_inset_layout_table_bytes()
         self.assertEqual(
-            _action_r60_preconstruct_bytes(table_va=layout_va),
+            expected_blue_table,
+            elf[blue_table_off:blue_table_off+len(expected_blue_table)],
+        )
+        self.assertEqual(
+            _action_r60_preconstruct_bytes(table_va=blue_table_va),
             elf[pre_file:pre_file + COMPANION_ACTION_R60_PRECONSTRUCT_SIZE],
         )
-        words = struct.unpack_from("<55I", elf, pre_file)
         self.assertEqual(0x001666C8, COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA)
         self.assertEqual((0x3C180016, 0x371866C8), words[:2])  # RA guard
         self.assertEqual(0x17F80032, words[2])  # bne ra,t8 -> fast-return
@@ -800,7 +817,7 @@ class CompanionHudTests(unittest.TestCase):
         ext_words = struct.unpack_from('<34I', result, ext_off)
         self.assertEqual(0x25EF13F4, ext_words[14])
         self.assertNotIn(0x25EF0B24, ext_words)
-        self.assertEqual((0xADEC0000,0xADEC0030,0xADEC0060), ext_words[16:19])
+        self.assertEqual((0,)*12, ext_words[16:28])  # retire late blue writes
         tampered = bytearray(result)
         tampered[ext_off+14*4] ^= 1
         check = next(c for c in verify_startup_elf(bytes(tampered)) if c['name']=='companion_hud_layout')
@@ -832,16 +849,10 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, ext_words[-3] >> 26)
         placement = p_offset + ((ext_words[-3] & 0x03FFFFFF) << 2) - p_va
         tail = struct.unpack_from("<I", elf, placement + 13*4)[0]
-        self.assertEqual(2, tail >> 26)
-        live_va = (tail & 0x03FFFFFF) << 2
-        live_file = p_offset + live_va - p_va
+        self.assertEqual(0x03E00008, tail)
         self.assertEqual(
-            _action_r58_blue_placement_bytes(tail_va=live_va),
+            _action_r58_blue_placement_bytes(tail_va=0),
             elf[placement:placement + COMPANION_ACTION_R58_POSITION_SIZE],
-        )
-        self.assertEqual(
-            _action_r61_live_blue_xy_bytes(),
-            elf[live_file:live_file + COMPANION_ACTION_R61_LIVE_OFFSET_SIZE],
         )
         # Exact data consumer is ELF file 0x3F8E50 (VA 0x4F8DD0),
         # consecutive slot records have 20-byte stride.
@@ -1032,10 +1043,8 @@ class CompanionHudTests(unittest.TestCase):
                 0x3C0E42C2, 0xADEE0008,       # green pivot-X 52 / 97
                 0x3C0F0045, 0x25EF13F4,       # blue frame0 geometry
                 0x3C0C4360,
-                0xADEC0000, 0xADEC0030, 0xADEC0060,  # blue width 224
-                0xADEA0004, 0xADEA0034, 0xADEA0064,  # blue height = action
-                0xADEE0008, 0xADEE0038, 0xADEE0068,  # blue pivot-X
-                0xADEB000C, 0xADEB003C, 0xADEB006C,  # blue pivot-Y
+                0, 0, 0, 0, 0, 0,  # r62 preserve preconstructor-only geometry
+                0, 0, 0, 0, 0, 0,
                 0x8FBF000C, 0x27BD0010, 0x24040002,
                 extension_words[31], 0x00000000, 0x00000000,
             ),

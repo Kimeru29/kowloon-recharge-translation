@@ -47,8 +47,8 @@ Status meanings:
 | Dungeon HUD exploration action text | **Working / runtime-proven / frozen** | Pablo accepts r29's moving action HUD as completely translated and visually correct. Freeze the proven `H_CmdIconDraw` owners for `Examine` / `Items` / `Jump`; r30 changes no r29 action-menu geometry or text. |
 | Dungeon HUD battle/L1 item text | **Working / runtime-proven / frozen** | Pablo accepts the r29 action/L1 HUD pass. Freeze the 446 exact PS4 item-name relocations and their 500-entry table ownership; r30 keeps these owners unchanged and regression-covered. |
 | SELECT command/menu labels | **Working / runtime-proven / frozen** | Pablo accepts r29's SELECT/start menu as completely translated and visually correct. Freeze all 18 proven wide-text command aliases; unresolved `メディア` remains pristine rather than guessed. |
-| Companion HUD action/skill label | **r61 true L1 id0x78 object X−2/Y+1, runtime pending** | One tint nearly aligned after r60. r61 moves the real blue sprite world XY relative to green with a 96-byte null-safe helper. F0/F2/SP/RA preserved; offline MIPS checked, actual visual runtime pending. |
-| Companion HUD transient comments | **r59 AFK approved/frozen through r61** | Nine independent SHA256 golden tests and r60->r61 strict executable audit guarantee no changes to native AFK owner/translation pointers, 600 layouts, hooks, metadata or placements. Do not reopen AFK without user request. |
+| Companion HUD action/skill label | **r62 inset blue native L1 geometry candidate, runtime pending** | All 31 action labels x both slots model a two-unit blue inset within the green body; preconstruction resource0x78 blue metadata used, late blue metadata overwrite retired, r61 ineffective XY nudge disabled. Local feature branch ONLY, do not update main before user confirms screenshot. |
+| Companion HUD transient comments | **r59 AFK approved and frozen** | No AFK changes permitted; nine independent user-approved r59 SHA256 fingerprints pass and r61->r62 strict binary audit confirms AFK unchanged byte for byte. |
 
 ## Known executable/UI text not yet solved
 

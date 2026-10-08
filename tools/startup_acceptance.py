@@ -114,6 +114,11 @@ from tools.companion_hud import (
     COMPANION_ACTION_R60_PRECONSTRUCT_SIZE,
     COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA,
     _action_r60_preconstruct_bytes,
+    _action_r62_inset_layout_table_bytes,
+    COMPANION_ACTION_R62_INSET_X,
+    COMPANION_ACTION_R62_INSET_TOP,
+    COMPANION_ACTION_R62_INSET_BOTTOM,
+    COMPANION_ACTION_R62_INSET_WIDTH,
     COMPANION_ACTION_R61_LIVE_OFFSET_SIZE,
     COMPANION_ACTION_R61_BLUE_SHIFT_X,
     COMPANION_ACTION_R61_BLUE_SHIFT_Y,
@@ -629,10 +634,8 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         0x3C0E4250, 0x11A00002, 0x00000000,
         0x3C0E42C2, 0xADEE0008,
         0x3C0F0045, 0x25EF13F4, 0x3C0C4360,
-        0xADEC0000, 0xADEC0030, 0xADEC0060,
-        0xADEA0004, 0xADEA0034, 0xADEA0064,
-        0xADEE0008, 0xADEE0038, 0xADEE0068,
-        0xADEB000C, 0xADEB003C, 0xADEB006C,
+        0, 0, 0, 0, 0, 0,  # late 0x78 blue writes retired by r62
+        0, 0, 0, 0, 0, 0,
         0x8FBF000C, 0x27BD0010, 0x24040002,
         struct.unpack_from("<I", raw, action_geometry_file + 31*4)[0],
         0x00000000, 0x00000000,
@@ -893,10 +896,24 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     action_table_va = ((select_hi & 0xFFFF) << 16) + (
         (select_lo & 0xFFFF) - (0x10000 if select_lo & 0x8000 else 0)
     )
+    preconstruct_words = struct.unpack_from("<55I", raw, preconstruct_file)
+    blue_table_va = ((preconstruct_words[18] & 0xFFFF) << 16) + (
+        (preconstruct_words[19] & 0xFFFF) - (0x10000 if preconstruct_words[19] & 0x8000 else 0)
+    )
+    blue_table_off = p_offset + blue_table_va - p_vaddr
+    expected_inset_table = _action_r62_inset_layout_table_bytes()
     if (
-        raw[preconstruct_file:preconstruct_file + COMPANION_ACTION_R60_PRECONSTRUCT_SIZE]
-        != _action_r60_preconstruct_bytes(table_va=action_table_va)
+        action_table_va == blue_table_va
+        or blue_table_off < p_offset
+        or blue_table_off + len(expected_inset_table) > p_offset + p_filesz
+        or raw[blue_table_off:blue_table_off+len(expected_inset_table)] != expected_inset_table
+        or raw[preconstruct_file:preconstruct_file + COMPANION_ACTION_R60_PRECONSTRUCT_SIZE]
+           != _action_r60_preconstruct_bytes(table_va=blue_table_va)
         or COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA != 0x001666C8
+        or COMPANION_ACTION_R62_INSET_X != 2.0
+        or COMPANION_ACTION_R62_INSET_TOP != 2.0
+        or COMPANION_ACTION_R62_INSET_BOTTOM != 2.0
+        or COMPANION_ACTION_R62_INSET_WIDTH != 220.0
     ):
         return False
     for site, size, payload in (
@@ -963,20 +980,16 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         return False
     placement_file = p_offset + action_placement_va - p_vaddr
     placement_tail = struct.unpack_from("<I", raw, placement_file + 13*4)[0]
-    if placement_tail >> 26 != 2 or struct.unpack_from("<I",raw,placement_file+14*4)[0] != 0:
+    if placement_tail != 0x03E00008 or struct.unpack_from("<I",raw,placement_file+14*4)[0] != 0:
         return False
-    live_va = resolve_j(placement_tail)
-    if (
-        live_va < p_vaddr
-        or live_va + COMPANION_ACTION_R61_LIVE_OFFSET_SIZE > p_vaddr+p_filesz
-        or COMPANION_ACTION_R61_BLUE_SHIFT_X != -2.0
-        or COMPANION_ACTION_R61_BLUE_SHIFT_Y != 1.0
-    ):
+    # r62: the r61 live XY patch has been retired, because it takes effect
+    # AFTER native sprite construction and r61 screenshots showed no improvement.
+    # The accepted preconstructor geometry is the sole active blue owner.
+    if action_ext_words[16:28] != (0,) * 12:
         return False
     for va, expected in (
         (afk_restore_va, _afk_r58_restore_placement_bytes()),
-        (action_placement_va, _action_r58_blue_placement_bytes(tail_va=live_va)),
-        (live_va, _action_r61_live_blue_xy_bytes()),
+        (action_placement_va, _action_r58_blue_placement_bytes(tail_va=0)),
     ):
         off = p_offset + va - p_vaddr
         if raw[off:off + len(expected)] != expected:

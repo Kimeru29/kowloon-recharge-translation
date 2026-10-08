@@ -171,6 +171,15 @@ COMPANION_ACTION_R61_LIVE_OFFSET_KEY = "companion_action_r61_blue_live_xy"
 COMPANION_ACTION_R61_LIVE_OFFSET_SIZE = 96
 COMPANION_ACTION_R61_BLUE_SHIFT_X = -2.0
 COMPANION_ACTION_R61_BLUE_SHIFT_Y = 1.0
+# r62: enforce blue tint fully INSIDE green body at construction time.
+# Keep r60/r61 payload addresses for binary compatibility, but disable late
+# id0x78 metadata overwrites and the ineffective post-constructor XY nudge.
+COMPANION_ACTION_R62_INSET_TABLE_KEY = "companion_action_r62_blue_inset_layout"
+COMPANION_ACTION_R62_INSET_X = 2.0
+COMPANION_ACTION_R62_INSET_TOP = 2.0
+COMPANION_ACTION_R62_INSET_BOTTOM = 2.0
+COMPANION_ACTION_R62_INSET_WIDTH = 220.0
+
 
 
 # r52 replaces both r51 runtime hooks with one AFK-only constructor fix.
@@ -445,6 +454,24 @@ def encode_companion_action(text: str) -> bytes:
 def _layout_table_bytes() -> bytes:
     return b"".join(
         struct.pack("<fff", layout.height, layout.pivot_y, layout.text_y)
+        for layout in COMPANION_ACTION_LAYOUTS
+    )
+
+
+def _action_r62_inset_layout_table_bytes() -> bytes:
+    """L1-only blue frame geometry, inset 2 units on all four body edges.
+
+    The three-field/12-byte layout mirrors the accepted action layout table,
+    but is consumed exclusively by the pre-construction 0x78 metadata owner.
+    No green frame/text or AFK layout changes.
+    """
+    return b"".join(
+        struct.pack(
+            "<fff",
+            layout.height - COMPANION_ACTION_R62_INSET_TOP - COMPANION_ACTION_R62_INSET_BOTTOM,
+            layout.pivot_y - COMPANION_ACTION_R62_INSET_TOP,
+            layout.text_y,
+        )
         for layout in COMPANION_ACTION_LAYOUTS
     )
 
@@ -973,6 +1000,12 @@ def _action_r50_panel_extension_bytes(*, placement_va: int) -> bytes:
         0x00000000,
         0x00000000,
     )
+    # r62: action id0x78 metadata was already initialized before native
+    # sprite construction from the separate inset layout. Rewriting the late
+    # blue frames to green-size geometry caused the near-identical r60/r61
+    # screenshots. Only the id0x78 writes are retired; green writes (0-12),
+    # caller restoration and existing placement callback are unchanged.
+    words = tuple(0 if 16 <= i <= 27 else value for i, value in enumerate(words))
     code = b"".join(struct.pack("<I", word) for word in words)
     if len(code) != COMPANION_ACTION_R50_PANEL_EXTENSION_SIZE:
         raise AssertionError(f"companion action r50 panel extension drifted: {len(code)}")
@@ -1004,7 +1037,7 @@ def _action_r58_blue_placement_bytes(*, tail_va: int) -> bytes:
         _mips_i(0x2B, 15, 14, 0x0000),  # blue layout X
         _mips_i(0x23, 12, 14, 0x0040),  # green Y
         _mips_i(0x2B, 15, 14, 0x0004),  # blue layout Y
-        _j_word(tail_va),                   # r61: align actual id0x78 instance
+        _mips_r(31,0,0,0,0x08),            # r62: no ineffective late XY mutation
         0,
         0,
     )
@@ -1248,17 +1281,17 @@ def _action_r60_preconstruct_bytes(*, table_va: int) -> bytes:
         _mips_r(0, 0, 13, 0, 0x21),      # otherwise slot0
         _mips_i(0x0F, 0, 15, 0x0045),
         _mips_i(0x09, 15, 15, 0x13F4), # 0x78 frame0 width owner
-        _mips_i(0x0F, 0, 12, 0x4360),  # width 224.0
+        _mips_i(0x0F, 0, 12, 0x435C),  # r62 width 220.0, green stays 224
         _mips_i(0x2B, 15, 12, 0x00),
         _mips_i(0x2B, 15, 12, 0x30),
         _mips_i(0x2B, 15, 12, 0x60),
         _mips_i(0x2B, 15, 10, 0x04),
         _mips_i(0x2B, 15, 10, 0x34),
         _mips_i(0x2B, 15, 10, 0x64),
-        _mips_i(0x0F, 0, 12, 0x4250),  # slot0 pivotX 52
+        _mips_i(0x0F, 0, 12, 0x4248),  # r62 slot0 pivotX 50 = green52 - 2
         _mips_i(0x04, 13, 0, 2),
         0,
-        _mips_i(0x0F, 0, 12, 0x42C2),  # slot1 pivotX 97
+        _mips_i(0x0F, 0, 12, 0x42BE),  # r62 slot1 pivotX 95 = green97 - 2
         _mips_i(0x2B, 15, 12, 0x08),
         _mips_i(0x2B, 15, 12, 0x38),
         _mips_i(0x2B, 15, 12, 0x68),
@@ -1878,6 +1911,7 @@ def finalize_companion_action_runtime_layout(
         afk_r58_restore_va = installed.target_vas[COMPANION_AFK_R58_RESTORE_KEY]
         action_r60_preconstruct_va = installed.target_vas[COMPANION_ACTION_R60_PRECONSTRUCT_KEY]
         action_r61_live_offset_va = installed.target_vas[COMPANION_ACTION_R61_LIVE_OFFSET_KEY]
+        action_r62_inset_table_va = installed.target_vas[COMPANION_ACTION_R62_INSET_TABLE_KEY]
     except KeyError as exc:
         raise ValueError(f"companion action runtime payload is missing: {exc.args[0]}") from exc
 
@@ -1903,6 +1937,7 @@ def finalize_companion_action_runtime_layout(
         afk_r58_restore_va,
         action_r60_preconstruct_va,
         action_r61_live_offset_va,
+        action_r62_inset_table_va,
     )
     if any(value & 3 for value in runtime_vas):
         raise ValueError(
@@ -1988,8 +2023,8 @@ def finalize_companion_action_runtime_layout(
             tail_va=action_r61_live_offset_va
         ), "L1 r58 blue layout placement + r61 tail"),
         (afk_r58_restore_va, _afk_r58_restore_placement_bytes(), "AFK r58 layout restore"),
-        (action_r60_preconstruct_va, _action_r60_preconstruct_bytes(table_va=table_va),
-         "L1 r60 preconstruct native 0x78 geometry"),
+        (action_r60_preconstruct_va, _action_r60_preconstruct_bytes(table_va=action_r62_inset_table_va),
+         "L1 r62 preconstruct inset 0x78 geometry"),
         (action_r61_live_offset_va, _action_r61_live_blue_xy_bytes(),
          "L1 r61 live id0x78 alignment"),
     )
@@ -2239,4 +2274,12 @@ def relocated_companion_entries(raw: bytes) -> tuple[RelocatedText, ...]:
             (COMPANION_ACTION_R61_LIVE_OFFSET_KEY, COMPANION_ACTION_R61_LIVE_OFFSET_SIZE),
         )
     )
+    # r62 blue-only inset table is appended AFTER every r61 relocation so all
+    # pre-existing VAs (including user-approved AFK data and code) stay fixed.
+    entries.append(RelocatedText(
+        key=COMPANION_ACTION_R62_INSET_TABLE_KEY,
+        encoded=_action_r62_inset_layout_table_bytes(),
+        pointer_offsets=(),
+        alignment=4,
+    ))
     return tuple(entries)
