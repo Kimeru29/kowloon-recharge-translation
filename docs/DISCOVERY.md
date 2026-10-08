@@ -731,3 +731,16 @@ The AFK helper restores both layers together before construction. Green uses slo
 The L1 extension does the inverse immediately before normal action construction. Green receives width 224 and pivot-X 52/97; blue frames receive the same width 224, the current action's calculated height/pivot-Y and the same slot pivot-X. This is necessary because the r49 screenshot proves leaving `0x6A` untouched causes its tinted body to remain in the wrong size/location while green moves correctly.
 
 Compatibility result: r50 appends only 348 bytes and moves no prior translated VA. All 999 AFK structural pointers and all 999 relocated AFK C-string payloads are byte-identical to r49. The r49 text hook and native-newline payloads are also unchanged; r50 is geometry-only with respect to translated dialogue content. The classified r49->r50 common-prefix audit reports zero unexplained bytes.
+
+
+## r51 ownership trace: constructor Y and missing L1 0x6A object
+
+The r50 screenshots distinguish geometry from object ownership. AFK green+blue sizing/placement is visually correct, yet text remains below the bubble. L1 green/text are correct, yet no blue tint appears. This means further metadata tuning would address neither defect.
+
+AFK specialized text construction proves the authoritative vertical owner. Caller `f13` flows through `0x1950A0` into generic constructor `0x188AD0`, which stores it at text-object `+0x18`. r49/r50 instead changed `+0x18` after construction; runtime shows that write does not control final rendering. r51 hooks immediately before the two specialized constructors at file `0x66250/0x66320`, indexes the same r50 layout table, and supplies line Y through `f13`. The original `mtc1 zero,f14` semantics are reproduced inside the helper and the original 245.0 f15 materialization remains in each JAL delay slot.
+
+The normal L1 path has only one speech-layer resource construction: r37+ changes pristine group2/resource0x18 into green `0x68/0x69`. No `0x6A` construction follows. Therefore r50's compact 0x6A metadata was necessary but insufficient. r51 inserts a real resource0x6A construction immediately after green, before the next native resource setup, using the already-packed green X/Y at stack +0x178. Depth 242.5 places blue between green Z=243 and text Z=242.
+
+Task `+0x2F4` is a safe storage slot because the normal L1 path never populates it, while lifecycle cleanup already tests/clears it. Pristine cleanup calls text destructor `0x1A1430`; because r51 stores a sprite/resource object there, the single cleanup JAL is changed to resource destructor `0x108650`, matching the existing 0x107D60-created handles at +0x2D4/+0x2D8/+0x2E4.
+
+Compatibility is append-only: the two new helpers occupy exactly 80+72 bytes after all r50 payloads. No r50 translated address moves; the whole old translation segment compares byte-for-byte identical. This ownership split should be preserved in future changes: AFK text Y belongs at constructor f13, and L1 blue visibility requires an actual 0x6A object, not only metadata.
