@@ -74,6 +74,11 @@ from tools.companion_hud import (
     COMPANION_AFK_WRAP_TEXT_HOOK_SIZE,
     COMPANION_AFK_R50_GEOMETRY_HOOK_SIZE,
     COMPANION_AFK_R52_PRETEXT_HOOK_SIZE,
+    COMPANION_ACTION_R58_POSITION_SIZE,
+    COMPANION_AFK_R58_RESTORE_SIZE,
+    COMPANION_ACTION_R58_PLACEMENT_X_VA,
+    _action_r58_blue_placement_bytes,
+    _afk_r58_restore_placement_bytes,
     COMPANION_AFK_RECORD_COUNT,
     COMPANION_AFK_RECORD_STRIDE,
     COMPANION_AFK_TABLE_OFFSET,
@@ -489,7 +494,7 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(0x25CE0B24, geometry_words[31])  # blue frame0 width field
         self.assertEqual(0x3C0D438D, geometry_words[32])  # blue 282, 3px green inset
         self.assertEqual((0xADCF0008, 0xADCF0038, 0xADCF0068), geometry_words[40:43])
-        self.assertEqual((0x86020004, 0x000219C0, 0x03E00008, 0), geometry_words[-4:])
+        self.assertEqual((0x86020004, 0x000219C0, geometry_words[-2], 0), geometry_words[-4:])
 
         hi = geometry_words[10] & 0xFFFF
         lo = geometry_words[11] & 0xFFFF
@@ -630,6 +635,60 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(("X" * 16, "X" * 16, "X" * 8), wrap_companion_afk_text("X" * 40))
         self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
+
+    def test_r58_native_blue_compositor_placement_and_afk_restore(self) -> None:
+        # Native global 0x6A X/Y placement records are written from the L1
+        # live green object and restored at AFK construction, unlike the
+        # r53-r57 ineffective task-local/pool sprite XY-only attempts.
+        elf = build_early_ui_elf(RAW)
+        _, p_offset, p_va, _, _, _, _, _ = struct.unpack_from("<8I", elf, 0x54)
+        def rel_jal(site: int) -> int:
+            instruction = struct.unpack_from("<I", elf, site)[0]
+            self.assertEqual(3, instruction >> 26)
+            return p_offset + (((instruction & 0x03FFFFFF) << 2) - p_va)
+        afk_geo_off = rel_jal(0x66050)
+        afk_tail = struct.unpack_from("<I", elf, afk_geo_off + 204)[0]
+        self.assertEqual(2, afk_tail >> 26)
+        afk_restore = p_offset + (((afk_tail & 0x03FFFFFF) << 2) - p_va)
+        self.assertEqual(_afk_r58_restore_placement_bytes(),
+                         elf[afk_restore:afk_restore + COMPANION_AFK_R58_RESTORE_SIZE])
+        action_off = rel_jal(0x66724)
+        action_words = struct.unpack_from("<47I", elf, action_off)
+        pointers = [(w & 0x03FFFFFF) << 2 for w in action_words if w >> 26 == 2]
+        self.assertEqual(1, len(pointers))
+        ext = p_offset + pointers[0] - p_va
+        ext_words = struct.unpack_from("<34I", elf, ext)
+        self.assertEqual(0x24040002, ext_words[-4])
+        self.assertEqual(2, ext_words[-3] >> 26)
+        placement = p_offset + ((ext_words[-3] & 0x03FFFFFF) << 2) - p_va
+        self.assertEqual(_action_r58_blue_placement_bytes(),
+                         elf[placement:placement + COMPANION_ACTION_R58_POSITION_SIZE])
+        # Exact data consumer is ELF file 0x3F8E50 (VA 0x4F8DD0),
+        # consecutive slot records have 20-byte stride.
+        self.assertEqual(0x004F8DD0, COMPANION_ACTION_R58_PLACEMENT_X_VA)
+        action = struct.unpack_from("<16I", elf, placement)
+        self.assertEqual(0x8E0C02D8, action[0])
+        self.assertEqual(0x8D8E003C, action[9])
+        self.assertEqual(0xADEE0000, action[10])
+        self.assertEqual(0x8D8E0040, action[11])
+        self.assertEqual(0xADEE0004, action[12])
+        restore = struct.unpack_from("<28I", elf, afk_restore)
+        self.assertEqual(0x860D02F8, restore[6]) # selected AFK slot
+        self.assertEqual(0x2DAE0002, restore[7]) # sltiu slot,2
+        self.assertEqual(0x15C00002, restore[8]) # branch on valid slot
+        self.assertEqual(0x8DEF0000, restore[17]) # live green height
+        self.assertEqual(0x43AC, restore[20] & 0xFFFF) # 344 for >=4 rows
+        self.assertEqual(0x43AD, restore[23] & 0xFFFF) # 346 for <=3 rows
+        # Fail closed on any change to either compositor owner.
+        for off in (placement + 9*4, placement + 12*4,
+                    afk_restore + 20*4, afk_restore + 23*4,
+                    ext + 31*4, afk_geo_off + 51*4):
+            with self.subTest(offset=hex(off)):
+                changed = bytearray(elf)
+                changed[off] ^= 1
+                check = next(x for x in verify_startup_elf(bytes(changed))
+                             if x["name"] == "companion_hud_layout")
+                self.assertFalse(check["ok"])
 
     def test_r53_preserves_afk_native_text_args_and_l1_sprite_fades(self) -> None:
         result = build_early_ui_elf(RAW)
@@ -798,7 +857,7 @@ class CompanionHudTests(unittest.TestCase):
                 0xADEE0008, 0xADEE0038, 0xADEE0068,  # blue pivot-X
                 0xADEB000C, 0xADEB003C, 0xADEB006C,  # blue pivot-Y
                 0x8FBF000C, 0x27BD0010, 0x24040002,
-                0x03E00008, 0x00000000, 0x00000000,
+                extension_words[31], 0x00000000, 0x00000000,
             ),
             extension_words,
         )
