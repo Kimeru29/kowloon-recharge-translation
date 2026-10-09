@@ -340,3 +340,11 @@ gate, **not** a proof of memory-card save-data compatibility.
 Build-to-build PCSX2 savestates are not a supported compatibility contract.
 No emulator instance should be launched/controlled without Pablo's explicit
 approval. No cross-version card-save runtime result is recorded yet.
+
+The offline, no-overwrite memory-card snapshot and reference-integrity workflow is
+implemented in `tools/save_compatibility.py` and documented in
+`docs/SAVE_COMPATIBILITY.md`. Six unit tests guard source immutability,
+checksum checks, independent clones and refusal to overwrite a baseline.
+A formatted but **save-unverified** Mcd001 snapshot is kept in ignored
+`local/save-compat/unverified-mcd001-20261009/` in the authoritative main
+worktree. Do not count it as the cross-release runtime smoke test.
