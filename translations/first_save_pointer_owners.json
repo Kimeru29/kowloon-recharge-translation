@@ -1,0 +1,416 @@
+{
+  "approved_r66_elf_sha256": "06ed43df4577215534f527cfecd5aa2ea71dac08da7de19bdb7b239171742958",
+  "official_english_bytes_sha256": "b8eb78a98bf9e4cde1b76887daa740ebeb7f9f856780bafdd9da1317aec6a17b",
+  "owners": [
+    {
+      "key": "room_chamber_of_lions",
+      "official_english": "Chamber of Lions",
+      "official_record_offset": 801855,
+      "owner_offsets": [
+        6084492
+      ],
+      "source_offset": 6081920,
+      "source_sha256": "c8be8736352e75987ac298c044732c1a52300a1beee43adb257dbe8e777001a7"
+    },
+    {
+      "key": "room_door_of_anubis",
+      "official_english": "Door of Anubis",
+      "official_record_offset": 801909,
+      "owner_offsets": [
+        6084496
+      ],
+      "source_offset": 6081952,
+      "source_sha256": "e1dd1747ae8325e5c35edeb1902292884cb6a7857ca4f1b0616e4aa68ecdc642"
+    },
+    {
+      "key": "room_soul_well",
+      "official_english": "Soul Well",
+      "official_record_offset": 799116,
+      "owner_offsets": [
+        6084288,
+        6084376,
+        6084400,
+        6084444,
+        6084480,
+        6084516,
+        6084560,
+        6084592,
+        6084604,
+        6084636,
+        6084672,
+        6084776,
+        6084780
+      ],
+      "source_offset": 6080448,
+      "source_sha256": "59e7b312470eea18d6d53f0009b68f60517eae59454055328f7befb3686ca183"
+    },
+    {
+      "key": "lion_inscription_1",
+      "official_english": "　\"When 4 fearsome beasts face each other,",
+      "official_record_offset": 807259,
+      "owner_offsets": [
+        5808728
+      ],
+      "source_offset": 5808640,
+      "source_sha256": "dfef2656ef3682db6d17f8ee9ed65332b1479022b7ded6fc908dbc47580bac6b"
+    },
+    {
+      "key": "lion_inscription_2",
+      "official_english": "　　the door to the east opens.\"",
+      "official_record_offset": 807361,
+      "owner_offsets": [
+        5808732
+      ],
+      "source_offset": 5808688,
+      "source_sha256": "f736e2b823f9285ef141b0153935fb80d9d3a7999aece5915efad901fc79ad2a"
+    },
+    {
+      "key": "anubis_inscription_1",
+      "official_english": "　\"When the row of nether gods",
+      "official_record_offset": 836426,
+      "owner_offsets": [
+        5836600
+      ],
+      "source_offset": 5836480,
+      "source_sha256": "5f8731f11391f9c46046c3db3db0e1d8828cc67ebd134710c6eb07e1092cafef"
+    },
+    {
+      "key": "anubis_inscription_2",
+      "official_english": "　　face south from the sunrise,",
+      "official_record_offset": 836501,
+      "owner_offsets": [
+        5836604
+      ],
+      "source_offset": 5836512,
+      "source_sha256": "c39f8948bc19ff81bc41c29a58cc75c79d32e5a02bc96475157228b1806727fa"
+    },
+    {
+      "key": "anubis_inscription_3",
+      "official_english": "　　an island to heaven surfaces.\"",
+      "official_record_offset": 836588,
+      "owner_offsets": [
+        5836608
+      ],
+      "source_offset": 5836544,
+      "source_sha256": "c9e8a0282d8668e701472611d24545841e174533265455b892061e4f2b22fe1f"
+    },
+    {
+      "key": "west_inscription_1",
+      "official_english": "　\"The one with a lowered head",
+      "official_record_offset": 836680,
+      "owner_offsets": [
+        5836728
+      ],
+      "source_offset": 5836624,
+      "source_sha256": "7b3a78d8ff2217a59b261e5e70af5915ab3daac0c8345395cb793cb4c127b919"
+    },
+    {
+      "key": "west_inscription_2",
+      "official_english": "　　that walks to the west",
+      "official_record_offset": 836746,
+      "owner_offsets": [
+        5836732
+      ],
+      "source_offset": 5836656,
+      "source_sha256": "6da2be1d2612b421308355e16e125922b9c289020fe2baaaa57208bf87d40ba0"
+    },
+    {
+      "key": "west_inscription_3",
+      "official_english": "　　will receive the mercy of god.\"",
+      "official_record_offset": 836818,
+      "owner_offsets": [
+        5836736
+      ],
+      "source_offset": 5836688,
+      "source_sha256": "f32702e1037e508d25bca065f12271b639a3037ea8f3a2037799c6aabe866909"
+    },
+    {
+      "key": "enemy_umara",
+      "official_english": "Umara",
+      "official_record_offset": 417119,
+      "owner_offsets": [
+        5852660
+      ],
+      "source_offset": 6905456,
+      "source_sha256": "7082500f67eee6444a4c12450b39e6ba8d120ca768a349f9a6021da54b5473b8"
+    },
+    {
+      "key": "object_treasure_vase",
+      "official_english": "Treasure Vase",
+      "official_record_offset": 836027,
+      "owner_offsets": [
+        5836240,
+        5836320,
+        5836352
+      ],
+      "source_offset": 6905296,
+      "source_sha256": "7a85728a6dffa798e487ab81c56eb27a83dd72016afd72db75a0e69c5217b15a"
+    },
+    {
+      "key": "object_snake_staff",
+      "official_english": "Snake Staff",
+      "official_record_offset": 807467,
+      "owner_offsets": [
+        5808832,
+        5809328,
+        5812672,
+        5812704,
+        5837008,
+        5840576,
+        5843504
+      ],
+      "source_offset": 6904888,
+      "source_sha256": "cda0ca715f6e3ffc0d399ea0d1d17d42eaa056c75631a211c278d9a3211d18ba"
+    },
+    {
+      "key": "door_heaven",
+      "official_english": "Heaven Door",
+      "official_record_offset": 834416,
+      "owner_offsets": [
+        5832032,
+        5844144
+      ],
+      "source_offset": 6905232,
+      "source_sha256": "42a64b4527853fd2513bd49b204fcceca829fb6fdf385898cdc1703ff2f94075"
+    },
+    {
+      "key": "door_earth",
+      "official_english": "Earth Door",
+      "official_record_offset": 834169,
+      "owner_offsets": [
+        5831952
+      ],
+      "source_offset": 6905224,
+      "source_sha256": "ce3c59423b54d147fe72e14565eb647bdf1f9f371b5f13fedce76b7cb80f80b5"
+    },
+    {
+      "key": "door_yomi",
+      "official_english": "Door to Yomi",
+      "official_record_offset": 833941,
+      "owner_offsets": [
+        5831824,
+        5838144
+      ],
+      "source_offset": 5831704,
+      "source_sha256": "899787398706aeb068665f55ad8b8e39b38de7d37ba01f360e3ca1c050f7452c"
+    },
+    {
+      "key": "object_lion_statue_name",
+      "official_english": "Lion Statue",
+      "official_record_offset": 29445,
+      "owner_offsets": [
+        5808192
+      ],
+      "source_offset": 5808120,
+      "source_sha256": "5b575d860d79715b774850a138a0ab37c5ad9f7c0a104504c19dfa0ece00a6d3"
+    },
+    {
+      "key": "object_lion_statue_description",
+      "official_english": "　Stone statue in the shape of a lion.",
+      "official_record_offset": 806544,
+      "owner_offsets": [
+        5808196
+      ],
+      "source_offset": 5808144,
+      "source_sha256": "d99a88950927e512fe40be84091bbc417d69e547238161d74c0517cbe04564cc"
+    },
+    {
+      "key": "object_anubis_statue_name",
+      "official_english": "Statue of Anubis",
+      "official_record_offset": 806633,
+      "owner_offsets": [
+        5808416,
+        5836784
+      ],
+      "source_offset": 5808280,
+      "source_sha256": "61ffea59d1f0e3d4d2bd25c27dabca5a7cced1eecb46e5b544a9bdcc39635a82"
+    },
+    {
+      "key": "object_anubis_statue_description",
+      "official_english": "　Ancient Egyptian god of the underworld.",
+      "official_record_offset": 806675,
+      "owner_offsets": [
+        5808420,
+        5836788
+      ],
+      "source_offset": 5808304,
+      "source_sha256": "89c9272f2fa162bb4d94e8acf7ad782f1634f05e88653f7c70d237d07903212a"
+    },
+    {
+      "key": "object_fixed_base_description",
+      "official_english": "　The base is fixed in position.",
+      "official_record_offset": 806785,
+      "owner_offsets": [
+        5808424,
+        5809624,
+        5837512,
+        5837544,
+        5837864,
+        5837960,
+        5837992,
+        5838188,
+        5838220,
+        5838252,
+        5838284,
+        5838316,
+        5838504,
+        5838600,
+        5838632,
+        5839096,
+        5839160,
+        5839192,
+        5839272,
+        5839304,
+        5839336,
+        5839368,
+        5839400,
+        5839432,
+        5839528,
+        5839880,
+        5839912,
+        5839944,
+        5839976,
+        5840860,
+        5840892,
+        5840924,
+        5840956,
+        5840988,
+        5841020,
+        5843928
+      ],
+      "source_offset": 5808352,
+      "source_sha256": "c512adc18e8fce69139440f5e665437e2b25a491d254163fa9dd6455e966a3a8"
+    },
+    {
+      "key": "object_cannot_interact_description",
+      "official_english": "　Cannot be interacted with.",
+      "official_record_offset": 806862,
+      "owner_offsets": [
+        5808428,
+        5809628,
+        5837516,
+        5837548,
+        5837740,
+        5837868,
+        5837964,
+        5837996,
+        5838192,
+        5838224,
+        5838256,
+        5838288,
+        5838320,
+        5838476,
+        5838508,
+        5838604,
+        5838636,
+        5839100,
+        5839164,
+        5839196,
+        5839276,
+        5839308,
+        5839340,
+        5839372,
+        5839404,
+        5839436,
+        5839532,
+        5839884,
+        5839916,
+        5839948,
+        5839980,
+        5840864,
+        5840896,
+        5840928,
+        5840960,
+        5840992,
+        5841024,
+        5843612,
+        5843676,
+        5843708,
+        5843932,
+        5843964,
+        5843992,
+        5844028
+      ],
+      "source_offset": 5808384,
+      "source_sha256": "4a215ab93fffb80d517ca91764b35c33dcd41d430d83cddbb7175c8e8d8ffa7a"
+    },
+    {
+      "key": "object_isis_inscription_name",
+      "official_english": "Isis' Inscription",
+      "official_record_offset": 29476,
+      "owner_offsets": [
+        5808560,
+        5843568
+      ],
+      "source_offset": 5808440,
+      "source_sha256": "0ac933613f4cd73d9eaa8e1c880c05f49ab35776734db745505d6c0b4e6e24e1"
+    },
+    {
+      "key": "object_isis_inscription_description",
+      "official_english": "　Ancient Heracleion epitaph.",
+      "official_record_offset": 806962,
+      "owner_offsets": [
+        5808564,
+        5843572
+      ],
+      "source_offset": 5808464,
+      "source_sha256": "d1c4de518b5200e1f6c1eae2e4d97bd84681152db765fd10879b7635810fc36e"
+    },
+    {
+      "key": "object_isis_inscription_effect",
+      "official_english": "　Strong Kirlian effect identified.",
+      "official_record_offset": 807048,
+      "owner_offsets": [
+        5808568,
+        5843576
+      ],
+      "source_offset": 5808512,
+      "source_sha256": "6b29ce69ef1eaf2bd74f690b4a8b27e8732bf732409295f064398392be6afbbf"
+    },
+    {
+      "key": "object_ancient_writing_description",
+      "official_english": "　Ancient Egyptian writing detected.",
+      "official_record_offset": 807163,
+      "owner_offsets": [
+        5808724,
+        5836596,
+        5836724,
+        5836948
+      ],
+      "source_offset": 5808592,
+      "source_sha256": "011c7918da4da03eeb567406bd28290adad1b5df94c571309e89c9f3c298eb42"
+    },
+    {
+      "key": "object_snake_staff_description",
+      "official_english": "　Staff in the shape of a snake.",
+      "official_record_offset": 807495,
+      "owner_offsets": [
+        5808836,
+        5809332,
+        5812676,
+        5812708,
+        5837012,
+        5840580,
+        5843508
+      ],
+      "source_offset": 5808752,
+      "source_sha256": "a077775af8b18a5439e194a82b315509aa60cb8df0f0f7b97e4ddb0ff02116cc"
+    },
+    {
+      "key": "object_snake_staff_motion_description",
+      "official_english": "　Movable exterior part identified.",
+      "official_record_offset": 807563,
+      "owner_offsets": [
+        5808840,
+        5809336,
+        5812680,
+        5812712,
+        5815800,
+        5818952
+      ],
+      "source_offset": 5808784,
+      "source_sha256": "4ee48e9494761b81055e8e93c76b85a6bc5dff1f18d03b90677c34e837294d81"
+    }
+  ],
+  "schema_version": 1
+}
