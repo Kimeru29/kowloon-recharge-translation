@@ -301,3 +301,42 @@ Frozen AFK regression barrier: nine literal SHA256 golden fixtures from the user
 Validation: focused45/45; full257 expected10 skips; Pillow257 expected1 skip; final ISO acceptance155/155; repeat ISO byte-identical. ISO /private/tmp/kowloon-recharge-startup-en-v11-r61.iso SHA256 7fa9eaa0ab2aaabf9d8393ec9bb2b1dcf8d9a5e36c4354855525d5a5a3e0e8a9. Offline Unicorn MIPS execution confirms native green coordinates (175,346) produce blue (173,347), null-path safety and preserved F0/F2/RA/SP. PCSX2 was NOT started or controlled.
 
 Manual gate: one blue L1 tint fully contained in the green outline for both companions and short/long action labels; AFK remains fully approved and frozen. Static tests do not prove visual success.
+
+
+## Approved r66 companion HUD and memory-card compatibility gates
+
+Pablo explicitly accepted both L1 and AFK in the r66 ISO on 2026-10-08.
+`tests/test_companion_hud.py` freezes six **independently SHA256-pinned** r66
+binary owners (native id0x78 constructor, all 31 per-action blue layouts, the
+disabled late-write path, placement, selector, and sprite lookup). Every owner
+also undergoes mutation testing against the `companion_hud_layout` final-ELF
+acceptance gate. The prior nine independent accepted r59 AFK golden digests
+continue to pin all 600 layouts, text/geometry hooks, owner/pointer records,
+native resources and placements. These are intentionally strict; any future
+change to an approved HUD surface requires explicit review and runtime proof.
+
+`tests/test_startup_acceptance.py` freezes all 15 native
+`BISLPM-66511Save` references and adjacent 64-byte path/descriptor windows,
+ensuring the save namespace and related paths cannot silently drift.
+`SLPM-66511` game identity must remain unchanged. This is a necessary static
+gate, **not** a proof of memory-card save-data compatibility.
+
+### Mandatory cross-release save/load smoke test
+
+1. Back up a working ordinary PS2 memory-card image containing a known r66
+   save; retain an untouched reference copy and record checksums.
+2. Cold-boot r66 with a dedicated copy, verify the save is readable; record
+   story checkpoint, party/companion, inventory, flags and name.
+3. Cold-boot candidate ISO with a disposable copy of the **same memory-card
+   image**, without loading an old savestate. Load the saved checkpoint,
+   compare state, advance gameplay, save again and restart candidate.
+4. Confirm reloading the candidate-written save works. If backwards
+   compatibility is required, separately test loading a disposable copy of
+   that save in r66 before making any promise.
+5. Reject release on missing saves, corruption, shifted inventory/events,
+   failed transitions or a changed serial/namespace/save serialization. Keep
+   save-format storage, IDs and scenario states invariant by default.
+
+Build-to-build PCSX2 savestates are not a supported compatibility contract.
+No emulator instance should be launched/controlled without Pablo's explicit
+approval. No cross-version card-save runtime result is recorded yet.

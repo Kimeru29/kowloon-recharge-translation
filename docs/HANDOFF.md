@@ -677,3 +677,60 @@ Pablo's r65 screenshot shows very slight remaining X− underfill and Y− overf
 AFK is PERFECT and explicitly user-approved from r59. Nine independent post-ROFS SHA256 golden fixtures continue to protect its 600 layouts, original owner records/pointers, text, geometry, sprite resources and placements. Strict r65→r66 binary comparison found exactly three L1 width/X-pivot immediate bytes and 31 blue-only action height floats changed, ZERO unclassified changes; all AFK bytes, green geometry, localized pointers, text and unrelated UI byte-identical.
 
 Candidate /private/tmp/kowloon-recharge-startup-en-v11-r66.iso, SHA256 1e818e50283ea1f8d9480293aecc5cd8dcc95b32fe128b430d7445ef1718d5e5. Focused46/46, full258 (10 expected skips), final image155/155, offline MIPS constructor64/64 and alpha64/64 passed. Repeat-build and Pillow suite are separately validated. Visual PCSX2 test STILL REQUIRED; no claim of perfect alignment until Pablo confirms. User explicitly forbids changing/pushing/merging main before approval. Keep r66 on unpushed LOCAL feature branch fix/r66-l1-edge-final-tuning, preserving main at e55e29c.
+
+
+## Latest authoritative checkpoint: r66 accepted — release hardening
+
+As of 2026-10-08, Pablo directly confirmed the **r66 AFK and L1 bubble backgrounds
+both work in PCSX2**. The prior local-only/no-merge restriction has been
+satisfied for this specific candidate. Earlier r62–r65 observations and
+hypotheses are historical; do not confuse them with current runtime status.
+
+- r66 ISO: `/private/tmp/kowloon-recharge-startup-en-v11-r66.iso`
+- ISO SHA256: `1e818e50283ea1f8d9480293aecc5cd8dcc95b32fe128b430d7445ef1718d5e5`
+- Native AFK group2/id0x6A: user-approved, unchanged since r59 layout.
+- Native L1 group2/id0x78: user-approved r66; 31 known L1 actions by 2
+  companion slots; blue width226, X pivots56/101, blue height green−6,
+  pivotY equal to green. All existing active green/text owners are untouched.
+- Six *independent literal* golden SHA256 L1 owners now join the nine
+  literal accepted AFK goldens; final-image verifier additionally locks the
+  action-selector bytes. Test names:
+  `test_r66_user_approved_l1_binary_owners_are_frozen` and
+  `test_r60_freezes_user_accepted_r59_afk_layout_and_runtime_bytes`.
+- Save static gate:
+  `test_approved_memory_card_save_namespace_and_paths_are_unchanged`
+  freezes all 15 original `BISLPM-66511Save` path/descriptor windows.
+- A new ISO remains unapproved unless Pablo sees and accepts its intended
+  runtime differences. Do not disturb PCSX2 without approval.
+
+### Recommended next work — incremental, save-compatible by design
+
+**Do not declare the PS4-derived translation complete.** Current corpus
+status in `docs/LOCALIZATION_STATUS.md` shows 962 exact MTX files/56,642
+English entries imported but 23 indirect/dynamic mapped MTX files/21,672
+entries rejected, 7 structurally changed MTX files/2,284 entries imported,
+only FD00_31 proven in the special 26-file FD00 family, KSF 868 fitting
+entries imported but 48 overflow and 4 ambiguous, PS2-exclusive text, and
+unmapped gameplay/UI graphics. The repo has substantial discovery but NOT
+sufficient proven remaster correspondence to auto-import every remaining
+string without risk. Do not extrapolate from lexical similarities.
+
+Ship vertical slices, preserving prior accepted presentation at every slice:
+(1) inventory/reconciling unproven PS4 exact/indirect MTX mappings and their
+dynamic ownership, (2) structurally changed FD00 and selected remaining KSF
+with bounds/overflow solutions, (3) later gameplay/ADV/DG routes plus
+unpromoted H.A.N.T./Mail/Help and remaining title/UI graphics, then
+(4) independent PS2/Re:charge-only content with marked provenance.
+Before each iteration choose one bounded class/chapter, inventory source/PS4
+mapping, change only proven owners, add exact fail-closed tests, build
+deterministically, run final-image acceptance, and request focused PCSX2
+visual review.
+
+**Save compatibility is a release gate.** Preserve
+`SLPM-66511`/`BISLPM-66511Save`, serialization, story IDs/flags, item
+indexes and transitions. Work on copies of a real ordinary PS2 memory card:
+boot r66 and the new ISO separately, load same older checkpoint, verify state,
+advance/save/restart/reload on candidate. Do not rely on savestates. Static
+names/path tests cannot guarantee runtime save compatibility; this smoke test
+is still pending and is the next non-translation acceptance infrastructure
+task. Never alter the original memory card as the test artifact.

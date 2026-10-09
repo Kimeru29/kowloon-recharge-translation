@@ -47,8 +47,8 @@ Status meanings:
 | Dungeon HUD exploration action text | **Working / runtime-proven / frozen** | Pablo accepts r29's moving action HUD as completely translated and visually correct. Freeze the proven `H_CmdIconDraw` owners for `Examine` / `Items` / `Jump`; r30 changes no r29 action-menu geometry or text. |
 | Dungeon HUD battle/L1 item text | **Working / runtime-proven / frozen** | Pablo accepts the r29 action/L1 HUD pass. Freeze the 446 exact PS4 item-name relocations and their 500-entry table ownership; r30 keeps these owners unchanged and regression-covered. |
 | SELECT command/menu labels | **Working / runtime-proven / frozen** | Pablo accepts r29's SELECT/start menu as completely translated and visually correct. Freeze all 18 proven wide-text command aliases; unresolved `メディア` remains pristine rather than guessed. |
-| Companion HUD action/skill label | **r66 generic L1 candidate, LOCAL only; visual approval pending** | Extends blue one native unit on X− and trims another one on Y−, keeping X+ and Y+ fixed. All 31 supported L1 action IDs × 2 companion slots verified; no hardcoded text. No push/merge to main until user confirms visually. |
-| Companion HUD transient comments | **AFK perfect and frozen** | All accepted r59 AFK golden hashes and strict r65→r66 audit pass; no changes to AFK code/data/geometry, text or pointers. |
+| Companion HUD action/skill label | **Working / runtime-proven / frozen (r66)** | Pablo explicitly approved the r66 L1 tint and AFK in PCSX2. Native group2/id0x78 geometry is table-driven for all 31 known action IDs and both native companion slots, including multiline heights and alpha lifecycle. Preserve approved r66 layout, constructor, selector and sprite lookup; six independent SHA256 golden snapshots now fail closed on drift. New action IDs/slot families still require discovery. |
+| Companion HUD transient comments | **Working / runtime-proven / frozen (r66; geometry from r59)** | Pablo confirmed AFK and L1 both work in r66. Retain the 600-record AFK layouts, multiline wrapping, text anchor, tint and 999 translated pointers; the nine accepted r59 binary SHA256 golden snapshots must remain identical. |
 
 ## Known executable/UI text not yet solved
 
@@ -531,3 +531,32 @@ Candidate `/private/tmp/kowloon-recharge-startup-en-v11-r29.iso` hashes to `1692
 ## v11-r30 companion HUD checkpoint
 
 The r29 runtime review promotes both dungeon action-menu sections and the SELECT/start menu to accepted/frozen. r30 traces the remaining companion HUD independently: 1,650 unique live `h_buddy.c` comment strings / 1,784 aliases all have unique exact PS4 `English.bytes` matches, while the 31-entry companion action table has 26 exact PS4 labels, one pristine placeholder, and four explicitly provenance-tagged Re:charge-only semantic labels. The generated manifest pins the pristine PS2 ELF and owned `English.bytes` hashes; regression tests fail closed on both source and pointer drift while preserving all r29 and H.A.N.T. owners. Candidate `/private/tmp/kowloon-recharge-startup-en-v11-r30.iso` hashes to `7bed876be95e19fd7c2fe1ade882eaf9fb0518db1165510861fa69d89db63c5f`; final-image acceptance is **153/153**; both suites execute **239 tests**; repeat ISO is byte-identical.
+
+
+## r66 runtime approval and regression checkpoint (2026-10-08)
+
+Pablo visually confirmed **both AFK and L1 dialogue backgrounds work correctly on r66**.
+Approved bootable ISO: `/private/tmp/kowloon-recharge-startup-en-v11-r66.iso`;
+SHA-256: `1e818e50283ea1f8d9480293aecc5cd8dcc95b32fe128b430d7445ef1718d5e5`.
+This is now the cumulative presentation baseline, not an untested candidate.
+All 31 known native L1 action IDs and both native companion slots inherit the accepted
+group2/id0x78 pre-construction geometry. The patch is not tied to a specific English
+label. Existing tests snapshot six independent r66 L1 binary owners and nine prior
+AFK owners and reject drift; the finished ISO passed 155/155 acceptance gates.
+
+**Coverage is still incomplete.** The corpus inventory above explicitly leaves
+23 indirect/dynamic exact MTX files (21,672 entries), FD00 structural variants,
+48 overflow/4 ambiguous KSF entries, PS2/Re:charge-only text, non-empty Mail,
+unpromoted Help bodies, eight save-management messages, and unproven artwork.
+Do not promise 100% official PS4 backport without individual correspondence
+proof. Prefer incremental progression by class and in-game checkpoint.
+
+**Cross-release save policy:** ordinary memory-card save data is the compatibility
+target, not savestates. Preserve SLPM-66511 and BISLPM-66511Save, all persistent
+field layouts, scenario IDs/flags/item IDs, and original save/load behavior. A
+new regression pins all 15 native save-path references and adjacent descriptors.
+That static invariant alone does not prove a save loads: before each future
+release, cold-boot the old and candidate ISOs with the same **backed-up,
+dedicated memory-card save**, verify load/progress/save and re-load on candidate,
+and reject builds that fail this smoke test. Existing savestates should not be
+reused across distinct executable/ISO revisions.

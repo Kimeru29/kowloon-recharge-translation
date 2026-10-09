@@ -700,6 +700,83 @@ class CompanionHudTests(unittest.TestCase):
                     self.assertEqual(green_right-2.0,blue_right)
                     self.assertEqual(green_top,blue_top)
 
+    def test_r66_user_approved_l1_binary_owners_are_frozen(self) -> None:
+        """Accepted r66 L1 appearance: independent golden hashes, not source-derived expectations.
+
+        Exact snapshots are from the accepted r66 translated executable.
+        Future translations must not silently change action selection, native
+        group2/id0x78 constructor geometry, its 31 layouts, or the disabled
+        late geometry write path. AFK has its separate accepted-r59 goldens.
+        """
+        elf = build_early_ui_elf(RAW)
+        _, off, va, _, _, _, _, _ = struct.unpack_from("<8I", elf, 0x54)
+
+        def branch_target(site: int) -> int:
+            insn = struct.unpack_from("<I", elf, site)[0]
+            self.assertEqual(3, insn >> 26)
+            return off + (((insn & 0x03FFFFFF) << 2) - va)
+
+        scan = branch_target(0x66740)
+        scan_words = struct.unpack_from("<39I", elf, scan)
+        self.assertEqual(2, scan_words[36] >> 26)
+        pre = off + (((scan_words[36] & 0x03FFFFFF) << 2) - va)
+        pre_words = struct.unpack_from("<55I", elf, pre)
+        blue_table_va = ((pre_words[18] & 0xFFFF) << 16) + (
+            (pre_words[19] & 0xFFFF) - (0x10000 if pre_words[19] & 0x8000 else 0)
+        )
+        blue_table = off + blue_table_va - va
+        selector = branch_target(0x66724)
+        selector_words = struct.unpack_from("<47I", elf, selector)
+        jumps = [insn for insn in selector_words if insn >> 26 == 2]
+        self.assertEqual(1, len(jumps))
+        late_geometry = off + (((jumps[0] & 0x03FFFFFF) << 2) - va)
+        extension_words = struct.unpack_from("<34I", elf, late_geometry)
+        self.assertEqual(2, extension_words[-3] >> 26)
+        late_placement = off + (((extension_words[-3] & 0x03FFFFFF) << 2) - va)
+
+        accepted = {
+            "native_constructor_0x78": (
+                pre, 220,
+                "08d9deb9d6487ad86c935e0939a03b9f75c5a20a23a523e6823ad72a316b1b68"
+            ),
+            "all_31_action_blue_layouts": (
+                blue_table, 31 * 12,
+                "a880c7bbb116b8521bf9b2cf28602ef8d3da1e6a2785aad6b954cca7550a3713"
+            ),
+            "disabled_late_metadata_writes": (
+                late_geometry, 136,
+                "1bc93d00cfb53535135f433b08428f8e3c731cfc956c826c50cde18b30eb5679"
+            ),
+            "native_action_placement": (
+                late_placement, 64,
+                "69399066c904477b90a531e49cd35974bb144b802aa5263cabde1211c20c7139"
+            ),
+            "action_selector": (
+                selector, 188,
+                "5703e08e842ffab5a8c4d2f65a094c9b19c94ebfbf9d624a9f90f7c70bc1ae97"
+            ),
+            "native_sprite_lookup": (
+                scan, 156,
+                "584934b5c46f2ed3a183f75e21318e9a8e93f0937963e51281c88280f81c3c1f"
+            ),
+        }
+        for name, (offset, size, accepted_sha) in accepted.items():
+            with self.subTest(approved_l1_component=name):
+                self.assertEqual(
+                    accepted_sha, hashlib.sha256(elf[offset:offset + size]).hexdigest()
+                )
+                tampered = bytearray(elf)
+                tampered[offset + size // 2] ^= 1
+                self.assertNotEqual(
+                    accepted_sha,
+                    hashlib.sha256(tampered[offset:offset + size]).hexdigest(),
+                )
+                owner = next(
+                    gate for gate in verify_startup_elf(bytes(tampered))
+                    if gate["name"] == "companion_hud_layout"
+                )
+                self.assertFalse(owner["ok"], name)
+
     def test_r62_l1_blue_preconstructor_retains_metadata_until_native_draw(self) -> None:
         elf=build_early_ui_elf(RAW)
         _,off,va,_,_,_,_,_=struct.unpack_from("<8I",elf,0x54)

@@ -890,7 +890,15 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
     if action_select >> 26 != 3:
         return False
     selector_file = p_offset + (((action_select & 0x03FFFFFF) << 2) - p_vaddr)
-    if selector_file < 0:
+    # Runtime-approved r66 action selector is now an immutable owner.
+    # Without an independent snapshot, changing non-layout branch words can
+    # silently pass the generated self-consistency checks below.
+    if (
+        selector_file < p_offset
+        or selector_file + 188 > p_offset + p_filesz
+        or sha256(raw[selector_file:selector_file + 188]).hexdigest()
+        != "5703e08e842ffab5a8c4d2f65a094c9b19c94ebfbf9d624a9f90f7c70bc1ae97"
+    ):
         return False
     select_hi, select_lo = struct.unpack_from("<2I", raw, selector_file + 14*4)
     action_table_va = ((select_hi & 0xFFFF) << 16) + (
