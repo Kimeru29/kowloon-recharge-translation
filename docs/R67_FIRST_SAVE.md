@@ -226,3 +226,51 @@ Use fresh output destinations if the paths already exist; the build is
 content-deterministic and SHA-fingerprinted. Never overwrite r66 or the
 pristine corpora. Layout and icons are **statically verified**; graphical
 acceptance still requires Pablo's own screenshots.
+
+## Integrated static candidate for first-save player review (2026-10-09)
+
+**Current state: static candidate built and checked; no PCSX2 launch or save; PR #36 remains a draft.** The older "Still required" section above describes the gaps found *before* the subsequent Help, inspection and graphics implementation.
+
+**Coverage:** the previously frozen 29 executable source owners/148 aliases now coexist with 50 added English H.A.N.T. Help bodies/99 body+metadata descriptors and nine extra first-dungeon interaction owners/78 aliases. All **55 Help topics** have English text pointers (the four previously accepted bodies and the separate starter tutorial remain frozen). The English Help generator respects the original row count, EOF markers, 28-cell width, controller-icon metadata and existing 12px/16px renderer. Official PS4 text is matched through hashed Japanese source text; missing standalone controller keys and the repeated Entering Battle command use explicit semantic exceptions.
+
+An offline JP/EN texture audit covered all 31 official localized remaster bundle pairs. The integrated overlay includes **85 official English TMX entries across 18 PS2 containers**: HUD, combat, menu, item/stat, optional H.A.N.T. panels, enemy/profile cards, first-save labels and secondary New Game/Load Game artwork. Entries are pinned by source and output hashes and the importer preserves every neighboring TMX chunk. The single previously translated native H.A.N.T. graphics resource, GP020_03, is preserved *from accepted r66* while GP020_02 is localized in the same container. No pristine source or accepted r66 asset was modified.
+
+**The ISO on the Mac:** /private/tmp/kowloon-r67-first-save-complete-static.iso
+
+**SHA-256:** e3cfa94fe2a23ba203387c7141072ccbf117db4f4bb60da49b1101d9a89f4a04
+
+**ISO size:** 2,095,382,528 bytes. Two independently generated ISO builds have the same hash. All **155/155** startup acceptance checks pass with the r67-specific graphics acceptance reference, and the complete ISO delta audit classifies **every changed byte**: exactly 148 earlier text pointers, 99 Help descriptors, 78 additional interaction pointers, 85 owned graphics entries, appended English payload and ELF/ISO9660 size fields. **Zero unclassified modifications.** The save namespace BISLPM-66511Save is byte-identical to r66 at all 15 offsets; the serial SLPM-66511 is unchanged. AFK/L1 and old-man renderer accepted static golden checks remain active.
+
+Static evidence is generated under local/r67-complete-static-build.json, local/r67-complete-static-acceptance-v2.json, local/r67-complete-static-delta.json, local/r67-help-icon-safe-report.json, local/r67-early-interactions-report.json, local/r67-english-graphics-85-report.json, and local/r67-graphics-pixel-audit.json. The audited source-owner manifests (not copyrighted byte arrays) are committed under translations/. The reproducible scripts are tools/first_save_r67.py, tools/first_save_help.py, tools/first_save_interactions.py, tools/first_save_graphics_port.py and tools/first_save_iso_delta.py.
+
+### Rebuild the finished ISO
+
+After regenerating P0, Help and interaction ELFs using the documented commands above, run the graphics importer on the owned original and accepted r66 sources:
+
+    uv run --with UnityPy python -m tools.first_save_graphics_port \
+      --pristine-iso '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+      --approved-r66-iso /private/tmp/kowloon-recharge-startup-en-v11-r66.iso \
+      --ps4-bundles /private/tmp/kowloon-ps4-recovered/CUSA27034/Media/StreamingAssets/BLBRD \
+      --manifest translations/r67_graphics_owners.json \
+      --overlay-root local/r67-english-graphics-85 \
+      --report local/r67-english-graphics-85-report.json
+
+    python3 -m tools.build_translation_iso \
+      '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+      /private/tmp/kowloon-r67-first-save-complete-static.iso \
+      --overlay exact-mtx ../startup-flow-v10/local/exact-mtx \
+      --overlay exact-ksf ../startup-flow-v10/local/exact-ksf \
+      --overlay structural-mtx ../startup-flow-v10/local/structural-mtx \
+      --overlay accepted ../startup-flow-v10/local/accepted-overrides \
+      --overlay startup-graphics ../startup-flow-v10/local/startup-graphics \
+      --overlay r67-graphics local/r67-english-graphics-85 \
+      --elf local/r67-early-interactions.elf \
+      --report local/r67-complete-static-build.json
+
+For finished-image acceptance, create an ignored reference tree at local/r67-acceptance-graphics/BLBRD containing symlinks to accepted r66 B_GP019.BIN, B_GP088.BIN and INIT_MES, but point B_GP020.BIN to the new r67 overlay. This allows the original 155 checks to account for the *intentional* GP020_02 localization; a separate test enforces byte-for-byte r66 GP020_03 and all other unowned sprite data. The full ISO delta gate additionally enforces per-entry SHA256.
+
+### What static analysis cannot prove
+
+This is a candidate **for the user's first playthrough**, not runtime acceptance. No claim is made that in-game text is not clipped or that all game-state-dependent optional screens have been visited. Twelve localized PS4 bundle families remain outside this bounded graphics import because their first-save relevance or PS2 atlas ownership was not established; some contain later-game school, dorm, museum, guild or ending artwork. This is not evidence that their content is reachable before the first save.
+
+**Player verification required:** New Game, Salah, full first dungeon, combat, all optional H.A.N.T. Help and item/inspection screens, Soul Well Save/Load. Report untranslated fragments and visual bugs. Fix those *before* the user makes the first permanent save and hashes the resulting memory card. Do not launch PCSX2 or create a save autonomously.
