@@ -662,37 +662,43 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
 
-    def test_r65_blue_extends_left_and_trims_bottom_with_fixed_right_top(self) -> None:
+    def test_r66_all_action_ids_and_slots_keep_right_top_and_fine_tune_left_bottom(self) -> None:
         # User approved the r63 blue RIGHT/TOP; left lacks coverage and the
         # bottom overflows. Assert independent screen-space edges for ALL action
         # ids and both slots (not merely self-consistency of patch constants).
-        self.assertEqual(-3.0, COMPANION_ACTION_R62_INSET_X)
+        self.assertEqual(-4.0, COMPANION_ACTION_R62_INSET_X)
         self.assertEqual(0.0, COMPANION_ACTION_R62_INSET_TOP)
-        self.assertEqual(5.0, COMPANION_ACTION_R62_INSET_BOTTOM)
-        self.assertEqual(225.0, COMPANION_ACTION_R62_INSET_WIDTH)
+        self.assertEqual(6.0, COMPANION_ACTION_R62_INSET_BOTTOM)
+        self.assertEqual(226.0, COMPANION_ACTION_R62_INSET_WIDTH)
         blue_bytes=_action_r62_inset_layout_table_bytes()
         self.assertEqual(len(COMPANION_ACTION_LAYOUTS)*12,len(blue_bytes))
         for action_id,green in enumerate(COMPANION_ACTION_LAYOUTS):
             blue_height,blue_pivot_y,blue_text_y=struct.unpack_from(
                 "<fff",blue_bytes,12*action_id)
             with self.subTest(action=action_id):
-                self.assertEqual(green.height-5.0,blue_height)
+                self.assertEqual(green.height-6.0,blue_height)
                 self.assertEqual(green.pivot_y,blue_pivot_y)
                 self.assertEqual(green.text_y,blue_text_y)
                 for slot,green_pivot_x in ((0,52.0),(1,97.0)):
-                    blue_pivot_x=green_pivot_x+3.0
+                    blue_pivot_x=green_pivot_x+4.0
                     green_left,green_top=-green_pivot_x,-green.pivot_y
                     blue_left,blue_top=-blue_pivot_x,-blue_pivot_y
                     green_right=green_left+224.0
-                    blue_right=blue_left+225.0
+                    blue_right=blue_left+226.0
                     green_bottom=green_top+green.height
                     blue_bottom=blue_top+blue_height
-                    # Compared to r64, left extends 1 unit more and the bottom
-                    # trims 1 unit more. The RIGHT and TOP remain identical.
-                    self.assertEqual(-3.0,blue_left-green_left)
+                    # Every one of the 31 native action IDs is covered by the SAME
+                    # computed blue layout. Both companion slots reuse the
+                    # same geometry with a different X pivot.
+                    # Compared with r65, left extends and bottom trims 1
+                    # more unit, while right/top stay exactly identical.
+                    self.assertEqual(-4.0,blue_left-green_left)
                     self.assertEqual(2.0,green_right-blue_right)
                     self.assertEqual(0.0,blue_top-green_top)
-                    self.assertEqual(5.0,green_bottom-blue_bottom)
+                    self.assertEqual(6.0,green_bottom-blue_bottom)
+                    # Preserve the already-approved X+/Y+ edges across r65->r66.
+                    self.assertEqual(green_right-2.0,blue_right)
+                    self.assertEqual(green_top,blue_top)
 
     def test_r62_l1_blue_preconstructor_retains_metadata_until_native_draw(self) -> None:
         elf=build_early_ui_elf(RAW)
