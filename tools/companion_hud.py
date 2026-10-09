@@ -171,16 +171,16 @@ COMPANION_ACTION_R61_LIVE_OFFSET_KEY = "companion_action_r61_blue_live_xy"
 COMPANION_ACTION_R61_LIVE_OFFSET_SIZE = 96
 COMPANION_ACTION_R61_BLUE_SHIFT_X = -2.0
 COMPANION_ACTION_R61_BLUE_SHIFT_Y = 1.0
-# r64: user confirms r63 right/top edges look good, but left has a gap and
-# bottom still overflows. Extend LEFT by 2, trim BOTTOM by 2 more; keep
-# RIGHT and TOP coordinates byte-for-byte equivalent to r63.
+# r65: r64 is close but still needs a small adjustment on X- and Y-.
+# Extend LEFT another 1 unit, trim BOTTOM another 1 unit. Preserve X+ and
+# Y+ bounds exactly as r64, without touching green/text or AFK.
 # Keep r60/r61 payload addresses for binary compatibility, but disable late
 # id0x78 metadata overwrites and the ineffective post-constructor XY nudge.
 COMPANION_ACTION_R62_INSET_TABLE_KEY = "companion_action_r62_blue_inset_layout"
-COMPANION_ACTION_R62_INSET_X = -2.0
+COMPANION_ACTION_R62_INSET_X = -3.0
 COMPANION_ACTION_R62_INSET_TOP = 0.0
-COMPANION_ACTION_R62_INSET_BOTTOM = 4.0
-COMPANION_ACTION_R62_INSET_WIDTH = 224.0
+COMPANION_ACTION_R62_INSET_BOTTOM = 5.0
+COMPANION_ACTION_R62_INSET_WIDTH = 225.0
 
 
 
@@ -1283,17 +1283,17 @@ def _action_r60_preconstruct_bytes(*, table_va: int) -> bytes:
         _mips_r(0, 0, 13, 0, 0x21),      # otherwise slot0
         _mips_i(0x0F, 0, 15, 0x0045),
         _mips_i(0x09, 15, 15, 0x13F4), # 0x78 frame0 width owner
-        _mips_i(0x0F, 0, 12, 0x4360),  # r64 width224 + left shift2: keep r63 right edge fixed
+        _mips_i(0x0F, 0, 12, 0x4361),  # r65 width225, 1 more unit left, right edge fixed
         _mips_i(0x2B, 15, 12, 0x00),
         _mips_i(0x2B, 15, 12, 0x30),
         _mips_i(0x2B, 15, 12, 0x60),
         _mips_i(0x2B, 15, 10, 0x04),
         _mips_i(0x2B, 15, 10, 0x34),
         _mips_i(0x2B, 15, 10, 0x64),
-        _mips_i(0x0F, 0, 12, 0x4258),  # r64 slot0 pivotX 54 = green52 + 2
+        _mips_i(0x0F, 0, 12, 0x425C),  # r65 slot0 pivotX55 = green52 + 3
         _mips_i(0x04, 13, 0, 2),
         0,
-        _mips_i(0x0F, 0, 12, 0x42C6),  # r64 slot1 pivotX 99 = green97 + 2
+        _mips_i(0x0F, 0, 12, 0x42C8),  # r65 slot1 pivotX100 = green97 + 3
         _mips_i(0x2B, 15, 12, 0x08),
         _mips_i(0x2B, 15, 12, 0x38),
         _mips_i(0x2B, 15, 12, 0x68),
