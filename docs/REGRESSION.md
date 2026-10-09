@@ -375,5 +375,10 @@ Final feature worktree tests: 254 tests in the dependency-free suite
 five focused adjacent-DC/approval/golden tests pass. The committed accepted
 translation manifest still compares equal to itself with zero changes.
 
+The default slot-1 card reference was inspected with read-only `mymcplusplus`
+and contains two unrelated save directories, **no** Kowloon directory. It is
+not a golden checkpoint. A fresh r66 in-game save must be generated on an
+expendable card before any r66->r67 load/save claim can be made.
+
 Actual runtime presentation, save compatibility and scene progression remain
 pending Pablo's approval/testing; static proof cannot upgrade them.

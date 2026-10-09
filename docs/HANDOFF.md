@@ -779,7 +779,11 @@ Neither PCSX2 nor any original memory-card image was modified.
   executable ROFS size bytes. No other changes. AFK/L1 rendering and all
   other executable instructions/data remain byte identical.
 - Save namespace/identity remains unchanged; the cross-version memory-card
-  runtime smoke test is still **pending**. PCSX2 was not launched.
+  runtime smoke test is still **pending**. Read-only `mymcplusplus dir` on the
+  checksummed default slot-1 reference card confirmed it contains two unrelated
+  game saves and **no Kowloon save**. A genuine r66 in-game save must first be
+  created using a disposable card under explicit PCSX2 approval; this reference
+  must not be represented as a golden Kowloon checkpoint. PCSX2 was not launched.
 - Before any merge/release: Pablo must approve a manual in-game observation
   of this specific MS04 scene, including correct multi-line English and
   unaffected UI/game progression; repeat cross-release real memory-card save

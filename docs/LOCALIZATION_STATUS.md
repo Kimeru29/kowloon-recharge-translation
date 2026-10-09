@@ -580,4 +580,7 @@ unchanged.
 
 **Runtime status:** not tested. Do not claim the MS04 English is visually
 accepted, or that actual cross-release memory-card saves work, until Pablo
-performs the prescribed tests without old savestates. No PCSX2 launch occurred.
+performs the prescribed tests without old savestates. The existing slot-1
+memory-card reference was inspected read-only and contains no Kowloon save;
+a genuine r66 checkpoint must be created on a disposable card first.
+No PCSX2 launch occurred.
