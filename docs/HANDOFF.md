@@ -741,3 +741,46 @@ unit tests). The existing Mac Mcd001 image was copied to a checksummed
 **unverified** reference under ignored `local/save-compat/`; presence of an
 actual Kowloon save and runtime cross-release compatibility remain unproven.
 Neither PCSX2 nor any original memory-card image was modified.
+
+## Proposed v11-r67: exact MS04 multiline DC import — STATIC ONLY
+
+- Baseline remains **runtime-approved r66** (`1e818e50...`); AFK group2/0x6A
+  and L1 group2/0x78 are frozen.
+- Feature worktree: `.worktrees/ms04-mtx-correspondence` on
+  `feat/ms04-mtx-correspondence`. Do **not** promote this candidate without
+  targeted runtime approval.
+- PS2 ADV source recovered from the pristine nested DATA.CVM at
+  `/private/tmp/khc-ps2-assets/ADV`: all 3,032 MTX/KSF files agree with
+  the historic `local/corpus-manifest.json` SHA256/size evidence.
+- PS4 PKG was re-extracted without touching its original bytes to
+  `/private/tmp/kowloon-ps4-recovered/CUSA27034` (9,837 files). PKG SHA256
+  matches the pristine source manifest; extracted `English.bytes` SHA256 is
+  `b8eb78a98bf9e4cde1b76887daa740ebeb7f9f856780bafdd9da1317aec6a17b`.
+- `MS/MS04_00.MTX`: byte-identical PS2/PS4 source
+  `221fac0fa1172104310cf10079161247bf6d217556d01f65cc6bfd9772f49701`.
+  Official English DC map has 40 entries. The sequence of keys 226,227,228
+  consists of one real anchor plus two adjacent synthetic line keys. The
+  last lands on a coincidental CP932 glyph boundary. A generic conditional
+  parser rule handles the provable glyph pair.
+- The opt-in `--approved-adjacent-dc translations/approved_adjacent_dc.json`
+  pins source/PS4/DC/output hashes. Without opt-in, old fail-closed behavior
+  remains. Only MS04_00 is approved; the newly eligible MS04_02 and MS13_03
+  are intentionally **not** imported and need independent review.
+- New exact import: **963 files / 56,682 entries** (candidate); 22 rejected /
+  21,632 entries. All 962 previously accepted exact outputs remain byte
+  identical. Translated MS04 output SHA256:
+  `20c2132ce2e9e22823bfd3452fea917bec493b3a85b9ebf17886c69603dcc4d4`.
+- Candidate ISO `/private/tmp/kowloon-recharge-startup-en-v11-r67-ms04.iso`;
+  SHA256 `d8b8fe7e824cc185a1c87a5fed3c34d0cf304fe70f8a3afd213d756295e177ef`.
+  Final acceptance **155/155**; **1,146** overlays/ROFS checks; deterministic
+  repeat ISO has the exact same SHA256.
+- Strict r66->r67 binary audit classifies **all** changed bytes:
+  1,411 in the sole MS04 data sector, four ISO9660 size bytes, and two
+  executable ROFS size bytes. No other changes. AFK/L1 rendering and all
+  other executable instructions/data remain byte identical.
+- Save namespace/identity remains unchanged; the cross-version memory-card
+  runtime smoke test is still **pending**. PCSX2 was not launched.
+- Before any merge/release: Pablo must approve a manual in-game observation
+  of this specific MS04 scene, including correct multi-line English and
+  unaffected UI/game progression; repeat cross-release real memory-card save
+  test as in `docs/SAVE_COMPATIBILITY.md`.
