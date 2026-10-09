@@ -1407,3 +1407,68 @@ Frozen AFK regression barrier: nine literal SHA256 golden fixtures from the user
 Validation: focused45/45; full257 expected10 skips; Pillow257 expected1 skip; final ISO acceptance155/155; repeat ISO byte-identical. ISO /private/tmp/kowloon-recharge-startup-en-v11-r61.iso SHA256 7fa9eaa0ab2aaabf9d8393ec9bb2b1dcf8d9a5e36c4354855525d5a5a3e0e8a9. Offline Unicorn MIPS execution confirms native green coordinates (175,346) produce blue (173,347), null-path safety and preserved F0/F2/RA/SP. PCSX2 was NOT started or controlled.
 
 Manual gate: one blue L1 tint fully contained in the green outline for both companions and short/long action labels; AFK remains fully approved and frozen. Static tests do not prove visual success.
+
+## v11-r67 MS04 exact multiline synthetic-DC candidate
+
+**This build is static only. Do not launch PCSX2 without Pablo's explicit
+approval.** The r66 AFK and L1 outputs must remain unchanged.
+
+Sources were restored under:
+- PS2 `/private/tmp/khc-ps2-assets/ADV` from the pristine ISO's embedded
+  DATA.CVM. All 3,032 MTX/KSF files matched historic corpus SHA256 values.
+- PS4 `/private/tmp/kowloon-ps4-recovered/CUSA27034`, extracted from the
+  pristine PKG with the open-source `ps4-pkg-tools` CLI (commit `45baeda`)
+  built under `/private/tmp/kowloon-pkg-tools-src`. 9,837 files recovered.
+  To recreate when temp data is cleared: clone
+  `https://github.com/xXJSONDeruloXx/ps4-pkg-tools` recursively, build
+  with CMake on macOS, and invoke `ps4-pkg-tool <owned khc.pkg> <fresh output>`.
+  Preserve and hash the original PKG, and verify the recovered PS4 source and
+  DC-map SHA256 against the committed approval manifest.
+
+Regenerate the corpus with explicit one-file approval (from project root):
+
+```bash
+python3 -m tools.import_exact_mtx \
+  --ps2-adv /private/tmp/khc-ps2-assets/ADV \
+  --ps4-adv /private/tmp/kowloon-ps4-recovered/CUSA27034/Media/StreamingAssets/data/ADV \
+  --output-root local/approved-ms04-exact-mtx \
+  --report local/approved-ms04-exact-report.json \
+  --approved-adjacent-dc translations/approved_adjacent_dc.json
+mkdir -p local/r67-ms04-overlay/MS
+cp local/approved-ms04-exact-mtx/MS/MS04_00.MTX \
+  local/r67-ms04-overlay/MS/MS04_00.MTX
+```
+
+Use **only this single file** as the new overlay above the existing frozen r66
+overlays. From the `feat/ms04-mtx-correspondence` feature worktree, with
+the sibling `../startup-flow-v10` retaining approved r66 generated inputs:
+
+```bash
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-recharge-startup-en-v11-r67-ms04.iso \
+  --overlay exact-mtx ../startup-flow-v10/local/exact-mtx \
+  --overlay exact-ksf ../startup-flow-v10/local/exact-ksf \
+  --overlay structural-mtx ../startup-flow-v10/local/structural-mtx \
+  --overlay accepted ../startup-flow-v10/local/accepted-overrides \
+  --overlay startup-graphics ../startup-flow-v10/local/startup-graphics \
+  --overlay official-ms04 local/r67-ms04-overlay \
+  --elf ../startup-flow-v10/artifacts/SLPM_665.11.en-early \
+  --report local/r67-ms04-build.json
+python3 -m tools.startup_acceptance \
+  /private/tmp/kowloon-recharge-startup-en-v11-r67-ms04.iso \
+  --startup-graphics-root ../startup-flow-v10/local/startup-graphics \
+  --report local/r67-ms04-acceptance.json
+```
+
+Verified r67 candidate ISO SHA256:
+`d8b8fe7e824cc185a1c87a5fed3c34d0cf304fe70f8a3afd213d756295e177ef`.
+155/155 final ISO checks, 1,146 overlays, all previous exact-MTX outputs
+unchanged, and deterministic repeat SHA256 identical. Strict r66/r67 binary
+diff contains only the new script sector and its ISO9660/ROFS size changes.
+
+Required human gate: advance to the original MS04_00 scene with a genuine
+memory-card save, confirm full official English line wrapping, unaffected
+dialogue presentation/action progression, preserved AFK/L1 appearance, and
+cold-boot cross-release save/load compatibility per
+`docs/SAVE_COMPATIBILITY.md`. Never rely on an r66 savestate.

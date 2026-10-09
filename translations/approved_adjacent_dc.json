@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "path": "MS/MS04_00.MTX",
+      "english_entries": 40,
+      "ps2_sha256": "221fac0fa1172104310cf10079161247bf6d217556d01f65cc6bfd9772f49701",
+      "ps4_sha256": "221fac0fa1172104310cf10079161247bf6d217556d01f65cc6bfd9772f49701",
+      "dc_sha256": "3b8902ee75fe0e83aa2de3b2f69e93795f4b815c179417418e0af69f2bfb65f1",
+      "output_sha256": "20c2132ce2e9e22823bfd3452fea917bec493b3a85b9ebf17886c69603dcc4d4",
+      "output_size": 1568
+    }
+  ]
+}

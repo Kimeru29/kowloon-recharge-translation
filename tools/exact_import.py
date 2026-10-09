@@ -10,14 +10,19 @@ class ExactImportError(ValueError):
     """Raised when an exact-tier import cannot be proven safe."""
 
 
-def import_exact_mtx(ps2_raw: bytes, ps4_raw: bytes, dc: dict[str, Any]) -> bytes:
+def import_exact_mtx(
+    ps2_raw: bytes, ps4_raw: bytes, dc: dict[str, Any], *,
+    allow_adjacent_synthetic_keys: bool = False,
+) -> bytes:
     """Import official English into a byte-identical MTX or fail closed."""
 
     if ps2_raw != ps4_raw:
         raise ExactImportError("Exact MTX import requires byte-identical PS2 and PS4 sources")
 
     try:
-        localization = DcLocalization.from_json(ps2_raw, dc)
+        localization = DcLocalization.from_json(
+            ps2_raw, dc, allow_adjacent_synthetic_keys=allow_adjacent_synthetic_keys
+        )
         original = MtxFile.parse(ps2_raw)
         replacements = tuple(
             MtxReplacement(group.anchor, group.replace_end, group.encoded_replacement())

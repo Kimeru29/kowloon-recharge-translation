@@ -348,3 +348,37 @@ checksum checks, independent clones and refusal to overwrite a baseline.
 A formatted but **save-unverified** Mcd001 snapshot is kept in ignored
 `local/save-compat/unverified-mcd001-20261009/` in the authoritative main
 worktree. Do not count it as the cross-release runtime smoke test.
+
+## r67 single-resource audit: r66 AFK/L1 frozen
+
+The candidate's exact MTX importer is opt-in via
+`translations/approved_adjacent_dc.json`, which freezes the pristine PS2
+source, PS4 source, official DC map, compiled output digest and size. A changed
+hash or missing asset aborts the build. Normal exact importer behavior stays
+unchanged for other resources.
+
+The r67 ISO was built twice from the pristine ISO and gives the same SHA256
+`d8b8fe7e824cc185a1c87a5fed3c34d0cf304fe70f8a3afd213d756295e177ef`;
+both builds retain original size, serial and save namespace. Finished ISO gate
+passed **155/155**, covering r66 AFK/L1 native geometry and text owners.
+
+Read-only binary comparison against visually approved r66 classified every
+changed byte: **1,411** translated MS04 payload bytes, **4** embedded
+ISO9660 size bytes and **2** MS04 ROFS file-size bytes in the executable.
+No other changed bytes exist. All r66 AFK/L1 resources, code, pointer records,
+sprites and native geometry are therefore literally unchanged, rather than
+merely passing semantic tests. The original MS04 data sector remains at the
+same extent; all 1,146 overlay resources re-resolve in the finished ISO.
+
+Final feature worktree tests: 254 tests in the dependency-free suite
+(15 expected skips), and 254 with optional Pillow (6 expected skips);
+five focused adjacent-DC/approval/golden tests pass. The committed accepted
+translation manifest still compares equal to itself with zero changes.
+
+The default slot-1 card reference was inspected with read-only `mymcplusplus`
+and contains two unrelated save directories, **no** Kowloon directory. It is
+not a golden checkpoint. A fresh r66 in-game save must be generated on an
+expendable card before any r66->r67 load/save claim can be made.
+
+Actual runtime presentation, save compatibility and scene progression remain
+pending Pablo's approval/testing; static proof cannot upgrade them.

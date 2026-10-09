@@ -886,3 +886,34 @@ Pablo's r65 screenshot shows very slight remaining X− underfill and Y− overf
 AFK is PERFECT and explicitly user-approved from r59. Nine independent post-ROFS SHA256 golden fixtures continue to protect its 600 layouts, original owner records/pointers, text, geometry, sprite resources and placements. Strict r65→r66 binary comparison found exactly three L1 width/X-pivot immediate bytes and 31 blue-only action height floats changed, ZERO unclassified changes; all AFK bytes, green geometry, localized pointers, text and unrelated UI byte-identical.
 
 Candidate /private/tmp/kowloon-recharge-startup-en-v11-r66.iso, SHA256 1e818e50283ea1f8d9480293aecc5cd8dcc95b32fe128b430d7445ef1718d5e5. Focused46/46, full258 (10 expected skips), final image155/155, offline MIPS constructor64/64 and alpha64/64 passed. Repeat-build and Pillow suite are separately validated. Visual PCSX2 test STILL REQUIRED; no claim of perfect alignment until Pablo confirms. User explicitly forbids changing/pushing/merging main before approval. Keep r66 on unpushed LOCAL feature branch fix/r66-l1-edge-final-tuning, preserving main at e55e29c.
+
+## r67 MS04 exact MTX multiline-DC semantic proof (2026-10-09)
+
+Pristine PS2 source and recovered PS4 source are byte-identical, 1,064 bytes,
+SHA256 `221fac0fa1172104310cf10079161247bf6d217556d01f65cc6bfd9772f49701`.
+Owned official `MS/EN/MS04_00DC.json` is SHA256
+`3b8902ee75fe0e83aa2de3b2f69e93795f4b815c179417418e0af69f2bfb65f1`
+and has exactly 40 entries.
+
+The previous `DcLocalization.from_json` parser interpreted key 228 as a new
+anchor solely because it is a CP932 lead-byte boundary. Key 227 lies *inside*
+the preceding two-byte glyph, and 226/227/228 are three consecutive DC keys
+corresponding to one multi-line text run. Byte inspection confirms there is
+no intervening opcode or terminator between the glyph pair. In the approved
+opt-in mode, the following synthetic key may continue through the **next**
+valid glyph boundary *only when* the anchor and candidate are exactly two
+bytes apart, the prior key is an adjacent synthetic key, and both CP932
+two-byte characters are valid. All other cases remain fail-closed.
+
+The localized text ends at its proven existing `wc` terminator, and
+`MtxFile.apply_replacements` preserves script control bytes, header size,
+single-region pointer structure and 4-byte alignment. This reduces 40 DC
+entries to 38 source regions, translating all 40 entries. No English-phrase
+special case is present in the implementation. Output: 1,568 bytes, SHA256
+`20c2132ce2e9e22823bfd3452fea917bec493b3a85b9ebf17886c69603dcc4d4`.
+
+Corpus-wide replay without gate would also admit MS04_02 (368 entries) and
+MS13_03 (256 entries). They are **not** independently proved/released, so
+the committed manifest opts in only MS04_00. With approval applied, all
+962 previously imported exact MTX files retain their literal output hashes;
+the resulting candidate imported count is 963.

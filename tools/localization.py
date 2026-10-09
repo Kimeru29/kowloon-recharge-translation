@@ -91,7 +91,10 @@ class DcLocalization:
     groups: tuple[DcGroup, ...]
 
     @classmethod
-    def from_json(cls, raw: bytes, obj: dict[str, Any]) -> "DcLocalization":
+    def from_json(
+        cls, raw: bytes, obj: dict[str, Any], *,
+        allow_adjacent_synthetic_keys: bool = False,
+    ) -> "DcLocalization":
         keys = obj.get("keys")
         values = obj.get("values")
         if not isinstance(keys, list) or not isinstance(values, list) or len(keys) != len(values):
@@ -105,7 +108,34 @@ class DcLocalization:
 
         grouped: list[dict[str, Any]] = []
         for key, value in pairs:
-            if key not in boundaries:
+            # Some official DC maps encode multiline parts as consecutive
+            # synthetic keys (anchor, anchor+1, anchor+2). The first synthetic
+            # key lies inside a two-byte CP932 glyph, but the second can
+            # accidentally land on the NEXT glyph boundary. In that case
+            # the two characters are contiguous literal text, with no script
+            # control/terminator between them: do not manufacture an anchor.
+            # Keep this limited to the first adjacent CP932 glyph pair;
+            # other indirect/dynamic key schemes must still fail closed.
+            continuation = False
+            if allow_adjacent_synthetic_keys and grouped and grouped[-1]["synthetic_keys"]:
+                previous = grouped[-1]
+                anchor = previous["anchor"]
+                if (
+                    key == previous["synthetic_keys"][-1] + 1
+                    and key == anchor + 2
+                    and key + 1 < len(raw)
+                    and (0x81 <= raw[anchor] <= 0x9F or 0xE0 <= raw[anchor] <= 0xFC)
+                    and (0x81 <= raw[key] <= 0x9F or 0xE0 <= raw[key] <= 0xFC)
+                ):
+                    try:
+                        continuation = (
+                            len(raw[anchor:key].decode("cp932")) == 1
+                            and len(raw[key:key + 2].decode("cp932")) == 1
+                        )
+                    except UnicodeDecodeError:
+                        continuation = False
+
+            if key not in boundaries or continuation:
                 if not grouped:
                     raise ValueError(f"Synthetic DC key {key} has no preceding anchor")
                 grouped[-1]["lines"].append(value)

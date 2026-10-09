@@ -560,3 +560,27 @@ release, cold-boot the old and candidate ISOs with the same **backed-up,
 dedicated memory-card save**, verify load/progress/save and re-load on candidate,
 and reject builds that fail this smoke test. Existing savestates should not be
 reused across distinct executable/ISO revisions.
+
+## v11-r67 MS04_00 candidate (STATIC ONLY; not runtime-approved)
+
+The approved release is still r66. PS2/PS4 source identity was re-verified.
+The exact MTX importer has a new *opt-in*, source/output-hash-pinned treatment
+of adjacent synthetic DC keys. `MS/MS04_00.MTX` contributes 40 official English
+entries, compiled as 38 groups, while all 962 prior exact imports remain
+unchanged. Regenerated candidate coverage would be **963 exact MTX files /
+56,682 official English entries**; other two newly eligible files are
+explicitly left unapproved/rejected (22 files / 21,632 entries rejected).
+
+Candidate: `/private/tmp/kowloon-recharge-startup-en-v11-r67-ms04.iso`
+SHA256: `d8b8fe7e824cc185a1c87a5fed3c34d0cf304fe70f8a3afd213d756295e177ef`.
+Finished-image validation **155/155**; repeated build byte-for-byte identical;
+strict audit proved only MS04 payload and requisite ISO9660/ROFS length
+metadata differ from approved r66. The AFK/L1 native renderer binaries are
+unchanged.
+
+**Runtime status:** not tested. Do not claim the MS04 English is visually
+accepted, or that actual cross-release memory-card saves work, until Pablo
+performs the prescribed tests without old savestates. The existing slot-1
+memory-card reference was inspected read-only and contains no Kowloon save;
+a genuine r66 checkpoint must be created on a disposable card first.
+No PCSX2 launch occurred.
