@@ -140,3 +140,89 @@ outputs. Use unique temporary output paths for repeats.
    persistent save and preserve its own checksum.
 
 Earlier full discovery: `docs/FIRST_SAVE_TRANSLATION_GATE.md`.
+
+## r67 follow-up: all 50 remaining H.A.N.T. Help bodies translated (static, unreviewed)
+
+`tools/first_save_help.py` is an append-only second executable pass over the
+already-validated 29-owner P0 ELF. It uses the same owned PS4 `English.bytes`
+to resolve **50 previously untranslated Help pages**, while preserving all five
+previously accepted pages (including the separate startup tutorial).
+The auditable file `translations/r67_help_owners.json` stores **no proprietary
+English body corpus**, only page/row source SHA256 fingerprints, mode/topic IDs,
+original descriptor offsets, and icon metadata SHA256 fingerprints.
+
+For all 50 pages, the localized table retains its **original row count and
+original EOF sentinel**. Output lines are at most **28 two-byte PS2 font
+cells**. The generator uses the already approved 12px glyph/16px row-advance
+transform and reserves five glyph cells for every visible controller icon
+before writing English glyphs; icons retain their original page-row association
+and their type/variant. The 14 unmatched controller-instruction occurrences
+are translated semantically by explicit original-offset mappings; the
+"Entering Battle" page requires four repetitions of two compact semantic
+sentences to fit its controller-heavy layout. No source rows are dropped or
+truncated by the packing algorithm. The original 15 ADV placeholder pages
+carry the official English "Saitama, Saitama!" and keep their original
+independent page descriptors.
+
+**Current provisional Help-inclusive ISO**:
+`/private/tmp/kowloon-r67-first-save-help-icons.iso`;
+SHA256 **`45dfa8ee15dc509e7c27d3d714cc9e88d91d9d3f8c701ff0804c4df78cb262b1`**.
+Two pristine builds are SHA-identical. **155/155** finished-ISO acceptance
+checks pass. Full suites: **259 tests** each (15 expected skips without Pillow;
+six expected skips with Pillow). New `tests/test_first_save_help.py`
+replays all 50 pages from the owned PS2/PS4 sources and checks the original
+row count/EOF, text width, icon-cell exclusions, controller metadata and
+SHA256-golden complete ELF.
+
+Compared with unchanged r66 across the entire ~2GB image:
+**148** original name/inscription/description pointers and **99** Help
+descriptor owners explain all changes, as do the appended English payload,
+ELF translation segment-size metadata and ISO9660 file-size records.
+`tools/first_save_iso_delta.py` returns **zero unclassified bytes**.
+
+**This is not a runtime-proven English-complete release**. First-dungeon
+optional graphics, item/interaction names and inspection prompts and
+combat/menu overlays are still under audit; long room/puzzle strings and new
+Help page layout have not yet been visually inspected in PCSX2. Do not label
+the ISO approved or request a save until those static audits and Pablo's
+subsequent playthrough have occurred.
+
+### Rebuild the 50-page r67 Help pass
+
+Start from the **unchanged original PS2 ELF** and the already-produced P0 ELF
+(`local/first-save-r67-expanded.elf`). This second pass does not rebuild or
+move any earlier AFK/L1 code:
+
+```sh
+python3 -m tools.first_save_help \
+  ../startup-flow-v10/fixtures/elf/SLPM_665.11 \
+  local/first-save-r67-expanded.elf \
+  --official-english-bytes /private/tmp/kowloon-ps4-recovered/CUSA27034/Media/StreamingAssets/data/English.bytes \
+  --manifest translations/r67_help_owners.json \
+  --output local/r67-help-icon-safe.elf \
+  --report local/r67-help-icon-safe-report.json
+
+python3 -m tools.build_translation_iso \
+  '/private/tmp/khc-ps2/Kowloon Youma Gakuenki re-charge (Japan).iso' \
+  /private/tmp/kowloon-r67-first-save-help-icons.iso \
+  --overlay exact-mtx ../startup-flow-v10/local/exact-mtx \
+  --overlay exact-ksf ../startup-flow-v10/local/exact-ksf \
+  --overlay structural-mtx ../startup-flow-v10/local/structural-mtx \
+  --overlay accepted ../startup-flow-v10/local/accepted-overrides \
+  --overlay startup-graphics ../startup-flow-v10/local/startup-graphics \
+  --elf local/r67-help-icon-safe.elf \
+  --report local/r67-help-icons-build.json
+
+python3 -m tools.first_save_iso_delta \
+  /private/tmp/kowloon-recharge-startup-en-v11-r66.iso \
+  /private/tmp/kowloon-r67-first-save-help-icons.iso \
+  --elf-report local/first-save-r67-expanded-elf-report.json \
+  --help-report local/r67-help-icon-safe-report.json \
+  --help-manifest translations/r67_help_owners.json \
+  --report local/r67-help-icons-delta.json
+```
+
+Use fresh output destinations if the paths already exist; the build is
+content-deterministic and SHA-fingerprinted. Never overwrite r66 or the
+pristine corpora. Layout and icons are **statically verified**; graphical
+acceptance still requires Pablo's own screenshots.
