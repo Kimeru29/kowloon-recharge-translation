@@ -171,14 +171,15 @@ COMPANION_ACTION_R61_LIVE_OFFSET_KEY = "companion_action_r61_blue_live_xy"
 COMPANION_ACTION_R61_LIVE_OFFSET_SIZE = 96
 COMPANION_ACTION_R61_BLUE_SHIFT_X = -2.0
 COMPANION_ACTION_R61_BLUE_SHIFT_Y = 1.0
-# r62: enforce blue tint fully INSIDE green body at construction time.
+# r63: r62 symmetric inset visibly over-spaced left/top. Preserve r60's
+# accepted origin and trim only the right and bottom edges of actual id0x78.
 # Keep r60/r61 payload addresses for binary compatibility, but disable late
 # id0x78 metadata overwrites and the ineffective post-constructor XY nudge.
 COMPANION_ACTION_R62_INSET_TABLE_KEY = "companion_action_r62_blue_inset_layout"
-COMPANION_ACTION_R62_INSET_X = 2.0
-COMPANION_ACTION_R62_INSET_TOP = 2.0
+COMPANION_ACTION_R62_INSET_X = 0.0
+COMPANION_ACTION_R62_INSET_TOP = 0.0
 COMPANION_ACTION_R62_INSET_BOTTOM = 2.0
-COMPANION_ACTION_R62_INSET_WIDTH = 220.0
+COMPANION_ACTION_R62_INSET_WIDTH = 222.0
 
 
 
@@ -459,7 +460,7 @@ def _layout_table_bytes() -> bytes:
 
 
 def _action_r62_inset_layout_table_bytes() -> bytes:
-    """L1-only blue frame geometry, inset 2 units on all four body edges.
+    """L1-only blue frame geometry: preserve green left/top, trim right/bottom.
 
     The three-field/12-byte layout mirrors the accepted action layout table,
     but is consumed exclusively by the pre-construction 0x78 metadata owner.
@@ -1000,7 +1001,7 @@ def _action_r50_panel_extension_bytes(*, placement_va: int) -> bytes:
         0x00000000,
         0x00000000,
     )
-    # r62: action id0x78 metadata was already initialized before native
+    # r62/r63: action id0x78 metadata initialized before native
     # sprite construction from the separate inset layout. Rewriting the late
     # blue frames to green-size geometry caused the near-identical r60/r61
     # screenshots. Only the id0x78 writes are retired; green writes (0-12),
@@ -1281,17 +1282,17 @@ def _action_r60_preconstruct_bytes(*, table_va: int) -> bytes:
         _mips_r(0, 0, 13, 0, 0x21),      # otherwise slot0
         _mips_i(0x0F, 0, 15, 0x0045),
         _mips_i(0x09, 15, 15, 0x13F4), # 0x78 frame0 width owner
-        _mips_i(0x0F, 0, 12, 0x435C),  # r62 width 220.0, green stays 224
+        _mips_i(0x0F, 0, 12, 0x435E),  # r63 width 222.0, green 224: trim only right edge
         _mips_i(0x2B, 15, 12, 0x00),
         _mips_i(0x2B, 15, 12, 0x30),
         _mips_i(0x2B, 15, 12, 0x60),
         _mips_i(0x2B, 15, 10, 0x04),
         _mips_i(0x2B, 15, 10, 0x34),
         _mips_i(0x2B, 15, 10, 0x64),
-        _mips_i(0x0F, 0, 12, 0x4248),  # r62 slot0 pivotX 50 = green52 - 2
+        _mips_i(0x0F, 0, 12, 0x4250),  # r63 slot0 pivotX 52 = green (no left inset)
         _mips_i(0x04, 13, 0, 2),
         0,
-        _mips_i(0x0F, 0, 12, 0x42BE),  # r62 slot1 pivotX 95 = green97 - 2
+        _mips_i(0x0F, 0, 12, 0x42C2),  # r63 slot1 pivotX 97 = green (no left inset)
         _mips_i(0x2B, 15, 12, 0x08),
         _mips_i(0x2B, 15, 12, 0x38),
         _mips_i(0x2B, 15, 12, 0x68),

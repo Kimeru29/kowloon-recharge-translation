@@ -662,24 +662,26 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
 
-    def test_r62_blue_inset_is_inside_green_for_all_31_actions_and_both_slots(self) -> None:
+    def test_r63_blue_keeps_green_left_top_with_right_bottom_trim(self) -> None:
         # Constructor geometry, not a postconstruct XY write, defines bounds.
         blue_bytes=_action_r62_inset_layout_table_bytes()
         self.assertEqual(len(COMPANION_ACTION_LAYOUTS)*12,len(blue_bytes))
         for action_id,green in enumerate(COMPANION_ACTION_LAYOUTS):
             blue_height,blue_pivot_y,_=struct.unpack_from("<fff",blue_bytes,12*action_id)
             with self.subTest(action=action_id):
-                self.assertEqual(green.height-4.0,blue_height)
-                self.assertEqual(green.pivot_y-2.0,blue_pivot_y)
+                self.assertEqual(green.height-2.0,blue_height)
+                self.assertEqual(green.pivot_y,blue_pivot_y)
                 for slot,green_pivot_x in ((0,52.0),(1,97.0)):
-                    blue_pivot_x=green_pivot_x-2.0
+                    blue_pivot_x=green_pivot_x
                     green_left=-green_pivot_x
                     blue_left=-blue_pivot_x
                     green_top=-green.pivot_y
                     blue_top=-blue_pivot_y
-                    self.assertEqual(2.0,blue_left-green_left)
-                    self.assertEqual(2.0,blue_top-green_top)
-                    self.assertEqual(2.0,(green_left+224.0)-(blue_left+220.0))
+                    # User's r62 image shows too much left padding; do not
+                    # move the blue left or top relative to r60 green.
+                    self.assertEqual(0.0,blue_left-green_left)
+                    self.assertEqual(0.0,blue_top-green_top)
+                    self.assertEqual(2.0,(green_left+224.0)-(blue_left+222.0))
                     self.assertEqual(2.0,(green_top+green.height)-(blue_top+blue_height))
 
     def test_r62_l1_blue_preconstructor_retains_metadata_until_native_draw(self) -> None:

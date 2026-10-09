@@ -910,10 +910,10 @@ def _verify_companion_hud_layout(raw: bytes) -> bool:
         or raw[preconstruct_file:preconstruct_file + COMPANION_ACTION_R60_PRECONSTRUCT_SIZE]
            != _action_r60_preconstruct_bytes(table_va=blue_table_va)
         or COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA != 0x001666C8
-        or COMPANION_ACTION_R62_INSET_X != 2.0
-        or COMPANION_ACTION_R62_INSET_TOP != 2.0
+        or COMPANION_ACTION_R62_INSET_X != 0.0
+        or COMPANION_ACTION_R62_INSET_TOP != 0.0
         or COMPANION_ACTION_R62_INSET_BOTTOM != 2.0
-        or COMPANION_ACTION_R62_INSET_WIDTH != 220.0
+        or COMPANION_ACTION_R62_INSET_WIDTH != 222.0
     ):
         return False
     for site, size, payload in (
