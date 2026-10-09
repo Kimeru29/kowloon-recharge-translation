@@ -560,3 +560,27 @@ release, cold-boot the old and candidate ISOs with the same **backed-up,
 dedicated memory-card save**, verify load/progress/save and re-load on candidate,
 and reject builds that fail this smoke test. Existing savestates should not be
 reused across distinct executable/ISO revisions.
+
+## Proposed r67 first-Soul-Well milestone — not yet releasable
+
+The user explicitly scoped **r67** to *New Game -> first successful Soul Well
+save*, including all optional content reachable during that route.
+The later-game `MS/MS04_00.MTX` PR #34 is deferred and does not count here.
+
+New fail-closed append-only exact English owners have been implemented:
+29 executable source records / 148 original literal pointer aliases, across
+early room labels, Anubis and Lion inscriptions, names of Umara/objects/
+Soul Well doors, and inspection descriptions. They compile into a P0
+provisional ISO, SHA256
+`57897c2ff1c4d84161bbb988318a00df5a75e2f20bc55c5fe82b6db612f487fb`.
+Full static acceptance 155/155; all changes classified relative to r66.
+No new game runtime observation.
+
+Independent Help body scan proves all **55 topic slots have content**:
+5 pages are already accepted English (including original H.A.N.T tutorial),
+**50 pages still contain Japanese**. 15 are the same one-line ADV
+placeholder; they are not empty. Out of 759 nonblank rows, 737 have a unique
+official-English corpus match, but reflow/control-icon metadata still requires
+proof. Screens and graphics beyond current source owners remain open audits.
+**Do not call first-save content fully English, release r67, or create the
+compatibility golden until Pablo verifies the finished candidate in-game.**

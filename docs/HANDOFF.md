@@ -741,3 +741,34 @@ unit tests). The existing Mac Mcd001 image was copied to a checksummed
 **unverified** reference under ignored `local/save-compat/`; presence of an
 actual Kowloon save and runtime cross-release compatibility remain unproven.
 Neither PCSX2 nor any original memory-card image was modified.
+
+## r67 objective reset — first Soul Well memory-card save, NOT MS04_00 (2026-10-09)
+
+Pablo explicitly defines r67 as "Everything from New Game through the first
+successful Soul Well save is in English", including mandatory/optional screens.
+The previously proposed `MS04_00` candidate (PR #34) is later-game and
+**must not** be treated as r67 or merged for this milestone.
+
+Implementation is in `.worktrees/first-save-r67`,
+`feat/first-save-r67`. See `docs/R67_FIRST_SAVE.md` for commands, exact
+owners, proof, and remaining release-blocking work. Current **P0 partial**
+candidate SHA256 `57897c2ff1c4d84161bbb988318a00df5a75e2f20bc55c5fe82b6db612f487fb`
+statically covers 29 original executable string owners and 148 pointers,
+including the early rooms, Soul Well, puzzle inscriptions, and object
+inspection texts. This is an append-only post-r66 ELF modification. ISO
+acceptance **155/155**, whole-image r66-delta audit **zero unexplained bytes**;
+AFK/L1 r66 binary code and text remain frozen. No PCSX2 was launched.
+
+**Still blocking completion:** 50 H.A.N.T. Help pages remain unpromoted; a
+full static texture, interactions, combat/status, UI and English text-layout
+audit is also required. The 55-page indexed inventory found 759 original
+nonblank body rows, 737 with unique PS4 matches. Fifteen ADV page slots share
+one actual Japanese one-line easter-egg placeholder ("Saitama, Saitama!"
+in the official remaster), *not* empty pages. The translated H.A.N.T.
+topic **labels** are not evidence that body pages are translated.
+Do not invite Pablo to play an allegedly English-complete release yet.
+
+Once static English coverage is complete, Pablo himself runs New Game through
+the Soul Well, reports untranslated content, and repeated fixes must close
+those gaps before any r67 milestone acceptance. Only **then** will he make
+the first genuine permanent in-game memory-card save (cross-release golden).

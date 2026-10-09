@@ -348,3 +348,38 @@ checksum checks, independent clones and refusal to overwrite a baseline.
 A formatted but **save-unverified** Mcd001 snapshot is kept in ignored
 `local/save-compat/unverified-mcd001-20261009/` in the authoritative main
 worktree. Do not count it as the cross-release runtime smoke test.
+
+## r67 first-save P0 preservation barrier (runtime NOT approved)
+
+Release target is now the **first Soul Well save**, not the deferred
+later-game MS04 dialogue.
+
+Original user-accepted r66 ISO SHA256:
+`1e818e50283ea1f8d9480293aecc5cd8dcc95b32fe128b430d7445ef1718d5e5`.
+Provisional P0 English candidate ISO:
+`/private/tmp/kowloon-recharge-startup-en-v11-r67-first-save-p0-expanded.iso`;
+SHA256:
+`57897c2ff1c4d84161bbb988318a00df5a75e2f20bc55c5fe82b6db612f487fb`.
+All 155 finished-image checks pass.
+
+New `tools/first_save_r67.py` pins the r66 pre-ROFS executable
+`06ed43df4577215534f527cfecd5aa2ea71dac08da7de19bdb7b239171742958`
+and official PS4 English.bytes
+`b8eb78a98bf9e4cde1b76887daa740ebeb7f9f856780bafdd9da1317aec6a17b`;
+it checks **29 exact source owners / 148 pointer aliases**, preserves all
+prior r66 payload VAs, and appends 1,437 text bytes to the existing
+1 MiB RWX translation segment. Pre-ROFS output ELF SHA256:
+`cd5441d3c408ca31d41e682be5bd4c0a8dec723cb481b1896be071822fd3be4f`.
+
+`tools/first_save_iso_delta.py` compared both full 2GB ISOs and found
+exactly 444 changed text-pointer bytes, 1,380 changed appended English bytes,
+2 segment-length bytes, and 4 ISO9660-length bytes;
+**zero unclassified changes** across the entire image. The 15 independent
+r66 AFK/L1 SHA golden areas and all code/geometry are byte-identical.
+No original save name, serialization fields or flags were changed.
+
+No PCSX2, genuine save creation, first-save content-completeness verdict, or
+r67 visual approval has been performed. 50 H.A.N.T. Help pages and a broader
+first-dungeon optional graphics/UI inventory remain blocking before the user's
+required New Game-to-Soul-Well runtime review. See
+`docs/R67_FIRST_SAVE.md`.
