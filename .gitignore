@@ -17,6 +17,10 @@ fixtures/*
 *.PKG
 *.cvm
 *.CVM
+*.ps2
+*.PS2
+*.mcd
+*.mcr
 *.7z
 *.FNT
 *.TMX

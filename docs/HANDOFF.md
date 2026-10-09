@@ -734,3 +734,10 @@ advance/save/restart/reload on candidate. Do not rely on savestates. Static
 names/path tests cannot guarantee runtime save compatibility; this smoke test
 is still pending and is the next non-translation acceptance infrastructure
 task. Never alter the original memory card as the test artifact.
+
+A safe offline snapshot helper and manual cross-release checklist are in
+`tools/save_compatibility.py` and `docs/SAVE_COMPATIBILITY.md` (six focused
+unit tests). The existing Mac Mcd001 image was copied to a checksummed
+**unverified** reference under ignored `local/save-compat/`; presence of an
+actual Kowloon save and runtime cross-release compatibility remain unproven.
+Neither PCSX2 nor any original memory-card image was modified.
