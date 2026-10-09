@@ -1,0 +1,160 @@
+{
+  "base_r67_elf_sha256": "174c6fdf2a8c7c0a2554f3a9896cd9ac08667b890809032c74d92bd6c894b9c1",
+  "fixed_item_pickup_rows": [
+    {
+      "offset": 5857296,
+      "slot_len": 24,
+      "slot_sha256": "b9832906201702b3b10ec034994ac9e5cc1ec35c3032d2262255b324794fb2f8"
+    },
+    {
+      "offset": 5857320,
+      "slot_len": 24,
+      "slot_sha256": "67ca7f8342438dfdb412134d5059233ba5ad1454fc1840507305b7be15039b5c"
+    }
+  ],
+  "official_english_sha256": "b8eb78a98bf9e4cde1b76887daa740ebeb7f9f856780bafdd9da1317aec6a17b",
+  "owners": [
+    {
+      "aliases": [
+        5835796,
+        5835924,
+        5836004,
+        5837204
+      ],
+      "offset": 5835712,
+      "ps4_record": 835461,
+      "source_sha256": "4e497d325e472abcfe0d519413a28438de0b786647bd8b58f8f10ab97240cafa"
+    },
+    {
+      "aliases": [
+        5835800,
+        5836072
+      ],
+      "offset": 5835744,
+      "ps4_record": 835548,
+      "source_sha256": "c71384b909ed368212358052413ce3f0a4243c910cf18214c5cd4e585040f2b4"
+    },
+    {
+      "aliases": [
+        5835812,
+        5835940,
+        5836020,
+        5837220
+      ],
+      "offset": 5835776,
+      "ps4_record": 835629,
+      "source_sha256": "857055214fb9ea7276b3f87385cad4a27fa2238c87e60f8907da9aed80117ff7"
+    },
+    {
+      "aliases": [
+        5835928,
+        5836104,
+        5836328
+      ],
+      "offset": 5835824,
+      "ps4_record": 835666,
+      "source_sha256": "43849fa1e2aac178307b8381742f61f8f752689f24efd4c1a6a9835e488ebebf"
+    },
+    {
+      "aliases": [
+        5835932,
+        5836012,
+        5836108,
+        5836140
+      ],
+      "offset": 5835872,
+      "ps4_record": 835758,
+      "source_sha256": "1f7d8649cc6c255649035deb8203f89d2c3576d080866891e3ef4e7e896206d6"
+    },
+    {
+      "aliases": [
+        5836008,
+        5836136,
+        5836360
+      ],
+      "offset": 5835952,
+      "ps4_record": 835849,
+      "source_sha256": "e5590cefa033a5ef4789f7c3cff9b2c95dc3b15dc10615ea46197f9ec0127fd8"
+    },
+    {
+      "aliases": [
+        5836068,
+        5836100,
+        5836132
+      ],
+      "offset": 5836032,
+      "ps4_record": 835954,
+      "source_sha256": "e8ff2a32937cbe1241290141af15a745097af8dee8ea0b88993bf716fc6a6275"
+    },
+    {
+      "aliases": [
+        5836244,
+        5836324,
+        5836356
+      ],
+      "offset": 5836160,
+      "ps4_record": 836057,
+      "source_sha256": "f6715dd267b1867d8528c24593d3b8c727f299ee32f0c0d7fb0af25e5762a2a3"
+    },
+    {
+      "aliases": [
+        5836248
+      ],
+      "offset": 5836192,
+      "ps4_record": 836145,
+      "source_sha256": "9d94c98ce98739a491df5535d0233249ff66345261bbdbb8333b204f0becb928"
+    },
+    {
+      "aliases": [
+        5836332,
+        5836364
+      ],
+      "offset": 5836272,
+      "ps4_record": 836249,
+      "source_sha256": "d21062fa72109ef490f96f4077dc3e7d11fdb3025c55751204d0452074b03347"
+    },
+    {
+      "aliases": [
+        5836456
+      ],
+      "offset": 5836416,
+      "ps4_record": 836333,
+      "source_sha256": "c7883bb7f02a76f86e34ae05c8aeb5e451b9baff34b23873dc000e6401f44f67"
+    },
+    {
+      "aliases": [
+        5856144
+      ],
+      "offset": 5855432,
+      "ps4_record": 400126,
+      "source_sha256": "89e731aba369dfd1f19ce8c3543031c7acaf163dec4d7fa6d968628c3e90c502"
+    },
+    {
+      "aliases": [
+        5836260,
+        5836340,
+        5836372
+      ],
+      "offset": 5836224,
+      "ps4_record": 836210,
+      "source_sha256": "30677f025b8acd148f125761b90adac654824e41eb2141efb388f4638832e41c"
+    },
+    {
+      "aliases": [
+        5853072,
+        5853076,
+        5853100
+      ],
+      "offset": 6905664,
+      "ps4_record": 854889,
+      "source_sha256": "21917cbb2e51f044cb9e9b2fcf26c23aed1bea315bb16525d85aafea5de6b300"
+    }
+  ],
+  "prior_compact_keys": [
+    "object_ancient_writing_description",
+    "lion_inscription_1",
+    "lion_inscription_2"
+  ],
+  "pristine_sha256": "6cc4f52dd2b576396003a9455f8222c9b647aa2d7076c08a97c703778d024794",
+  "schema_version": 1
+}
