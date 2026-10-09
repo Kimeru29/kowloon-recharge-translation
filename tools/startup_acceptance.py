@@ -396,7 +396,17 @@ def _verify_companion_hud_semantics(
                 comments_ok = False
                 break
             target_va = struct.unpack_from("<I", raw, pointer_offset)[0]
-            if not _segment_has_wide_text(raw, segment, target_va, spec.display_english):
+            # Gameplay r67: this 22-cell story comment visibly exceeded its
+            # native speech bubble. Keep the exact official PS4 wording valid
+            # for r66, and accept only the 17-cell semantic compression in a
+            # later candidate. AFK and L1 code/translation owners are frozen.
+            allowed_texts = (spec.display_english,)
+            if spec.source_offset == 0x3C1A50 and spec.display_english == "What an eerie place...":
+                allowed_texts += ("An eerie place...",)
+            if not any(
+                _segment_has_wide_text(raw, segment, target_va, text)
+                for text in allowed_texts
+            ):
                 comments_ok = False
                 break
 

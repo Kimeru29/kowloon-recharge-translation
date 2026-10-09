@@ -18,6 +18,7 @@ def audit_iso_delta(
     baseline_path: Path, candidate_path: Path, inspection_report: dict,
     inspection_manifest: dict, help_report: dict, help_manifest: dict,
     history_report: dict | None = None,
+    story_report: dict | None = None,
 ) -> dict:
     with baseline_path.open("rb") as f, candidate_path.open("rb") as g:
         with mmap.mmap(f.fileno(),0,access=mmap.ACCESS_READ) as base, mmap.mmap(
@@ -40,6 +41,10 @@ def audit_iso_delta(
                 if history_report["candidate_size"]-history_report["previous_size"] != history_report["helper_bytes"]:
                     raise ValueError("Unexpected dialogue history helper size")
                 append=history_report["candidate_size"]
+            if story_report is not None:
+                if story_report["original_size"] != append:
+                    raise ValueError("Story comment does not follow owned text stages")
+                append=story_report["new_size"]
             if old.size!=orig or new.size!=append:
                 raise ValueError(f"Unexpected ELF size: {old.size}, {new.size}, {orig}, {append}")
             if help_report["input_sha256"]!=inspection_report["result_elf_sha256"]:
@@ -64,6 +69,9 @@ def audit_iso_delta(
             if history_report is not None:
                 caller = history_report["source_jal"]
                 add(exe+caller,exe+caller+4,"history_modal_jal")
+            if story_report is not None:
+                ptr=story_report["pointer_offset"]
+                add(exe+ptr,exe+ptr+4,"story_comment_pointer")
             counts: Counter[str]=Counter()
             for start in range(0,len(base),4*1024*1024):
                 first=base[start:start+4*1024*1024]
@@ -83,6 +91,8 @@ def audit_iso_delta(
                     raise ValueError(f"Expected modified owner absent: {required}")
             if history_report is not None and counts["history_modal_jal"]<=0:
                 raise ValueError("History modal trampoline callsite not installed")
+            if story_report is not None and counts["story_comment_pointer"]<=0:
+                raise ValueError("Expected story comment correction not present")
             return dict(
                 original_iso=str(baseline_path),candidate_iso=str(candidate_path),
                 previous_elf_size=old.size,new_elf_size=new.size,
@@ -100,6 +110,7 @@ def main() -> None:
     p.add_argument("--help-manifest",type=Path,required=True)
     p.add_argument("--output",type=Path,required=True)
     p.add_argument("--history-report",type=Path)
+    p.add_argument("--story-report",type=Path)
     a=p.parse_args()
     if a.output.exists():
         raise FileExistsError(a.output)
@@ -107,7 +118,8 @@ def main() -> None:
         a.baseline,a.candidate,json.loads(a.inspection_report.read_text()),
         json.loads(a.inspection_manifest.read_text()),json.loads(a.help_report.read_text()),
         json.loads(a.help_manifest.read_text()),
-        json.loads(a.history_report.read_text()) if a.history_report else None
+        json.loads(a.history_report.read_text()) if a.history_report else None,
+        json.loads(a.story_report.read_text()) if a.story_report else None
     )
     a.output.write_text(json.dumps(out,indent=2,sort_keys=True)+"\n")
     print(json.dumps(out,sort_keys=True))

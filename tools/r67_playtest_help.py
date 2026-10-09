@@ -25,7 +25,29 @@ from tools.localization import encode_ps2_english
 # The user's in-game screenshots prove that automatically fusing the command
 # rows produces unreadable Help on these two icon-heavy pages. Preserve each
 # native icon's existing row and user input, but use concise command captions.
+# Basic Attack froze after the text-table rewrite in the latest playtest.
+# Retain its previously playable r67 table and all sprite descriptors until
+# runtime has isolated the exact failure; do not deploy a second guess.
+FREEZE_SAFETY_ROLLBACK = frozenset({"basic_attack"})
+
 READABLE_ICON_PAGES: dict[str, tuple[str, ...]] = {
+    "turn_based_combat": (
+        "Turns", "",
+        "Combat alternates by turn.",
+        "and the enemy each turn.", "", "",
+        "AP .........................", "",
+        "Moves and attacks use AP.",
+        "Each action reduces your AP.", "",
+        "When AP is depleted, you",
+        "cannot act until next turn.", "", "", "",
+        "Recovering AP .............", "",
+        "Your AP returns to maximum",
+        "when your turn begins.", "",
+        "Some items can restore AP.", "", "",
+        "Ending Your Turn ..........", "",
+        "Press        to end turn.",
+        "Your turn ends.", "",
+    ),
     "entering_battle": (
         "     Exploration to Combat", "",
         "Enemies trigger combat mode.", "",
@@ -62,6 +84,8 @@ def reflow_readable(
 ) -> tuple[str, ...]:
     rows = _raw_rows(pristine, page)
     reserved, _ = _icon_reservations(page, _metadata(pristine, page))
+    if page["key"] in FREEZE_SAFETY_ROLLBACK:
+        return _reflow_page(rows, english, reserved, page["key"])[0]
     if page["key"] in READABLE_ICON_PAGES:
         arranged = READABLE_ICON_PAGES[page["key"]]
     else:
@@ -187,6 +211,14 @@ def append_polished_help(
         if struct.unpack_from("<I",base,old_off+page["rows"]*4)[0]!=_EOF:
             raise ValueError(f"Old Help table EOF changed: {page['key']}")
 
+        if page["key"] in FREEZE_SAFETY_ROLLBACK:
+            # A known playable original r67 table. Preserve the exact
+            # descriptor and its referenced bytes, not merely equivalent text.
+            metadata.append(dict(key=page["key"],rows=page["rows"],
+                                 old_table_va=old_va,polished_table_va=old_va,
+                                 first_line=current[0],changed_lines=0,
+                                 frozen_for_freeze_investigation=True))
+            continue
         lines=reflow_readable(pristine,page,dictionary)
         pointers=[
             append(encode_ps2_english(line,collapse_spaces=False)+b"\0") if line else _BLANK

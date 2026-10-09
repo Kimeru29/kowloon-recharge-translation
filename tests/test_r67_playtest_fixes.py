@@ -10,11 +10,13 @@ import unittest
 from tools.first_save_help import _icon_reservations,_metadata
 from tools.inspect_english_bytes import parse
 from tools.r67_playtest_help import (
-    READABLE_ICON_PAGES, append_polished_help, reflow_readable,
+    READABLE_ICON_PAGES, FREEZE_SAFETY_ROLLBACK,
+    append_polished_help, reflow_readable,
 )
 from tools.r67_playtest_inspections import COMPACT_PICKUP_ROWS, append_inspection_fixes
 from tools.r67_playtest_history import append_history_layout, JAL_FILE_OFFSET, JAL_PREIMAGE, shim_bytes
 from tools.localization import encode_ps2_english
+from tools.r67_playtest_story_comment import append_compact_story_comment, COMPACT, OFFICIAL as COMMENT_OFFICIAL, OWNER
 
 ROOT=Path(__file__).resolve().parents[1]
 PRISTINE=ROOT.parent/'startup-flow-v10/fixtures/elf/SLPM_665.11'
@@ -22,7 +24,9 @@ OFFICIAL=Path('/private/tmp/kowloon-ps4-recovered/CUSA27034/Media/StreamingAsset
 P0=ROOT/'local/r67-early-interactions.elf'
 OLD_HELP=ROOT/'local/r67-help-icon-safe.elf'
 INSPECTIONS=ROOT/'local/r67-playtest-inspections-v2.elf'
-POLISHED=ROOT/'local/r67-playtest-help-v2.elf'
+POLISHED=ROOT/'local/r67-playtest-help-v3.elf'
+ORIGINAL_POLISHED=ROOT/'local/r67-playtest-help-v2.elf'
+STORY=ROOT/'local/r67-playtest-safe-v4.elf'
 INSPECTION_MANIFEST=ROOT/'translations/r67_playtest_inspection_owners.json'
 HELP_MANIFEST=ROOT/'translations/r67_help_owners.json'
 HISTORY=ROOT/'local/r67-playtest-history-v2.elf'
@@ -33,6 +37,8 @@ class R67PlaytestPolishTests(unittest.TestCase):
     def test_manual_help_instruction_pages_fit_and_preserve_icons(self):
         self.assertEqual(18,len(READABLE_ICON_PAGES["entering_battle"]))
         self.assertEqual(22,len(READABLE_ICON_PAGES["basic_attack"]))
+        self.assertEqual(29,len(READABLE_ICON_PAGES["turn_based_combat"]))
+        self.assertIn("basic_attack",FREEZE_SAFETY_ROLLBACK)
         for key,rows in READABLE_ICON_PAGES.items():
             self.assertTrue(any("Combat" in t or "Attack" in t for t in rows))
             self.assertFalse(any("--------" in line for line in rows))
@@ -92,8 +98,13 @@ class R67PlaytestPolishTests(unittest.TestCase):
         )
         self.assertEqual(POLISHED.read_bytes(),output)
         self.assertEqual(50,report["pages"])
-        self.assertEqual(32,report["changed_pages"])
-        self.assertEqual(529,report["changed_rows"])
+        self.assertGreaterEqual(report["changed_pages"],30)
+        self.assertGreaterEqual(report["changed_rows"],450)
+        basic = next(x for x in manifest["pages"] if x["key"]=="basic_attack")
+        self.assertEqual(
+            original_help[basic["descriptor_offset"]:basic["descriptor_offset"]+4],
+            output[basic["descriptor_offset"]:basic["descriptor_offset"]+4]
+        )
         self.assertEqual(hashlib.sha256(output).hexdigest(),report["output_sha256"])
         entries={}
         for jp,en,_ in official:entries.setdefault(jp,set()).add(en)
@@ -119,10 +130,36 @@ class R67PlaytestPolishTests(unittest.TestCase):
             source,next(x for x in manifest["pages"] if x["key"]=="turn_based_combat"),entries
         )))
 
+    @unittest.skipUnless(all(x.exists() for x in (PRISTINE,POLISHED,STORY,OLD_HELP)),
+                         "Local native source and built staged ELF required")
+    def test_companion_story_short_line_and_basic_attack_freeze_barriers(self):
+        approved=POLISHED.read_bytes()
+        translated,report=append_compact_story_comment(PRISTINE.read_bytes(),approved)
+        self.assertEqual(STORY.read_bytes(),translated)
+        self.assertEqual(COMMENT_OFFICIAL,"What an eerie place...")
+        self.assertEqual(COMPACT,"An eerie place...")
+        self.assertLessEqual(len(COMPACT),17)
+        self.assertEqual("4f5f01f0a293172c6ebfa81f311f5d1bc8df6cb3e3a15dd17ce279ab47e47798",
+                         report["new_sha256"])
+        self.assertNotEqual(approved[OWNER:OWNER+4], translated[OWNER:OWNER+4])
+        manifest=json.loads(HELP_MANIFEST.read_text())
+        basic=next(x for x in manifest["pages"] if x["key"]=="basic_attack")
+        where=basic["descriptor_offset"]
+        previous=OLD_HELP.read_bytes()
+        self.assertEqual(translated[where:where+4],previous[where:where+4])
+        old_table=struct.unpack_from("<I",previous,where)[0]
+        offset=struct.unpack_from("<I",previous,0x58)[0]+old_table-struct.unpack_from("<I",previous,0x5c)[0]
+        size=(basic["rows"]+1)*4
+        self.assertEqual(translated[offset:offset+size],previous[offset:offset+size])
+        invalid=bytearray(approved)
+        invalid[OWNER:OWNER+4]=b"\0"*4
+        with self.assertRaisesRegex(ValueError,"Official PS4 comment"):
+            append_compact_story_comment(PRISTINE.read_bytes(),bytes(invalid))
+
     @unittest.skipUnless(POLISHED.exists() and HISTORY.exists(),
                          "Local staged dialogue-history ELF unavailable")
     def test_history_modal_horizontal_shim_does_not_touch_frozen_adv(self):
-        source=POLISHED.read_bytes()
+        source=ORIGINAL_POLISHED.read_bytes()
         localized, report=append_history_layout(source)
         self.assertEqual(HISTORY.read_bytes(),localized)
         self.assertEqual(72, len(shim_bytes()))
