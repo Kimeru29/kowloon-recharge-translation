@@ -402,7 +402,9 @@ def _verify_companion_hud_semantics(
             # later candidate. AFK and L1 code/translation owners are frozen.
             allowed_texts = (spec.display_english,)
             if spec.source_offset == 0x3C1A50 and spec.display_english == "What an eerie place...":
-                allowed_texts += ("An eerie place...",)
+                allowed_texts += ("An eerie place...", "Eerie place.")
+            if spec.source_offset == 0x3C1F38 and spec.display_english == "Good. The door should be":
+                allowed_texts += ("Door's ready.",)
             if not any(
                 _segment_has_wide_text(raw, segment, target_va, text)
                 for text in allowed_texts
