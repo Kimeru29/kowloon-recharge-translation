@@ -47,8 +47,8 @@ Status meanings:
 | Dungeon HUD exploration action text | **Working / runtime-proven / frozen** | Pablo accepts r29's moving action HUD as completely translated and visually correct. Freeze the proven `H_CmdIconDraw` owners for `Examine` / `Items` / `Jump`; r30 changes no r29 action-menu geometry or text. |
 | Dungeon HUD battle/L1 item text | **Working / runtime-proven / frozen** | Pablo accepts the r29 action/L1 HUD pass. Freeze the 446 exact PS4 item-name relocations and their 500-entry table ownership; r30 keeps these owners unchanged and regression-covered. |
 | SELECT command/menu labels | **Working / runtime-proven / frozen** | Pablo accepts r29's SELECT/start menu as completely translated and visually correct. Freeze all 18 proven wide-text command aliases; unresolved `メディア` remains pristine rather than guessed. |
-| Companion HUD action/skill label | **r63 right/bottom-only native L1 id0x78 blue trim, runtime pending** | r62 symmetric inset was worse. r63 restores blue left/top to green origin and trims only right/bottom by 2 game units. Candidate local only, do not push/merge main until user approves. |
-| Companion HUD transient comments | **AFK perfect; user-approved immutable** | No changes. Nine golden AFK hashes still pass and strict binary audit confirms all AFK code/data byte-identical. |
+| Companion HUD action/skill label | **r64 candidate local only, awaiting runtime confirmation** | r63 underfills X− and overflows Y−. Extend only left by 2 and trim only bottom by 2, preserving blue right/top, text and green geometry. No merge/push to main until visual approval. |
+| Companion HUD transient comments | **AFK perfect and immutable** | AFK data/hooks/resources byte-identical, with nine accepted r59 golden SHA256 regressions passing. No changes. |
 
 ## Known executable/UI text not yet solved
 

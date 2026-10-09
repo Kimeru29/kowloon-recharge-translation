@@ -646,3 +646,13 @@ r63 restores the closer r60 blue left/top to match accepted green (X pivots 52/9
 Strict r62->r63 executable audit finds exactly 3 L1 blue preconstructor immediate changes and 62 L1-only per-action blue table floats; no other bytes changed. Nine user-approved AFK golden SHA256 tests remain enforced. Focused46/46, full258 expected10 skips, Pillow258 expected1 skip, final ISO155/155; offline MIPS emulator executes all 31 actions for 2 slots plus invalid inputs and alpha fast-return paths. Candidate ISO /private/tmp/kowloon-recharge-startup-en-v11-r63.iso SHA256 67b30d2df92a665a537588f34f190696f3dd3bca3359529ab6d70ee8271e2d19.
 
 User expressly prohibits pushing/merging/updating main until runtime screenshot confirmation. Keep local branch fix/r63-l1-asymmetric-blue-bounds only, do not change main; do not launch or disturb running PCSX2. If further visual correction is needed, capture actual native draw primitive bounds/texture UV rather than blindly adjusting offsets.
+
+## r64 — user-directed L1 blue left expansion and bottom shortening (LOCAL ONLY)
+
+Latest PCSX2 r63 screenshot: blue L1 layer fills X+ but X- has an unfilled strip; Y+ improved but Y- still overflows green. AFK perfect/frozen. r64 retains r63 blue TOP and RIGHT exactly, extends only the left by 2 native game units, and shortens blue bottom by 2 more. Resource is native action group2/id0x78, not AFK id0x6A.
+
+For all 31 actions/two speakers: blue width224 (r63 222); blue pivotX slot0 54 vs r63 52 and slot1 99 vs r63 97. At unchanged anchor, screen-left 2 units farther left while screen-right remains EXACTLY r63. Blue Y pivot untouched, preserving r63 top. Blue height = green height−4 (r63 green−2), trimming bottom by two. No green, action text, or AFK changes. r62 native preconstructor owner remains; late blue writes and r61 ineffective live XY stay disabled. Screenshot-guided candidate requires graphical confirmation.
+
+Focused46/46; full258 (10 expected skips); Pillow258 (1 expected skip); final image155/155; offline Unicorn64/64 constructors and64/64 alpha callbacks. Strict r63->r64 post-ROFS binary audit: only 3 native L1 width/pivotX immediates and one blue-only height float for each of 31 action layouts changed. Zero unclassified differences. All AFK hooks/data, user-approved green sprites, text pointer records unchanged; nine independent AFK SHA256 golden tests pass. Repeat ISO byte-for-byte identical.
+
+ISO /private/tmp/kowloon-recharge-startup-en-v11-r64.iso SHA-256 4ee5bd6d6fbabd515947a53eee365da0b3094dcd9f687df11b522570475299b6. User explicitly prohibits changes to main until visual confirmation: keep local feature branch fix/r64-l1-expand-left-trim-bottom ONLY; do not push or merge. PCSX2 not controlled or restarted. Visual result pending.
