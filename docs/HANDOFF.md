@@ -626,3 +626,111 @@ Frozen AFK regression barrier: nine literal SHA256 golden fixtures from the user
 Validation: focused45/45; full257 expected10 skips; Pillow257 expected1 skip; final ISO acceptance155/155; repeat ISO byte-identical. ISO /private/tmp/kowloon-recharge-startup-en-v11-r61.iso SHA256 7fa9eaa0ab2aaabf9d8393ec9bb2b1dcf8d9a5e36c4354855525d5a5a3e0e8a9. Offline Unicorn MIPS execution confirms native green coordinates (175,346) produce blue (173,347), null-path safety and preserved F0/F2/RA/SP. PCSX2 was NOT started or controlled.
 
 Manual gate: one blue L1 tint fully contained in the green outline for both companions and short/long action labels; AFK remains fully approved and frozen. Static tests do not prove visual success.
+
+## r62 — native L1 inset geometry candidate, awaiting visual approval
+
+Pablo's r61 screenshot shows the single L1 action blue tint still subtly displaced despite r61's post-constructor sprite X/Y nudge. AFK has been explicitly approved and MUST NOT be touched. The observed ineffectiveness of r61 implies that last-minute object XY is not the final geometry owner.
+
+r62 changes only the true native L1 group2/id0x78 panel geometry at its r60 pre-construction owner. It appends a separate per-action blue geometry table after all r61 payloads, sets width 220 instead of green's 224, height to green-height minus four, pivot-X to green pivot-X minus two (slot0 50, slot1 95), pivot-Y to green pivot-Y minus two. By standard sprite origin/pivot rectangle arithmetic the blue panel's top/left/right/bottom edges are each inset two game units from the green bubble BODY at unchanged native XY. All 31 labels and both slots obey these bounds in tests. The r59 later blue metadata writes to the old green-size 224 are replaced with NOPs (green writes unchanged), and r61's ineffective post-construction live XY tail is replaced by normal return; allocated historical helpers retained to preserve all preceding relocated addresses. Unlike r61's nudge, this fixes the geometry at the actual constructor rather than after initialization, so subsequent geometry writes cannot undo it.
+
+Strict r61->r62 post-ROFS audit finds only ELF segment size, 12 L1 post-constructor blue metadata stores disabled, an L1-only tail return, and the L1-only pre-constructor inset table+width/X pivots changed. ZERO unexplained changes; every native AFK hook/layout, original record, translated text and pointer remains byte-for-byte unchanged, including all nine independent SHA256 golden fixtures from user-approved r59. Focused46/46, two 258-test full suites (expected skips only), final image acceptance155/155. Emulator instruction-level MIPS test exercises all 31 action IDs x 2 slots plus invalid action/slot cases and all 64 alpha fast returns; real frame0/1/2 metadata matches inset geometry and no AFK metadata changes. Repeated ISO build is byte-for-byte identical.
+
+Candidate ISO: /private/tmp/kowloon-recharge-startup-en-v11-r62.iso. No in-game visual verification has been performed by the assistant. The user specifically requested NO updates to main until visual confirmation. Keep this change local on feature branch fix/r62-l1-layer-alignment-investigation and do not push or merge without explicit approval.
+
+## r63 — L1 native blue right/bottom-only trim (local candidate)
+
+User tested r62 and reported it still misaligned and worse than r60/r61. In r62 screenshot, the blue fill's left gap is visibly larger than its right gap. r62's symmetric 2-game-unit inset caused this asymmetry, possibly compounded by intrinsic alpha padding in the native blue id0x78 texture (UV .375-.96875, .6875-.8125). Postconstructor sprite XY corrections in r61 did not improve the rendered position.
+
+r63 restores the closer r60 blue left/top to match accepted green (X pivots 52/97, Y pivot same action value), while trimming only 2 native game units from the right and bottom (blue width222 vs green224; blue height green−2). The accepted native 0x78 geometry is patched before constructor and 12 later blue geometry overwrites remain disabled; r61 live XY nudge remains dormant. Green action bubble, all text, resource metadata and all AFK code/data untouched. This is a screenshot-motivated geometry hypothesis, not in-game proof.
+
+Strict r62->r63 executable audit finds exactly 3 L1 blue preconstructor immediate changes and 62 L1-only per-action blue table floats; no other bytes changed. Nine user-approved AFK golden SHA256 tests remain enforced. Focused46/46, full258 expected10 skips, Pillow258 expected1 skip, final ISO155/155; offline MIPS emulator executes all 31 actions for 2 slots plus invalid inputs and alpha fast-return paths. Candidate ISO /private/tmp/kowloon-recharge-startup-en-v11-r63.iso SHA256 67b30d2df92a665a537588f34f190696f3dd3bca3359529ab6d70ee8271e2d19.
+
+User expressly prohibits pushing/merging/updating main until runtime screenshot confirmation. Keep local branch fix/r63-l1-asymmetric-blue-bounds only, do not change main; do not launch or disturb running PCSX2. If further visual correction is needed, capture actual native draw primitive bounds/texture UV rather than blindly adjusting offsets.
+
+## r64 — user-directed L1 blue left expansion and bottom shortening (LOCAL ONLY)
+
+Latest PCSX2 r63 screenshot: blue L1 layer fills X+ but X- has an unfilled strip; Y+ improved but Y- still overflows green. AFK perfect/frozen. r64 retains r63 blue TOP and RIGHT exactly, extends only the left by 2 native game units, and shortens blue bottom by 2 more. Resource is native action group2/id0x78, not AFK id0x6A.
+
+For all 31 actions/two speakers: blue width224 (r63 222); blue pivotX slot0 54 vs r63 52 and slot1 99 vs r63 97. At unchanged anchor, screen-left 2 units farther left while screen-right remains EXACTLY r63. Blue Y pivot untouched, preserving r63 top. Blue height = green height−4 (r63 green−2), trimming bottom by two. No green, action text, or AFK changes. r62 native preconstructor owner remains; late blue writes and r61 ineffective live XY stay disabled. Screenshot-guided candidate requires graphical confirmation.
+
+Focused46/46; full258 (10 expected skips); Pillow258 (1 expected skip); final image155/155; offline Unicorn64/64 constructors and64/64 alpha callbacks. Strict r63->r64 post-ROFS binary audit: only 3 native L1 width/pivotX immediates and one blue-only height float for each of 31 action layouts changed. Zero unclassified differences. All AFK hooks/data, user-approved green sprites, text pointer records unchanged; nine independent AFK SHA256 golden tests pass. Repeat ISO byte-for-byte identical.
+
+ISO /private/tmp/kowloon-recharge-startup-en-v11-r64.iso SHA-256 4ee5bd6d6fbabd515947a53eee365da0b3094dcd9f687df11b522570475299b6. User explicitly prohibits changes to main until visual confirmation: keep local feature branch fix/r64-l1-expand-left-trim-bottom ONLY; do not push or merge. PCSX2 not controlled or restarted. Visual result pending.
+
+## r65 — final 1-unit L1 blue-edge calibration (LOCAL candidate; requires visual signoff)
+
+Pablo tested r64 with two screen crops and confirms the L1 blue background is much closer, but there is still a slight X-minus/left gap and Y-minus/bottom overflow. He specifically wants the blue tint to fill the complete green dialogue body. r65 makes only the two independent edge adjustments requested, conservatively one more native game unit in each direction, without moving accepted right/top edges.
+
+Real native action group2/resource0x78 geometry is initialized BEFORE the sprite constructor. r64 blue width224, pivotX54/99 becomes r65 width225, pivotX55/100 for speaker slot0/1: left edge moves ONE native unit left while its right edge is mathematically identical. Its action-specific blue height is reduced from green−4 to green−5, preserving the same pivotY/upper edge and moving only the blue bottom ONE native unit upward. All 31 action IDs and both slots are explicitly checked against green body bounds. AFK uses separate resource0x6A and is user-approved; do not touch it.
+
+Validation: focused46/46; full258 tests (expected skips); Pillow258 tests with one expected skip; ISO acceptance155/155. Strict r64->r65 post-ROFS binary audit reports exactly three native L1 blue width/pivotX immediates and the 31 action-only blue height floats changed, ZERO unrelated/unclassified differences. All AFK hooks, resources, pointer records, translated text, green geometry, and nine user-approved r59 golden AFK SHA256 snapshots are unchanged. Offline Unicorn MIPS executed 64 native constructor cases and 64 alpha callbacks, preserving FPU/GPR state and AFK data. ISO /private/tmp/kowloon-recharge-startup-en-v11-r65.iso SHA256 92edf5a82f9bbc2603666dcfe9ed6e55995b705cae61556aa27f5dfd55d7b8a5, with deterministic byte-identical repeat build.
+
+User constraint is still active: DO NOT push, merge, or update main without explicit visual confirmation. Keep changes in local feature branch fix/r65-l1-final-left-bottom-calibration. PCSX2 was not started or controlled. The graphical result remains UNCONFIRMED pending the user's test screenshot.
+
+
+## r66 — generic L1 action/speaker edge adjustment (LOCAL candidate, not visually approved)
+
+Pablo's r65 screenshot shows very slight remaining X− underfill and Y− overflow on L1 callout; right/top are approved. Adjust ACTUAL native group2/id0x78 blue geometry in its pre-constructor code without touching accepted green geometry/text or ANY AFK data. Compared with r65: blue width225→226, blue pivotX slot0 55→56 and slot1 100→101. The blue left edge moves one game unit left; because width and pivot change together, the RIGHT edge is mathematically identical. Blue height green−5→green−6, keeping pivotY unchanged; the bottom moves one game unit UP while top stays identical.
+
+**Generic scope**: r66 does not hardcode "Throw a Rock." It operates on the same dynamic blue layout table for ALL 31 currently defined native L1 action IDs, with native companion slot selection 0/1. Unit tests independently verify green-relative X−/X+/Y+/Y− bounds on all 31 records and both slots, including action-specific heights, and MIPS32 emulation checks all 62 valid action/slot combinations plus invalid action/slot fallbacks and alpha-callback fast paths (64 cases of each). Thus it covers every CURRENT supported L1 action for a companion occupying either native slot. New action IDs or a future third native slot would require extending the table/validation; do not claim these unimplemented cases automatically work.
+
+AFK is PERFECT and explicitly user-approved from r59. Nine independent post-ROFS SHA256 golden fixtures continue to protect its 600 layouts, original owner records/pointers, text, geometry, sprite resources and placements. Strict r65→r66 binary comparison found exactly three L1 width/X-pivot immediate bytes and 31 blue-only action height floats changed, ZERO unclassified changes; all AFK bytes, green geometry, localized pointers, text and unrelated UI byte-identical.
+
+Candidate /private/tmp/kowloon-recharge-startup-en-v11-r66.iso, SHA256 1e818e50283ea1f8d9480293aecc5cd8dcc95b32fe128b430d7445ef1718d5e5. Focused46/46, full258 (10 expected skips), final image155/155, offline MIPS constructor64/64 and alpha64/64 passed. Repeat-build and Pillow suite are separately validated. Visual PCSX2 test STILL REQUIRED; no claim of perfect alignment until Pablo confirms. User explicitly forbids changing/pushing/merging main before approval. Keep r66 on unpushed LOCAL feature branch fix/r66-l1-edge-final-tuning, preserving main at e55e29c.
+
+
+## Latest authoritative checkpoint: r66 accepted — release hardening
+
+As of 2026-10-08, Pablo directly confirmed the **r66 AFK and L1 bubble backgrounds
+both work in PCSX2**. The prior local-only/no-merge restriction has been
+satisfied for this specific candidate. Earlier r62–r65 observations and
+hypotheses are historical; do not confuse them with current runtime status.
+
+- r66 ISO: `/private/tmp/kowloon-recharge-startup-en-v11-r66.iso`
+- ISO SHA256: `1e818e50283ea1f8d9480293aecc5cd8dcc95b32fe128b430d7445ef1718d5e5`
+- Native AFK group2/id0x6A: user-approved, unchanged since r59 layout.
+- Native L1 group2/id0x78: user-approved r66; 31 known L1 actions by 2
+  companion slots; blue width226, X pivots56/101, blue height green−6,
+  pivotY equal to green. All existing active green/text owners are untouched.
+- Six *independent literal* golden SHA256 L1 owners now join the nine
+  literal accepted AFK goldens; final-image verifier additionally locks the
+  action-selector bytes. Test names:
+  `test_r66_user_approved_l1_binary_owners_are_frozen` and
+  `test_r60_freezes_user_accepted_r59_afk_layout_and_runtime_bytes`.
+- Save static gate:
+  `test_approved_memory_card_save_namespace_and_paths_are_unchanged`
+  freezes all 15 original `BISLPM-66511Save` path/descriptor windows.
+- A new ISO remains unapproved unless Pablo sees and accepts its intended
+  runtime differences. Do not disturb PCSX2 without approval.
+
+### Recommended next work — incremental, save-compatible by design
+
+**Do not declare the PS4-derived translation complete.** Current corpus
+status in `docs/LOCALIZATION_STATUS.md` shows 962 exact MTX files/56,642
+English entries imported but 23 indirect/dynamic mapped MTX files/21,672
+entries rejected, 7 structurally changed MTX files/2,284 entries imported,
+only FD00_31 proven in the special 26-file FD00 family, KSF 868 fitting
+entries imported but 48 overflow and 4 ambiguous, PS2-exclusive text, and
+unmapped gameplay/UI graphics. The repo has substantial discovery but NOT
+sufficient proven remaster correspondence to auto-import every remaining
+string without risk. Do not extrapolate from lexical similarities.
+
+Ship vertical slices, preserving prior accepted presentation at every slice:
+(1) inventory/reconciling unproven PS4 exact/indirect MTX mappings and their
+dynamic ownership, (2) structurally changed FD00 and selected remaining KSF
+with bounds/overflow solutions, (3) later gameplay/ADV/DG routes plus
+unpromoted H.A.N.T./Mail/Help and remaining title/UI graphics, then
+(4) independent PS2/Re:charge-only content with marked provenance.
+Before each iteration choose one bounded class/chapter, inventory source/PS4
+mapping, change only proven owners, add exact fail-closed tests, build
+deterministically, run final-image acceptance, and request focused PCSX2
+visual review.
+
+**Save compatibility is a release gate.** Preserve
+`SLPM-66511`/`BISLPM-66511Save`, serialization, story IDs/flags, item
+indexes and transitions. Work on copies of a real ordinary PS2 memory card:
+boot r66 and the new ISO separately, load same older checkpoint, verify state,
+advance/save/restart/reload on candidate. Do not rely on savestates. Static
+names/path tests cannot guarantee runtime save compatibility; this smoke test
+is still pending and is the next non-translation acceptance infrastructure
+task. Never alter the original memory card as the test artifact.

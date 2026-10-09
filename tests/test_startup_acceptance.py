@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import struct
 import unittest
 from pathlib import Path
@@ -102,6 +103,37 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertIn("companion_hud_actions", names)
         self.assertIn("companion_afk_free_talk", names)
         self.assertIn("companion_hud_layout", names)
+
+    def test_approved_memory_card_save_namespace_and_paths_are_unchanged(self) -> None:
+        """Cross-release save identity barrier (NOT proof of save/load behavior).
+
+        This freezes all 15 native save-directory/path references and adjacent
+        descriptors from the pristine game. The PS2 card-save format itself
+        must still be smoke-tested between releases in PCSX2.
+        """
+        built = build_early_ui_elf(RAW)
+        name = b"BISLPM-66511Save"
+        offsets = [pos for pos in range(len(RAW)) if RAW.startswith(name, pos)]
+        expected_offsets = (
+            0x406771, 0x406791, 0x4067B1, 0x4067D1, 0x4067E2,
+            0x406801, 0x406812, 0x406831, 0x406842, 0x406861,
+            0x406872, 0x406891, 0x4068A2, 0x4068C1, 0x4068D2,
+        )
+        self.assertEqual(expected_offsets, tuple(offsets))
+        self.assertEqual(15, built.count(name))
+        self.assertEqual(15, RAW.count(name))
+        windows = [slice(pos - 1, pos + len(name) + 64) for pos in offsets]
+        approved_sha = "27e5830aedec88451070b350897733f043dd11fef38fdab27a1dc9dd5cd5294f"
+        self.assertEqual(
+            approved_sha,
+            hashlib.sha256(b"".join(RAW[window] for window in windows)).hexdigest(),
+        )
+        self.assertEqual(
+            approved_sha,
+            hashlib.sha256(b"".join(built[window] for window in windows)).hexdigest(),
+        )
+        self.assertIn(b"SLPM-66511", built)
+        self.assertIn(b"BISLPM-66511Save", built)
 
     def test_pristine_elf_fails_translated_renderer_checks(self) -> None:
         checks = verify_startup_elf(RAW)

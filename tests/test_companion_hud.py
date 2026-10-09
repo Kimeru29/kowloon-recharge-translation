@@ -85,6 +85,11 @@ from tools.companion_hud import (
     COMPANION_ACTION_R60_PRECONSTRUCT_SIZE,
     COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA,
     _action_r60_preconstruct_bytes,
+    _action_r62_inset_layout_table_bytes,
+    COMPANION_ACTION_R62_INSET_X,
+    COMPANION_ACTION_R62_INSET_TOP,
+    COMPANION_ACTION_R62_INSET_BOTTOM,
+    COMPANION_ACTION_R62_INSET_WIDTH,
     COMPANION_ACTION_R61_LIVE_OFFSET_SIZE,
     COMPANION_ACTION_R61_BLUE_SHIFT_X,
     COMPANION_ACTION_R61_BLUE_SHIFT_Y,
@@ -657,43 +662,140 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, encode_companion_afk_text("X" * 40).count(b"\x0a"))
 
 
-    def test_r61_l1_id78_subpixel_alignment_does_not_touch_afk(self) -> None:
+    def test_r66_all_action_ids_and_slots_keep_right_top_and_fine_tune_left_bottom(self) -> None:
+        # User approved the r63 blue RIGHT/TOP; left lacks coverage and the
+        # bottom overflows. Assert independent screen-space edges for ALL action
+        # ids and both slots (not merely self-consistency of patch constants).
+        self.assertEqual(-4.0, COMPANION_ACTION_R62_INSET_X)
+        self.assertEqual(0.0, COMPANION_ACTION_R62_INSET_TOP)
+        self.assertEqual(6.0, COMPANION_ACTION_R62_INSET_BOTTOM)
+        self.assertEqual(226.0, COMPANION_ACTION_R62_INSET_WIDTH)
+        blue_bytes=_action_r62_inset_layout_table_bytes()
+        self.assertEqual(len(COMPANION_ACTION_LAYOUTS)*12,len(blue_bytes))
+        for action_id,green in enumerate(COMPANION_ACTION_LAYOUTS):
+            blue_height,blue_pivot_y,blue_text_y=struct.unpack_from(
+                "<fff",blue_bytes,12*action_id)
+            with self.subTest(action=action_id):
+                self.assertEqual(green.height-6.0,blue_height)
+                self.assertEqual(green.pivot_y,blue_pivot_y)
+                self.assertEqual(green.text_y,blue_text_y)
+                for slot,green_pivot_x in ((0,52.0),(1,97.0)):
+                    blue_pivot_x=green_pivot_x+4.0
+                    green_left,green_top=-green_pivot_x,-green.pivot_y
+                    blue_left,blue_top=-blue_pivot_x,-blue_pivot_y
+                    green_right=green_left+224.0
+                    blue_right=blue_left+226.0
+                    green_bottom=green_top+green.height
+                    blue_bottom=blue_top+blue_height
+                    # Every one of the 31 native action IDs is covered by the SAME
+                    # computed blue layout. Both companion slots reuse the
+                    # same geometry with a different X pivot.
+                    # Compared with r65, left extends and bottom trims 1
+                    # more unit, while right/top stay exactly identical.
+                    self.assertEqual(-4.0,blue_left-green_left)
+                    self.assertEqual(2.0,green_right-blue_right)
+                    self.assertEqual(0.0,blue_top-green_top)
+                    self.assertEqual(6.0,green_bottom-blue_bottom)
+                    # Preserve the already-approved X+/Y+ edges across r65->r66.
+                    self.assertEqual(green_right-2.0,blue_right)
+                    self.assertEqual(green_top,blue_top)
+
+    def test_r66_user_approved_l1_binary_owners_are_frozen(self) -> None:
+        """Accepted r66 L1 appearance: independent golden hashes, not source-derived expectations.
+
+        Exact snapshots are from the accepted r66 translated executable.
+        Future translations must not silently change action selection, native
+        group2/id0x78 constructor geometry, its 31 layouts, or the disabled
+        late geometry write path. AFK has its separate accepted-r59 goldens.
+        """
+        elf = build_early_ui_elf(RAW)
+        _, off, va, _, _, _, _, _ = struct.unpack_from("<8I", elf, 0x54)
+
+        def branch_target(site: int) -> int:
+            insn = struct.unpack_from("<I", elf, site)[0]
+            self.assertEqual(3, insn >> 26)
+            return off + (((insn & 0x03FFFFFF) << 2) - va)
+
+        scan = branch_target(0x66740)
+        scan_words = struct.unpack_from("<39I", elf, scan)
+        self.assertEqual(2, scan_words[36] >> 26)
+        pre = off + (((scan_words[36] & 0x03FFFFFF) << 2) - va)
+        pre_words = struct.unpack_from("<55I", elf, pre)
+        blue_table_va = ((pre_words[18] & 0xFFFF) << 16) + (
+            (pre_words[19] & 0xFFFF) - (0x10000 if pre_words[19] & 0x8000 else 0)
+        )
+        blue_table = off + blue_table_va - va
+        selector = branch_target(0x66724)
+        selector_words = struct.unpack_from("<47I", elf, selector)
+        jumps = [insn for insn in selector_words if insn >> 26 == 2]
+        self.assertEqual(1, len(jumps))
+        late_geometry = off + (((jumps[0] & 0x03FFFFFF) << 2) - va)
+        extension_words = struct.unpack_from("<34I", elf, late_geometry)
+        self.assertEqual(2, extension_words[-3] >> 26)
+        late_placement = off + (((extension_words[-3] & 0x03FFFFFF) << 2) - va)
+
+        accepted = {
+            "native_constructor_0x78": (
+                pre, 220,
+                "08d9deb9d6487ad86c935e0939a03b9f75c5a20a23a523e6823ad72a316b1b68"
+            ),
+            "all_31_action_blue_layouts": (
+                blue_table, 31 * 12,
+                "a880c7bbb116b8521bf9b2cf28602ef8d3da1e6a2785aad6b954cca7550a3713"
+            ),
+            "disabled_late_metadata_writes": (
+                late_geometry, 136,
+                "1bc93d00cfb53535135f433b08428f8e3c731cfc956c826c50cde18b30eb5679"
+            ),
+            "native_action_placement": (
+                late_placement, 64,
+                "69399066c904477b90a531e49cd35974bb144b802aa5263cabde1211c20c7139"
+            ),
+            "action_selector": (
+                selector, 188,
+                "5703e08e842ffab5a8c4d2f65a094c9b19c94ebfbf9d624a9f90f7c70bc1ae97"
+            ),
+            "native_sprite_lookup": (
+                scan, 156,
+                "584934b5c46f2ed3a183f75e21318e9a8e93f0937963e51281c88280f81c3c1f"
+            ),
+        }
+        for name, (offset, size, accepted_sha) in accepted.items():
+            with self.subTest(approved_l1_component=name):
+                self.assertEqual(
+                    accepted_sha, hashlib.sha256(elf[offset:offset + size]).hexdigest()
+                )
+                tampered = bytearray(elf)
+                tampered[offset + size // 2] ^= 1
+                self.assertNotEqual(
+                    accepted_sha,
+                    hashlib.sha256(tampered[offset:offset + size]).hexdigest(),
+                )
+                owner = next(
+                    gate for gate in verify_startup_elf(bytes(tampered))
+                    if gate["name"] == "companion_hud_layout"
+                )
+                self.assertFalse(owner["ok"], name)
+
+    def test_r62_l1_blue_preconstructor_retains_metadata_until_native_draw(self) -> None:
         elf=build_early_ui_elf(RAW)
         _,off,va,_,_,_,_,_=struct.unpack_from("<8I",elf,0x54)
-        call=struct.unpack_from("<I",elf,0x66724)[0]
-        self.assertEqual(3,call>>26)
-        action=off+((call&0x03FFFFFF)<<2)-va
-        aw=struct.unpack_from("<47I",elf,action)
-        tails=[w for w in aw if w>>26==2]
-        self.assertEqual(1,len(tails))
-        ext=off+((tails[0]&0x03FFFFFF)<<2)-va
-        extw=struct.unpack_from("<34I",elf,ext)
-        self.assertEqual(2,extw[-3]>>26)
-        placement=off+((extw[-3]&0x03FFFFFF)<<2)-va
-        jw=struct.unpack_from("<I",elf,placement+13*4)[0]
-        self.assertEqual(2,jw>>26)
-        live=off+((jw&0x03FFFFFF)<<2)-va
-        words=struct.unpack_from("<24I",elf,live)
-        self.assertEqual(-2.0,COMPANION_ACTION_R61_BLUE_SHIFT_X)
-        self.assertEqual(1.0,COMPANION_ACTION_R61_BLUE_SHIFT_Y)
-        self.assertEqual(0x8E0C02D8, words[0])   # green native object
-        self.assertEqual(0x8E0E02E0, words[1])   # real L1 id0x78
-        self.assertEqual((0x11800013,0,0x11C00011,0),words[2:6]) # null-safe
-        self.assertEqual(0xE7A00000,words[7])   # save native f0
-        self.assertEqual(0xE7A20004,words[8])   # save native f2
-        self.assertEqual(0x3C0F4000,words[10])  # subtract 2.0f
-        self.assertEqual(0x46020001,words[12])  # sub.s
-        self.assertEqual(0xE5C0003C,words[13])  # native blue X only
-        self.assertEqual(0x3C0F3F80,words[15])  # add 1.0f
-        self.assertEqual(0x46020000,words[17])  # add.s
-        self.assertEqual(0xE5C00040,words[18])  # native blue Y only
-        self.assertEqual((0xC7A20004,0xC7A00000,0x27BD0010),words[19:22])
-        self.assertEqual((0x03E00008,0),words[22:24])
-        for n in (0,1,2,4,7,8,10,12,13,15,17,18,19,20,22):
-            with self.subTest(tamper_word=n):
-                modified=bytearray(elf)
-                modified[live+n*4]^=1
-                check=next(x for x in verify_startup_elf(bytes(modified))
+        selector_jal=struct.unpack_from("<I",elf,0x66724)[0]
+        action=off+((selector_jal&0x03FFFFFF)<<2)-va
+        action_words=struct.unpack_from("<47I",elf,action)
+        targets=[w for w in action_words if w>>26==2]
+        self.assertEqual(1,len(targets))
+        ext=off+((targets[0]&0x03FFFFFF)<<2)-va
+        ext_words=struct.unpack_from("<34I",elf,ext)
+        self.assertEqual((0,)*12,ext_words[16:28])
+        self.assertEqual(2,ext_words[-3]>>26)
+        place=off+((ext_words[-3]&0x03FFFFFF)<<2)-va
+        self.assertEqual(0x03E00008,struct.unpack_from("<I",elf,place+13*4)[0])
+        for index in (16,17,18,19,20,21,22,23,24,25,26,27):
+            with self.subTest(no_late_blue_store=index):
+                tampered=bytearray(elf)
+                tampered[ext+4*index]^=1
+                check=next(x for x in verify_startup_elf(bytes(tampered))
                            if x["name"]=="companion_hud_layout")
                 self.assertFalse(check["ok"])
 
@@ -714,11 +816,21 @@ class CompanionHudTests(unittest.TestCase):
         sel = struct.unpack_from("<47I", elf, selector)
         hi, lo = sel[14] & 0xFFFF, sel[15] & 0xFFFF
         layout_va = (hi << 16) + lo - (0x10000 if lo & 0x8000 else 0)
+        words = struct.unpack_from("<55I", elf, pre_file)
+        blue_table_va = ((words[18]&0xFFFF)<<16) + (
+            (words[19]&0xFFFF) - (0x10000 if words[19]&0x8000 else 0)
+        )
+        self.assertNotEqual(layout_va,blue_table_va)
+        blue_table_off=segment_offset+blue_table_va-segment_va
+        expected_blue_table=_action_r62_inset_layout_table_bytes()
         self.assertEqual(
-            _action_r60_preconstruct_bytes(table_va=layout_va),
+            expected_blue_table,
+            elf[blue_table_off:blue_table_off+len(expected_blue_table)],
+        )
+        self.assertEqual(
+            _action_r60_preconstruct_bytes(table_va=blue_table_va),
             elf[pre_file:pre_file + COMPANION_ACTION_R60_PRECONSTRUCT_SIZE],
         )
-        words = struct.unpack_from("<55I", elf, pre_file)
         self.assertEqual(0x001666C8, COMPANION_ACTION_R60_NATIVE_CONSTRUCTOR_RETURN_VA)
         self.assertEqual((0x3C180016, 0x371866C8), words[:2])  # RA guard
         self.assertEqual(0x17F80032, words[2])  # bne ra,t8 -> fast-return
@@ -800,7 +912,7 @@ class CompanionHudTests(unittest.TestCase):
         ext_words = struct.unpack_from('<34I', result, ext_off)
         self.assertEqual(0x25EF13F4, ext_words[14])
         self.assertNotIn(0x25EF0B24, ext_words)
-        self.assertEqual((0xADEC0000,0xADEC0030,0xADEC0060), ext_words[16:19])
+        self.assertEqual((0,)*12, ext_words[16:28])  # retire late blue writes
         tampered = bytearray(result)
         tampered[ext_off+14*4] ^= 1
         check = next(c for c in verify_startup_elf(bytes(tampered)) if c['name']=='companion_hud_layout')
@@ -832,16 +944,10 @@ class CompanionHudTests(unittest.TestCase):
         self.assertEqual(2, ext_words[-3] >> 26)
         placement = p_offset + ((ext_words[-3] & 0x03FFFFFF) << 2) - p_va
         tail = struct.unpack_from("<I", elf, placement + 13*4)[0]
-        self.assertEqual(2, tail >> 26)
-        live_va = (tail & 0x03FFFFFF) << 2
-        live_file = p_offset + live_va - p_va
+        self.assertEqual(0x03E00008, tail)
         self.assertEqual(
-            _action_r58_blue_placement_bytes(tail_va=live_va),
+            _action_r58_blue_placement_bytes(tail_va=0),
             elf[placement:placement + COMPANION_ACTION_R58_POSITION_SIZE],
-        )
-        self.assertEqual(
-            _action_r61_live_blue_xy_bytes(),
-            elf[live_file:live_file + COMPANION_ACTION_R61_LIVE_OFFSET_SIZE],
         )
         # Exact data consumer is ELF file 0x3F8E50 (VA 0x4F8DD0),
         # consecutive slot records have 20-byte stride.
@@ -1032,10 +1138,8 @@ class CompanionHudTests(unittest.TestCase):
                 0x3C0E42C2, 0xADEE0008,       # green pivot-X 52 / 97
                 0x3C0F0045, 0x25EF13F4,       # blue frame0 geometry
                 0x3C0C4360,
-                0xADEC0000, 0xADEC0030, 0xADEC0060,  # blue width 224
-                0xADEA0004, 0xADEA0034, 0xADEA0064,  # blue height = action
-                0xADEE0008, 0xADEE0038, 0xADEE0068,  # blue pivot-X
-                0xADEB000C, 0xADEB003C, 0xADEB006C,  # blue pivot-Y
+                0, 0, 0, 0, 0, 0,  # r62 preserve preconstructor-only geometry
+                0, 0, 0, 0, 0, 0,
                 0x8FBF000C, 0x27BD0010, 0x24040002,
                 extension_words[31], 0x00000000, 0x00000000,
             ),

@@ -85,7 +85,7 @@ ISO9660 is not the only runtime source of truth. `SLPM_665.11` contains a ROFS f
 
 ## Save compatibility
 
-The executable uses `BISLPM-66511Save`. Ordinary memory-card saves are the cross-build compatibility target. Savestates are considered build-specific. The serial `SLPM-66511` and save namespace are build invariants.
+The executable uses `BISLPM-66511Save`. Ordinary memory-card saves are the cross-build compatibility target. Savestates are considered build-specific. The serial `SLPM-66511` and save namespace are build invariants. The accepted r66 gate preserves all 15 original save path references and surrounding descriptors, while future changes must also preserve serialized fields, scenario/flag/item IDs and the save/load code path. A cold-boot, cross-build memory-card load/progress/re-save/re-load smoke test is required before calling a future ISO save-compatible. Static name preservation alone is insufficient proof.
 
 
 ### v11-r20 selector ownership
