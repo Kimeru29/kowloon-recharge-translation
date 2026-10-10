@@ -31,3 +31,10 @@ Large Container, Stone Pedestal, and Treasure Vase: these are frozen. The
 pickup-name clipping, Use Item slight clipping, START history and story-comment
 speech placement remain unsolved. 67.04 is a partial testing prerelease, built
 as a small incremental xdelta update from 67.03 and never merged to main.
+
+67.05: shorter L1/R1 Target caption (full text visible within native width) and
+additional Basic Attack captions on native controller-icon rows 16 and 19.
+Stone Pedestal Push/Use Item action explicitly frozen. Other approved panels,
+Turn-Based Combat and AFK/L1 unchanged. History, old-man blue backing/text and
+Lion Statue pickup title remain blocked on independent renderer ownership.
+This is another partial testing prerelease, not full first-save acceptance.
