@@ -23,3 +23,11 @@ translate Use Item action; reformat icon-preserving Basic Attack/Turn-Based
 Combat Help and nudge first chamber speech text right. Door, Stone tablet,
 Treasure Vase and Entering Battle frozen. START history and story speech
 background/vertical offset remain open; user PCSX2 validation required.
+
+67.04: Official Change target label for the Lion Statue L1/R1 interaction and
+Basic Attack Help copy cleanup within the original 15 occupied rows only.
+Pablo accepted Turn-Based Combat, Stone Tablet, physical Lion Statue inspection,
+Large Container, Stone Pedestal, and Treasure Vase: these are frozen. The
+pickup-name clipping, Use Item slight clipping, START history and story-comment
+speech placement remain unsolved. 67.04 is a partial testing prerelease, built
+as a small incremental xdelta update from 67.03 and never merged to main.
