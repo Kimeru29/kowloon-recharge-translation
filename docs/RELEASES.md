@@ -17,3 +17,9 @@ ISO SHA-256 checksums are in the release notes. PCSX2 approval pending.
 help (15 existing rows only), compact story speech and experimental horizontal
 Start-key history modal. Entering Battle and Turn-Based Combat are locked.
 User PCSX2 approval pending.
+
+67.03: Compact Lion Statue, pedestal, large-vase and common state descriptions;
+translate Use Item action; reformat icon-preserving Basic Attack/Turn-Based
+Combat Help and nudge first chamber speech text right. Door, Stone tablet,
+Treasure Vase and Entering Battle frozen. START history and story speech
+background/vertical offset remain open; user PCSX2 validation required.
