@@ -123,3 +123,28 @@ Independently unzipped **both untouched** private slot-2 (`15896a89...`) and slo
 - No user's original saves/PCXS2 session or approved graphics were modified. Keep candidate ISOs ignored outside Git.
 
 **Important limitation:** r67.14h is an **engineering candidate only**. This patch still needs a fresh room-entry PCSX2 render proving the entire text is **inside** the approved green bubble, the blue background and vertical placement are unchanged, and timed disappearance still works. Old savestates restore unpatched executable instructions and cannot independently verify it. No PR merge or release approval without the user's visual acceptance.
+
+## r67.14h rejected; switch to read-only scene evidence (2026-10-11)
+
+Pablo rejected r67.14h with a live screenshot: the green border and blue backing remained intact, while the Chamber comment was **absent within the bubble** and faint green glyphs were visible along/below the bubble's lower border. The same class of failure occurred in r67.14f and r67.14g. **DO NOT present r67.14h as a fix or try another blind native scale/advance patch.** The last near-correct visual control remains **r67.14e**, which still overflows the right edge but leaves the other approved geometry intact.
+
+Additional actual-session evidence was obtained *read-only* from `~/Library/Application Support/PCSX2/logs/emulog.txt` (mtime 2026-10-11 11:51): PCSX2 explicitly opened and executed `67.14h-chamber-horizontal-cursor-only.iso` (active CRC `8F452AD4`), also switching among r67.14g/r67.14f/h and restarting several times. Thus ISO selection alone **does not explain** the failure. Existing savestates *can* replace patched EE code with old native instructions, but the log does not establish that this particular screenshot was taken after a savestate restore; do not assert that as the root cause.
+
+Native disassembly refines the previous incorrect assumption: r67.14h altered `0x18E004`, an orientation/control-related cursor-step case within the glyph-layout routine. Normal glyph geometry also follows **distinct paths** around `0x18D1A0`, `0x18D730` and `0x18DCA0`, storing generated glyph geometry in separate node fields. Reducing a control-step operand does **not** establish control over the visible English glyph spacing. The failed r67.14f after-render glyph-node X mutation is also rejected; do not revive it without runtime evidence.
+
+A new non-invasive `tools/r67_chamber_runtime_probe.py` collects **read-only PINE Read32** data from an *already running* PCSX2 instance, or reads an existing `.p2s` as clearly labeled offline reference. It records the live callsite words, source pointers, task/line indices, returned text owners, font origins/scales/orientation, and bounded glyph-node X/Y/IDs; it never writes guest RAM, launches PCSX2, loads states or changes the GUI. Its task address `0xE11C80` is provisional and verified only for the old slot-3 snapshot.
+
+Offline fixture result: original slot-3 holds `comment_index=2`, `comment_line=2`, pointers `0x92D0C8/0x92D104/0x92D140`, and a font owned at `0x14E80C0`, with X positions `117, 133, 149...` and **constant Y=313**, orientation 0, both scales 1.0. Crucially, the saved ELF callsite words are all unpatched: it does not prove r67.14h's running glyph behavior.
+
+The user's normal PCSX2 configuration was checked read-only: `EnablePINE=false`, `PINESlot=28011`. **Do not silently enable PINE or start another emulator**. Therefore the live-socket variant is not currently available for the normal game session. A private temporary diagnostic emulator could use a separate PINE-enabled profile, but previous `-nogui` launches stole GUI focus and must not be repeated.
+
+Preferred next evidence: while the broken bubble is visible, **export a new disposable savestate to a separate file** from the existing PCSX2 GUI (do not overwrite any established numbered slot), then inspect the saved snapshot as an *offline* reference:
+
+```sh
+cd ~/repos/kowloon-recharge-translation/.worktrees/first-save-r67
+python3 -m tools.r67_chamber_runtime_probe \
+  --state /path/to/newly-exported-chamber-state.p2s \
+  --output local/r67-chamber-failure-evidence.json
+```
+
+If and only if the user separately authorizes read-only PINE access to a running instance where PINE is already enabled, supply that socket explicitly with `--socket` instead. The probe cannot enable a disabled socket itself. Compare the failing font's Y and horizontal glyph-node positions against the archived offline coordinates and verify that the candidate's JALs are active. If the provisional task address no longer points to H_TalkBuddyTask, do not draw conclusions. **No next release candidate or merge of PR #42 until runtime ownership is established.**

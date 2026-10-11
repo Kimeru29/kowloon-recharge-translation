@@ -1,4 +1,9 @@
-"""r67.14h diagnostic: compress ONLY matched story-comment horizontal cursor advance.
+"""REJECTED r67.14h diagnostic: attempted story-comment cursor advance.
+
+Live screenshot on 2026-10-11 disproved visual success: bubble remained empty
+with glyphs on/below its lower border. DO NOT release this patch. The hook
+at 0x18E004 was not proven to control normal glyph spacing; see investigation
+and read-only probe in docs/R67_16_CHAMBER_STORY_COMMENT_REPLACEMENT.md.
 
 The r67.14g early font +0x48 mutation is REJECTED: live screenshot places
 text below the approved bubble. Unlike that patch, this module never writes
@@ -107,7 +112,7 @@ def apply(source:bytes)->tuple[bytes,dict]:
     for name in (b'SLPM-66511',b'BISLPM-66511Save'):
         if name not in p: raise ValueError('Game save identity missing')
     return bytes(p),dict(
-        revision='r67.14h',status='DIAGNOSTIC_REQUIRES_FRESH_CHAMBER_VISUAL_REVIEW',
+        revision='r67.14h',status='REJECTED_BY_USER_NEVER_RELEASE',
         baseline_sha256=APPROVED_SHA256,staged_elf_sha256=sha(p),
         native_horizontal_cursor_site=hex(CURSOR_STEP_SITE),
         cursor_helper_va=hex(cursor),cursor_multiplier=HORIZONTAL_ADVANCE_MULTIPLIER,
