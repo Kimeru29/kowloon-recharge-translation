@@ -8,7 +8,7 @@ mode at / any time." All other source pointers call the original renderer
 with untouched registers and leave returned font objects unchanged.
 
 Matched lines get Y=280/300 BEFORE 0x189E40 creates the font, then X scale
-0.55 on the returned font (nested +0x3C) AFTER construction, following the
+0.40 on the returned font (nested +0x3C) AFTER construction, following the
 same proven AFK approach without patching any backing-resource geometry.
 The short third sentence is horizontally centered at X=205. Only the intended
 comment text is affected; no sprite, blue panel, green border, atlas, normal
@@ -35,7 +35,7 @@ ORIGINAL_JAL = 0x0C062790  # jal 0x189E40
 SCRIPT_POINTER_OFFSETS = (0x3D3438, 0x3D343C, 0x3D3448)
 APPROVED_POINTERS = (0x92D0C8, 0x92D104, 0x92D140)
 SHORT_MESSAGE_POINTER = APPROVED_POINTERS[-1]
-HORIZONTAL_SCALE = 0.55
+HORIZONTAL_SCALE = 0.40
 SHORT_MESSAGE_X = 205.0
 
 def _sha(data:bytes) -> str:

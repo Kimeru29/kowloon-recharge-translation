@@ -15,7 +15,7 @@ from tools.r67_history_layout_lock import read_lock,verify_bytes
 
 ROOT=Path(__file__).resolve().parents[1]
 BASE=ROOT/"local/r67-12-history-compact.elf"
-PROBE=ROOT/"local/r67-14b-chamber-story-only.elf"
+PROBE=ROOT/"local/r67-14c-chamber-story-only.elf"
 
 
 class ChamberStoryTextOnly(unittest.TestCase):
@@ -35,7 +35,7 @@ class ChamberStoryTextOnly(unittest.TestCase):
         self.assertLess(STORY_CALLS[1][1]+16,349-6)
         self.assertEqual((280.0,300.0),tuple(v for _,v in STORY_CALLS))
         self.assertEqual(205.0,SHORT_MESSAGE_X)
-        self.assertEqual(0.55,HORIZONTAL_SCALE)
+        self.assertEqual(0.40,HORIZONTAL_SCALE)
 
     def test_byte_exact_local_helpers_have_explicit_source_pointer_checks(self):
         for _,y in STORY_CALLS:
@@ -90,6 +90,24 @@ class ChamberStoryTextOnly(unittest.TestCase):
                           (0x3F8E1C,0x3F8E70)):
             self.assertEqual(before[start:end],after[start:end])
         self.assertEqual(4,len(verify_bytes(after,read_lock())))
+
+    @unittest.skipUnless(PROBE.exists() and (ROOT/"local/r67-14b-chamber-story-only.elf").exists(),
+                         "previous diagnostic ELF fixture absent")
+    def test_refinement_changes_only_two_horizontal_font_scale_literals(self):
+        previous=(ROOT/"local/r67-14b-chamber-story-only.elf").read_bytes()
+        current=PROBE.read_bytes()
+        self.assertEqual(len(previous),len(current))
+        touched=[i for i,(x,y) in enumerate(zip(previous,current)) if x!=y]
+        self.assertEqual([0x863FB8,0x863FB9,0x864084,0x864085],touched)
+        # Both Y anchors, all X origins, both font objects, and both bubble
+        # layers must be bit-identical to the user's nearly-approved version.
+        old_word=struct.pack("<I",_float_word(0.55))
+        new_word=struct.pack("<I",_float_word(HORIZONTAL_SCALE))
+        for off in (0x863FB8,0x864084):
+            self.assertEqual(previous[off:off+2],old_word[2:])
+            self.assertEqual(current[off:off+2],new_word[2:])
+            self.assertEqual(previous[off+4:off+6],old_word[:2])
+            self.assertEqual(current[off+4:off+6],new_word[:2])
 
     @unittest.skipUnless(BASE.exists(),"private approved baseline ELF not mounted")
     def test_fail_closed_on_drift(self):

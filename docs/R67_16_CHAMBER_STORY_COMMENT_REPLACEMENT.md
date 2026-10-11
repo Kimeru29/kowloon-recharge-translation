@@ -30,3 +30,15 @@ Whole 2,095,382,528-byte ISO binary audit versus accepted r67.12: 266 changed by
 The user's slot-3 state already has native text objects constructed. Attempts to alter only a disposable copy of H_TalkBuddyTask state near EE 0xE11C80 and replay did not reproduce the target comment: the game advanced into H.A.N.T. or a blank state. Thus there is NO visual proof that the new renderer places the entire text correctly inside the green bubble; mark as diagnostic, do not tell the user it is fixed, and do not merge PR #42.
 
 Original slot3 copy SHA-256: 9372b86d139b90e0b2a3ae8215c3db8d1f3d870581d7b06a4be60bbf49e07d6a. Original user saves were never modified. Synthetic states are isolated scratch only; isolated PCSX2 was stopped and its StartPaused setting restored. Real user PCSX2 and Edge must not be touched.
+
+## r67.14c — X-overflow refinement after positive user runtime feedback (2026-10-10)
+
+Pablo confirmed the r67.14b old-man automatic comment is now centered vertically, with the bluish background fully enclosed by the original green speech bubble. The only remaining regression is that the text extends past the **right-hand (X+) border**. Do not reopen the accepted vertical text placement, green graphics, blue fill or name/history layouts.
+
+The new **r67.14c** candidate changes `HORIZONTAL_SCALE` from **0.55 to 0.40** at the exact same two already-isolated story-comment text helper constants. It preserves both text Y coordinates (280/300), all X origins including the short third-line alignment, original English source pointers, line spacing and vertical character scale. It does not touch a single backing-layer pixel, resource, callsite or font-constructor instruction.
+
+- New candidate ISO: `local/r67-candidates/67.14c-chamber-comment-x-fit.iso`, SHA-256 `4d2030145c5d970b8affbcd39697fb8d99aae7990d82989e90d549221719eb4d`.
+- ELF: `local/r67-14c-chamber-story-only.elf`, SHA-256 `b179b9deeb37b7bcad019841f29b28acbff49850f1d1fafc077c7e49c86e0b8d`.
+- ISO 155/155 checks pass. Locked r67.12 history four-region checks pass on ELF and ISO; H.A.N.T. and AFK tests remain under the full regression suite.
+- **Exact 2,095,382,528-byte ISO audit against r67.14b:** precisely **four bytes changed**: `0x7c46efb8`, `0x7c46efb9`, `0x7c46f084`, `0x7c46f085`. Each is the high immediate halfword of one of two horizontal font-scale float literals. Every other ISO byte—including all green-bubble graphics, bluish background, text origins, pointer records, full script content, save IDs and unrelated UI—is identical. Audit `local/r67-14c-strict-only-scale-delta.json`.
+- User's qualitative previous screenshot feedback guides the amount of reduction. A true fresh chamber-entry screenshot from r67.14c has not been captured within the isolated test environment, so the final visual enclosure is **pending user playtest**, not already proven. Do not merge PR #42 without that approval.
