@@ -741,3 +741,80 @@ unit tests). The existing Mac Mcd001 image was copied to a checksummed
 **unverified** reference under ignored `local/save-compat/`; presence of an
 actual Kowloon save and runtime cross-release compatibility remain unproven.
 Neither PCSX2 nor any original memory-card image was modified.
+
+## r67 objective reset — first Soul Well memory-card save, NOT MS04_00 (2026-10-09)
+
+Pablo explicitly defines r67 as "Everything from New Game through the first
+successful Soul Well save is in English", including mandatory/optional screens.
+The previously proposed `MS04_00` candidate (PR #34) is later-game and
+**must not** be treated as r67 or merged for this milestone.
+
+Implementation is in `.worktrees/first-save-r67`,
+`feat/first-save-r67`. See `docs/R67_FIRST_SAVE.md` for commands, exact
+owners, proof, and remaining release-blocking work. Current **P0 partial**
+candidate SHA256 `57897c2ff1c4d84161bbb988318a00df5a75e2f20bc55c5fe82b6db612f487fb`
+statically covers 29 original executable string owners and 148 pointers,
+including the early rooms, Soul Well, puzzle inscriptions, and object
+inspection texts. This is an append-only post-r66 ELF modification. ISO
+acceptance **155/155**, whole-image r66-delta audit **zero unexplained bytes**;
+AFK/L1 r66 binary code and text remain frozen. No PCSX2 was launched.
+
+**Still blocking completion:** 50 H.A.N.T. Help pages remain unpromoted; a
+full static texture, interactions, combat/status, UI and English text-layout
+audit is also required. The 55-page indexed inventory found 759 original
+nonblank body rows, 737 with unique PS4 matches. Fifteen ADV page slots share
+one actual Japanese one-line easter-egg placeholder ("Saitama, Saitama!"
+in the official remaster), *not* empty pages. The translated H.A.N.T.
+topic **labels** are not evidence that body pages are translated.
+Do not invite Pablo to play an allegedly English-complete release yet.
+
+Once static English coverage is complete, Pablo himself runs New Game through
+the Soul Well, reports untranslated content, and repeated fixes must close
+those gaps before any r67 milestone acceptance. Only **then** will he make
+the first genuine permanent in-game memory-card save (cross-release golden).
+
+## r67 follow-up: all 50 remaining H.A.N.T. Help bodies translated (static, unreviewed)
+
+`tools/first_save_help.py` is an append-only second executable pass over the
+already-validated 29-owner P0 ELF. It uses the same owned PS4 `English.bytes`
+to resolve **50 previously untranslated Help pages**, while preserving all five
+previously accepted pages (including the separate startup tutorial).
+The auditable file `translations/r67_help_owners.json` stores **no proprietary
+English body corpus**, only page/row source SHA256 fingerprints, mode/topic IDs,
+original descriptor offsets, and icon metadata SHA256 fingerprints.
+
+For all 50 pages, the localized table retains its **original row count and
+original EOF sentinel**. Output lines are at most **28 two-byte PS2 font
+cells**. The generator uses the already approved 12px glyph/16px row-advance
+transform and reserves five glyph cells for every visible controller icon
+before writing English glyphs; icons retain their original page-row association
+and their type/variant. The 14 unmatched controller-instruction occurrences
+are translated semantically by explicit original-offset mappings; the
+"Entering Battle" page requires four repetitions of two compact semantic
+sentences to fit its controller-heavy layout. No source rows are dropped or
+truncated by the packing algorithm. The original 15 ADV placeholder pages
+carry the official English "Saitama, Saitama!" and keep their original
+independent page descriptors.
+
+**Current provisional Help-inclusive ISO**:
+`/private/tmp/kowloon-r67-first-save-help-icons.iso`;
+SHA256 **`45dfa8ee15dc509e7c27d3d714cc9e88d91d9d3f8c701ff0804c4df78cb262b1`**.
+Two pristine builds are SHA-identical. **155/155** finished-ISO acceptance
+checks pass. Full suites: **259 tests** each (15 expected skips without Pillow;
+six expected skips with Pillow). New `tests/test_first_save_help.py`
+replays all 50 pages from the owned PS2/PS4 sources and checks the original
+row count/EOF, text width, icon-cell exclusions, controller metadata and
+SHA256-golden complete ELF.
+
+Compared with unchanged r66 across the entire ~2GB image:
+**148** original name/inscription/description pointers and **99** Help
+descriptor owners explain all changes, as do the appended English payload,
+ELF translation segment-size metadata and ISO9660 file-size records.
+`tools/first_save_iso_delta.py` returns **zero unclassified bytes**.
+
+**This is not a runtime-proven English-complete release**. First-dungeon
+optional graphics, item/interaction names and inspection prompts and
+combat/menu overlays are still under audit; long room/puzzle strings and new
+Help page layout have not yet been visually inspected in PCSX2. Do not label
+the ISO approved or request a save until those static audits and Pablo's
+subsequent playthrough have occurred.

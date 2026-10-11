@@ -1,0 +1,176 @@
+{
+  "english_corpus_sha256": "b8eb78a98bf9e4cde1b76887daa740ebeb7f9f856780bafdd9da1317aec6a17b",
+  "help_elf_sha256": "26db69bd46e119ecbb7f114ecdafc678976294460f56b7a214861de82c95d76a",
+  "owners": [
+    {
+      "approved_pointer_offsets": [
+        5808212
+      ],
+      "english": "Lion Statue",
+      "key": "lion_statue_phonetic",
+      "official_record_offset": null,
+      "provenance": "semantic_verified_identifier",
+      "source_offset": 5808176,
+      "source_sha256": "89e731aba369dfd1f19ce8c3543031c7acaf163dec4d7fa6d968628c3e90c502"
+    },
+    {
+      "approved_pointer_offsets": [
+        5808436,
+        5836804
+      ],
+      "english": "Statue of Anubis",
+      "key": "anubis_statue_phonetic",
+      "official_record_offset": 806917,
+      "provenance": "official_exact",
+      "source_offset": 5808400,
+      "source_sha256": "fafe595084c69b86b7eb5a10b0e405dd78897f84335cff794e676cf024410e53"
+    },
+    {
+      "approved_pointer_offsets": [
+        5808580,
+        5843588
+      ],
+      "english": "Isis' Inscription",
+      "key": "isis_inscription_phonetic",
+      "official_record_offset": null,
+      "provenance": "semantic_verified_identifier",
+      "source_offset": 5808544,
+      "source_sha256": "79092476eddab391b0a1c618dabe71d28300ca4ddc6c9db346572612823a698f"
+    },
+    {
+      "approved_pointer_offsets": [
+        5808852,
+        5809348,
+        5812692,
+        5812724,
+        5837028,
+        5840596,
+        5843524
+      ],
+      "english": "Snake Staff",
+      "key": "snake_staff_phonetic",
+      "official_record_offset": null,
+      "provenance": "semantic_verified_identifier",
+      "source_offset": 5808816,
+      "source_sha256": "8b04a49f70fdac39b9e010cb54c5115b437b00ec30431f2e2d3db148a13c3470"
+    },
+    {
+      "approved_pointer_offsets": [
+        5836792,
+        5837080
+      ],
+      "english": "　Machine on base identified.",
+      "key": "anubis_base_mechanism",
+      "official_record_offset": 836905,
+      "provenance": "official_exact",
+      "source_offset": 5836752,
+      "source_sha256": "45ee5778e4b4a8ffcb59202495880f59baa3a1b45852c28a2cd17623730bdbc6"
+    },
+    {
+      "approved_pointer_offsets": [
+        5808740,
+        5836612,
+        5836740,
+        5836964,
+        5838452,
+        5841124,
+        5841572,
+        5841716,
+        5841892,
+        5842068,
+        5842180,
+        5842308,
+        5842484,
+        5842596,
+        5842724,
+        5842836,
+        5842980,
+        5843140,
+        5843236,
+        5843364,
+        5843876,
+        5844564,
+        5844740,
+        5844916,
+        5845092,
+        5845252,
+        5845428,
+        5845588,
+        5845716,
+        5845892,
+        5846068,
+        5846228,
+        5846324,
+        5846468,
+        5846644,
+        5846820,
+        5846980,
+        5847124,
+        5847300,
+        5847460,
+        5847620,
+        5847780,
+        5847956,
+        5848068,
+        5848244,
+        5848372,
+        5848532,
+        5848644,
+        5848804,
+        5848932,
+        5849108,
+        5849252,
+        5849412,
+        5849588,
+        5849732,
+        5849844,
+        5850004,
+        5850164
+      ],
+      "english": "Stone tablet",
+      "key": "generic_stele",
+      "official_record_offset": null,
+      "provenance": "semantic_verified_identifier",
+      "source_offset": 6904880,
+      "source_sha256": "263d7597208d142e1a24d9c2a9b698727d221e6859eec5963d732644006d7bba"
+    },
+    {
+      "approved_pointer_offsets": [
+        5833380,
+        5843684
+      ],
+      "english": "Baggage",
+      "key": "object_baggage",
+      "official_record_offset": 835409,
+      "provenance": "official_exact",
+      "source_offset": 6905248,
+      "source_sha256": "9fe6b4fbe14bdd5df12474c9e61c3e9f35108738c00ebc8e716008d99895d859"
+    },
+    {
+      "approved_pointer_offsets": [
+        5833472
+      ],
+      "english": "Well",
+      "key": "generic_well",
+      "official_record_offset": null,
+      "provenance": "semantic_verified_identifier",
+      "source_offset": 6905256,
+      "source_sha256": "e553116c627f3720bd6cb78347c458ed9ff7793c5964ff3b704309daf82caa5b"
+    },
+    {
+      "approved_pointer_offsets": [
+        5836084,
+        5836116,
+        5836148
+      ],
+      "english": "Door",
+      "key": "generic_door",
+      "official_record_offset": 836006,
+      "provenance": "official_exact",
+      "source_offset": 6905288,
+      "source_sha256": "c1afb454f7c15b37eb82b5db413e22b50b0b9f8f3a0ff20f3adaf54c062fea55"
+    }
+  ],
+  "schema_version": 1,
+  "source_elf_sha256": "6cc4f52dd2b576396003a9455f8222c9b647aa2d7076c08a97c703778d024794"
+}
