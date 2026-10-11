@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "approval": "User visually approved r67.14q on 2026-10-11: all Chamber automatic companion comments fit, including opening two lines; other companion event timing and AFK/free-talk are locked.",
+  "approved_git_commit": "86e5319760b5ca1cabe69fde806e4811dd1c0fe8",
+  "baseline_elf_sha256": "c3babe784c07f83312273ac789040b74ea46d492eea48eee0f1ae17ce5c781ba",
+  "baseline_iso_sha256": "3c07d63b0be346bc8493de581c28772272a2c6dd56a1704d528e0c95c7d44e96",
+  "baseline_iso_elf_extent": 1013782,
+  "baseline_elf_size": 8798749,
+  "regions": [
+    {"name": "native_h_talkbuddy_event_state_and_calls", "file_offset": 417664, "byte_length": 1120, "sha256": "4ca6490ecf73f396d0475b2d519e31d14dedc5f6d2f6e4f61b5c185b88278597"},
+    {"name": "afk_free_talk_native_constructor", "file_offset": 610592, "byte_length": 448, "sha256": "403ea7b17c3ae8632feb85ec46b5ce7c7fe7b816496537dc4ccadff0bea0f77f"},
+    {"name": "native_glyph_renderer", "file_offset": 576464, "byte_length": 5792, "sha256": "d7c4a847c92019a9e45f2a8a23cfbe97208111a5cffc1e98fcba4325215918b4"},
+    {"name": "native_companion_event_private_helpers", "file_offset": 8797776, "byte_length": 728, "sha256": "ca5ff283e06d3487b6b3f7ad3fd6612ebfa1854fdfb1a9d08812c9dd0c795981"}
+  ],
+  "approved_words": {
+    "0x3d3438": "0x963f00",
+    "0x3d343c": "0x963f8c",
+    "0x3d3440": "0x1",
+    "0x3d3448": "0x92d140",
+    "0x3d3428": "0x9630ba",
+    "0x3d3b28": "0x962dc8",
+    "0x3d3b2c": "0x92d854",
+    "0x66248": "0x10000010",
+    "0x6624c": "0x8602000a",
+    "0x66378": "0x2402009c",
+    "0x6637c": "0xa6020008",
+    "0x663a0": "0x240200f0",
+    "0x663a4": "0xa6020008",
+    "0x863f4c": "0x3c093ecc",
+    "0x863f50": "0x3529cccd",
+    "0x864140": "0x240200f0"
+  },
+  "wide_text_by_pointer_alias": {
+    "0x3d3438": "Make sure you're always ready to",
+    "0x3d343c": "switch into battle mode anytime."
+  },
+  "explicitly_unlocked_next_owners": [
+    "lion_statue_new_item_acquisition_popup_own_geometry",
+    "lion_statue_push_target_or_item_selection_own_label_layout"
+  ],
+  "notes": "The baseline ELF/ISO SHA values establish provenance, not an absolute SHA requirement for future ISOs. Future releases MUST pass protected-region, alias, native-instruction and exact approved text checks on their newly generated ELF/ISO; permitted item-specific changes outside those owners are allowed. No AFK modification is permitted. Full static acceptance does not prove visual correctness."
+}
