@@ -1,6 +1,6 @@
 # r67.12 — Compact spacing inside chronological dialogue-history sections
 
-**Status: diagnostic pending user screenshot and multi-dialogue/scroll runtime validation. Do not merge PR #42 or tag r67.**
+**Status update (2026-10-10): User has approved the single-dialogue visual layout in r67.12. The layout is now frozen by `docs/R67_15_APPROVED_HISTORY_LAYOUT_LOCK.md`, `translations/r67_history_layout_lock.json`, and `tests/test_r67_history_layout_lock.py`. Multi-dialogue/scroll runtime validation remains pending. Do not merge PR #42 or tag r67.**
 
 ## User feedback
 

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "lock_id": "r67.12-approved-start-history-layout",
+  "status": "USER_APPROVED_CURRENT_VISUAL_LAYOUT__FURTHER_CHANGES_REQUIRE_EXPLICIT_APPROVAL",
+  "user_approval": "2026-10-10 user screenshot and explicit 'perfection, let's lock it for now'",
+  "approved_evidence": "START history screenshot: [Old man's voice] first row, Hey; over here. second row, compact spacing",
+  "approval_scope": "Single visibly tested speaker/dialogue pair; static layout only. Multi-turn paging, long text wrapping, and scrolling remain unverified.",
+  "reference_stage_elf": "local/r67-12-history-compact.elf",
+  "reference_stage_sha256": "d531e8545c86322d09527bc2a8c32ee01e3d5fbda67f735a0a92acc2519b2179",
+  "reference_iso": "local/r67-candidates/67.12-history-compact-diagnostic.iso",
+  "reference_iso_sha256": "87cfa6f445eba36687e1d5badc621d9efd3157560a3be8da0c5eda4309a54e63",
+  "notes": [
+    "Never change this approved display as a side effect of other r67 fixes.",
+    "Other executable code and translation owners remain editable.",
+    "To intentionally change the history layout, request explicit new approval and update both the lock manifest and the tests.",
+    "No release is authorized by this lock; PR #42 remains draft/unmerged.",
+    "No screenshots, game assets, ISO or savestates are committed."
+  ],
+  "locked_regions": [
+    {
+      "name": "adv_history_layout_and_row_spacing",
+      "offset": 1390784,
+      "size": 1392,
+      "sha256": "c8a1406fb9f3672f659249066960745af7c918db7473ddfb28cdb770ba372843",
+      "purpose": "story-order selection, speaker/body ordering, row spacing and grouping"
+    },
+    {
+      "name": "adv_history_font_creator",
+      "offset": 1400464,
+      "size": 160,
+      "sha256": "f84ff13d474f66531d74dc204c7559d77cbbebd0494ae6bf3a550550d4d75e23",
+      "purpose": "history-only font styles and constructor dispatch"
+    },
+    {
+      "name": "history_horizontal_constructor_clone",
+      "offset": 8797344,
+      "size": 576,
+      "sha256": "fd1a98baa46194657614d276313e230fdf8f7655c9bdfbc1e7c101721fd46c35",
+      "purpose": "horizontal glyph advance without touching normal dialogue"
+    },
+    {
+      "name": "history_chronological_ring_helper",
+      "offset": 8797920,
+      "size": 48,
+      "sha256": "8d44f8d2c4074edce03955e3b7b11a5140ebcc9fe2da013de638b49cda7c851f",
+      "purpose": "latest twelve history records in chronological order"
+    }
+  ]
+}
