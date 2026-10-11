@@ -81,3 +81,21 @@ Inside the existing native renderer, only its callsite `0x189ED8` (`jal 0x188940
 - The focused regression suite adds a test that verifies font `+0x3C` dereferences on the real saved EE memory, and fails if the early hook continues writing to the outer owner.
 
 **Status: static validation complete; live screenshot of a newly instantiated Chamber of Lions comment still required.** The user's slot-3 savestate was recorded *after* the glyphs had been created; it cannot confirm the runtime effect of this early hook. Do not describe the text as visually fixed, promote to a release, modify the user PCSX2/Edge window, or merge draft PR #42 until visual approval. The user has explicitly asked that the perfect green/blue bubble and text Y position never be touched.
+
+## r67.14g follow-up — old savestates restore stale EE executable code (2026-10-11)
+
+The current committed/pushed branch is `fix/67.06-renderer-corrections` at `c8af819`; the working tree was clean before these documentation/test updates. The ISO `local/r67-candidates/67.14g-chamber-correct-font-target.iso` was SHA-256 reverified as `705b381e57091aff6babf00d604c38c64a4efbbf60d59802dc046fffaec89ea8`. Fresh full Python regression recheck: **320 tests, 18 expected skips, 0 failures** (log `local/r67-14g-regression-recheck-20261011.log`).
+
+**Crucial new runtime fact:** A cleanly separated, muted PCSX2 2.9.117 instance loaded the copied slot-2 state with the r67.14g ISO mounted. A **read-only PINE** inspection of its running EE RAM found that all three relevant sites still contained the *old* calls, even though the ISO's staged executable contains new private hooks:
+
+| EE callsite | Restored old savestate RAM | Expected r67.14g ISO code |
+|---|---|---|
+| `0x189ED8` | `0x0C062250` → `jal 0x188940` | `0x0C258F30` → `jal 0x963CC0` |
+| `0x1661BC` | `0x0C062790` → `jal 0x189E40` | `0x0C258F48` → `jal 0x963D20` |
+| `0x16628C` | `0x0C062790` → `jal 0x189E40` | `0x0C258F7F` → `jal 0x963DFC` |
+
+Independently unzipped **both untouched** private slot-2 (`15896a89...`) and slot-3 (`9372b86d...`) archives and found the **same original instructions** in their `eeMemory.bin`. Both saved states therefore restore code that bypasses r67.14g's new font hook, regardless of the ISO mounted at replay. A fresh cold-boot playthrough (or a rigorously isolated, code-only overlay diagnostic clearly distinguished from legitimate gameplay) is necessary for a meaningful r67.14g runtime test. Do not infer hook failure or success from direct replay of either old state. A regression test now documents this condition.
+
+**Desktop safety:** A second, throwaway PCSX2 profile was made under ignored `local/pcsx2-r67-14g-headless`; no existing profile, original state, memory card, or ISO was modified. The emulator's `-nogui` flag **still opened a game window and made PCSX2 foreground** on this Mac, so it is *not* an acceptable nonintrusive test technique. That test instance (PID 14115) was stopped immediately after confirming it; process recheck found no PCSX2 running, with ChatGPT back in foreground. Do not repeat this launch approach or interrupt Edge/other apps. No trustworthy new in-game visual acceptance was obtained.
+
+**Release status remains DIAGNOSTIC ONLY.** Keep green border, blue layer, approved Y, timing, H.A.N.T., and history frozen. Do not merge PR #42 without fresh game-entry visual approval.

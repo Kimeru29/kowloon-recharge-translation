@@ -142,6 +142,37 @@ class ChamberOnlyPreGlyph(unittest.TestCase):
             self.assertEqual(1.0,struct.unpack_from("<f",ee,font+0x48)[0])
             self.assertNotEqual(1.0,struct.unpack_from("<f",ee,outer+0x48)[0])
 
+    @unittest.skipUnless(PROPOSED.exists() and all(
+        (ROOT / "local/pcsx2-67.06-isolated" / name).exists() for name in (
+            "slot2-before-chamber-20261009.p2s", "slot3-chamber-oldman-20261010.p2s"
+        )
+    ), "original private savestates or candidate ELF unavailable")
+    def test_old_savestates_cannot_verify_new_pre_layout_hook(self):
+        """Savestate loading restores original EE code, even with r67.14g ISO mounted."""
+        import zipfile
+
+        expected_hashes = {
+            "slot2-before-chamber-20261009.p2s":
+                "15896a89c0cd2cb54af42cc15a5621fa9517217610a6ea22e05c8e34a73edfb4",
+            "slot3-chamber-oldman-20261010.p2s":
+                "9372b86d139b90e0b2a3ae8215c3db8d1f3d870581d7b06a4be60bbf49e07d6a",
+        }
+        candidate = PROPOSED.read_bytes()
+        original_calls = (
+            (PRE_GLYPH_CALL_SITE, CALL_SITE_PREIMAGE),
+            *((site, _jal(0x189E40)) for site, _ in STORY_CALLS),
+        )
+        for name, expected_sha in expected_hashes.items():
+            path = ROOT / "local/pcsx2-67.06-isolated" / name
+            self.assertEqual(expected_sha, sha(path.read_bytes()))
+            with zipfile.ZipFile(path) as archive:
+                ee = archive.read("eeMemory.bin")
+            for site, original in original_calls:
+                with self.subTest(state=name, site=hex(site)):
+                    self.assertEqual(original, struct.unpack_from("<I", ee, site)[0])
+                    self.assertNotEqual(original, struct.unpack_from(
+                        "<I", candidate, site - ELF_BIAS)[0])
+
     @unittest.skipUnless(APPROVED.exists(),"private fixture unavailable")
     def test_fail_closed_when_native_callsite_or_translation_differs(self):
         damaged=bytearray(APPROVED.read_bytes())
