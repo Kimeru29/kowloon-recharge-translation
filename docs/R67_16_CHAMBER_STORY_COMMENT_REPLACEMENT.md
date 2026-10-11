@@ -99,3 +99,27 @@ Independently unzipped **both untouched** private slot-2 (`15896a89...`) and slo
 **Desktop safety:** A second, throwaway PCSX2 profile was made under ignored `local/pcsx2-r67-14g-headless`; no existing profile, original state, memory card, or ISO was modified. The emulator's `-nogui` flag **still opened a game window and made PCSX2 foreground** on this Mac, so it is *not* an acceptable nonintrusive test technique. That test instance (PID 14115) was stopped immediately after confirming it; process recheck found no PCSX2 running, with ChatGPT back in foreground. Do not repeat this launch approach or interrupt Edge/other apps. No trustworthy new in-game visual acceptance was obtained.
 
 **Release status remains DIAGNOSTIC ONLY.** Keep green border, blue layer, approved Y, timing, H.A.N.T., and history frozen. Do not merge PR #42 without fresh game-entry visual approval.
+
+## r67.14g rejected by live screenshot; r67.14h horizontal-cursor-only candidate (2026-10-11)
+
+**User rejection:** The screenshot of r67.14g shows the original green speech-bubble border and bluish backing still correctly sized, but most of the English comment is invisible inside the bubble and green text is drawn **below the bottom border**. This is a severe vertical/text-layout regression. **r67.14g is rejected and must never be described as visually approved.** The rejected pre-layout mutation `sw t1,+0x48(font)` at `0x189ED8` is not suitable, regardless of its pointer correctness. Keep the user-approved near-perfect r67.14e visual baseline available for rollback.
+
+**Native ownership traced from the approved ELF:**
+
+- `0x189E40` invokes glyph positioning `0x18CB50` at multiple native callsites (`0x18A058`, `0x18A264`, etc.).
+- At `0x18DFFC`, `bnez s6,0x18E024` separates the **vertical** cursor path from the **horizontal** path. The vertical path uses `font+0x4C`; it is not patched.
+- The horizontal path starts at `0x18E004: lwc1 f1,+0x48(s4)`, then consumes that temporary scale in the arithmetic at `0x18E010/0x18E014` and advances horizontal cursor `f21` at `0x18E018`. The original next instruction `0x18E008: mtc1 zero,f0` is preserved as the new JAL delay slot.
+- The active three-pointer `LION` marker is held in saved `s7`; static instruction analysis shows `0x18CB50` does not write `s7` before the cursor step. The comment wrappers save/restore the previous caller's `s7`.
+
+**New constrained patch `tools/r67_chamber_cursor_advance_only.py`** generates r67.14h from the exact approved r67.12 ELF; its two story-comment wrappers are the same ones as r67.14g/r67.14e (same complete official English, Y=280/300, third phrase X=205, post-render font X=0.40). Instead of changing the font object during text construction, a 68-byte helper at `0x963CC0` replaces only `0x18E004`. It executes the original `lwc1 f1,+0x48(s4)`, applies `mul.s f1,f1,0.55` **only when `s7==LION`**, restores its temporary `t0` and `f2` and returns into the original horizontal-advance instructions. For all other strings the helper loads the same `f1` and returns unchanged. Native constructor `0x188AD0`, clear `0x188940`, story renderer `0x189E40`, the vertical path, name/history layout, green border, bluish backing, timers, other strings, and save identifiers are unchanged. No post-glyph coordinate-list traversal, cloned native renderer, or pre-layout font-object scale mutation.
+
+**Static verification:**
+
+- Candidate ELF `local/r67-14h-comment-horizontal-cursor.elf`, SHA-256 `33deb708ba32ffab4d11c44873f679bd98f69ea3398da5e7201a1a3829267ca8`.
+- Diagnostic ISO `local/r67-candidates/67.14h-chamber-horizontal-cursor-only.iso`, SHA-256 `ae2264b2cbc6538eccde71ac9218a075fe2af3963aeb68e461beb98456949ecc`.
+- Full Python suite **326 tests, 18 expected skips, zero failures**; five new focused r67.14h tests pass.
+- Startup acceptance **155/155**. Approved history byte locks **4/4** in ELF and finished ISO; history paging is not proven by the byte lock.
+- Full ISO audit of all **2,095,382,528 bytes** against r67.14e: exactly **397 changed bytes**, confined to the approved executable private-helper appends, the whitelisted original executable JALs/callsites (`0x1661BC`, `0x16628C`, `0x189ED8` restoring original clear, and `0x18E004` adding the horizontal step), executable size metadata, and **two external directory-size metadata bytes** at disc positions `0x8286A` and `0x82871`. No unexpected original ELF bytes changed. Reports `local/r67-14h-iso-full-audit.json`, `local/r67-14h-startup-acceptance.json`, `local/r67-14h-validation.log`.
+- No user's original saves/PCXS2 session or approved graphics were modified. Keep candidate ISOs ignored outside Git.
+
+**Important limitation:** r67.14h is an **engineering candidate only**. This patch still needs a fresh room-entry PCSX2 render proving the entire text is **inside** the approved green bubble, the blue background and vertical placement are unchanged, and timed disappearance still works. Old savestates restore unpatched executable instructions and cannot independently verify it. No PR merge or release approval without the user's visual acceptance.
