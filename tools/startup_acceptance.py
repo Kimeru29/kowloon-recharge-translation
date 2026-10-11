@@ -405,37 +405,12 @@ def _verify_companion_hud_semantics(
                 allowed_texts += ("An eerie place...", "Eerie place.", "  Eerie place.")
             if spec.source_offset == 0x3C1F38 and spec.display_english == "Good. The door should be":
                 allowed_texts += ("Door's ready.",)
-            # r67.14n preserves ALL three official Chamber fragments by
-            # reflowing their exact joined wording into TWO native fields.
-            # The third event record becomes absent (not an empty extra bubble).
-            # Only these two precise source aliases may use the reflow.
-            if spec.source_offset == 0x3C1A70 and spec.display_english == "Make sure you're always ready":
-                allowed_texts += ("Make sure you're always ready to",)
-            if spec.source_offset == 0x3C1A88 and spec.display_english == "to switch into battle mode at":
-                allowed_texts += ("switch into battle mode at any time.",)
             if not any(
                 _segment_has_wide_text(raw, segment, target_va, text)
                 for text in allowed_texts
             ):
                 comments_ok = False
                 break
-
-    # Fail closed if a scene combines three PS4 fragments into two screen rows:
-    # acceptance is conditional on BOTH native strings being intact, the
-    # third native record being absent, AND the original third string still
-    # being present in its unchanged translated pointer. Never allow a
-    # partially applied reflow to pass as a complete translation.
-    if comments_ok and segment is not None:
-        opening_ptr = struct.unpack_from("<I", raw, 0x3D3438)[0]
-        if _segment_has_wide_text(raw, segment, opening_ptr, "Make sure you're always ready to"):
-            second_ptr = struct.unpack_from("<I", raw, 0x3D343C)[0]
-            last_ptr = struct.unpack_from("<I", raw, 0x3D3448)[0]
-            comments_ok = (
-                _segment_has_wide_text(raw, segment, second_ptr, "switch into battle mode at any time.")
-                and struct.unpack_from("<I", raw, 0x3D3440)[0] == 0
-                and last_ptr == 0x92D140
-                and _segment_has_wide_text(raw, segment, last_ptr, "any time.")
-            )
 
     actions_ok = segment is not None and len(COMPANION_ACTION_LABELS) == 31
     for spec in COMPANION_ACTION_LABELS:
