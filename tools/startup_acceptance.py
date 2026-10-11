@@ -410,7 +410,7 @@ def _verify_companion_hud_semantics(
             if spec.source_offset == 0x3C1A70 and spec.display_english == "Make sure you're always ready":
                 allowed_texts += ("Make sure you're always ready to",)
             if spec.source_offset == 0x3C1A88 and spec.display_english == "to switch into battle mode at":
-                allowed_texts += ("switch into battle mode at any time.",)
+                allowed_texts += ("switch into battle mode at any time.", "switch into battle mode anytime.")
             if not any(
                 _segment_has_wide_text(raw, segment, target_va, text)
                 for text in allowed_texts
@@ -427,7 +427,10 @@ def _verify_companion_hud_semantics(
             second_ptr = struct.unpack_from("<I", raw, 0x3D343C)[0]
             third_ptr = struct.unpack_from("<I", raw, 0x3D3448)[0]
             comments_ok = (
-                _segment_has_wide_text(raw, segment, second_ptr, "switch into battle mode at any time.")
+                (
+                    _segment_has_wide_text(raw, segment, second_ptr, "switch into battle mode at any time.")
+                    or _segment_has_wide_text(raw, segment, second_ptr, "switch into battle mode anytime.")
+                )
                 and struct.unpack_from("<I", raw, 0x3D3440)[0] == 1
                 and third_ptr == 0x92D140
                 and _segment_has_wide_text(raw, segment, third_ptr, "any time.")
