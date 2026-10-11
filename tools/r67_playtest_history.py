@@ -18,6 +18,7 @@ from tools.companion_hud import _mips_i, _mips_mtc1
 
 
 EXPECTED_INPUT_SHA = "be8152e77d1fe675871f5bd0eab2e857a3911a9c8f44264c602a0e83bb92a759"
+EXPECTED_67_02_INPUT_SHA = "aba86a5fd8b1f81e12c50f5c1d15cb40fdb44d8fffa50b3ee7530128f77b4727"
 JAL_FILE_OFFSET = 0x159D54
 JAL_PREIMAGE = 0x0C062FC4  # 0x18BF10 (native font-canvas constructor)
 NATIVE_FONT_VA = 0x18BF10
@@ -62,7 +63,7 @@ def shim_bytes() -> bytes:
 
 
 def append_history_layout(approved_r67: bytes) -> tuple[bytes, dict]:
-    if sha(approved_r67)!=EXPECTED_INPUT_SHA:
+    if sha(approved_r67) not in (EXPECTED_INPUT_SHA, EXPECTED_67_02_INPUT_SHA):
         raise ValueError("Unexpected r67 Help/inspection stage")
     _,fo,va,_,size,reserve,flags,_=struct.unpack_from("<8I",approved_r67,0x54)
     if fo+size!=len(approved_r67) or va!=0x902F00 or reserve!=0x100000 or flags!=7:
