@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from tools.r67_chamber_runtime_probe import (
     StateMemory, LiveMemory, snapshot, describe_text, TASK_ADDRESS,
-    SOURCE_PTR_RECORDS, KNOWN_OFFICIAL_PTRS, NODE_LIMIT, EE_SIZE,
+    SOURCE_PTR_RECORDS, KNOWN_OFFICIAL_PTRS, NODE_LIMIT, EE_SIZE, identify_revision,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +53,35 @@ class R67ReadOnlyProbe(unittest.TestCase):
         self.assertLessEqual(len(active["nodes"]), NODE_LIMIT)
         self.assertEqual(result["text_owners"][1]["error"],
                          "owner pointer absent/out of EE range")
+
+    def test_build_signature_does_not_conflate_14h_with_14g(self):
+        signatures = {
+            "0x18e004": "0xc258f30",
+            "0x189ed8": "0xc062250",
+        }
+        self.assertIn("r67.14h", identify_revision(signatures))
+        self.assertIn("NOT r67.14g", identify_revision(signatures))
+        signatures["0x18e004"] = "0xc6810048"
+        signatures["0x189ed8"] = "0xc258f30"
+        self.assertIn("pre-layout", identify_revision(signatures))
+        signatures["0x189ed8"] = "0xc062250"
+        self.assertIn("no hook", identify_revision(signatures))
+
+    @unittest.skipUnless((ROOT / "local/r67-14h-20261011-live-bubble-slot1-copy.p2s").exists(),
+                         "new user-provided slot-1 archive unavailable")
+    def test_new_saved_slot1_carries_14h_instructions_and_unmodified_glyph_positions(self):
+        reader = StateMemory(ROOT / "local/r67-14h-20261011-live-bubble-slot1-copy.p2s")
+        record = snapshot(reader)
+        self.assertIn("r67.14h", record["instruction_fingerprint"])
+        self.assertEqual(record["comment_index"], 2)
+        self.assertEqual(record["source_pointers"], [hex(v) for v in KNOWN_OFFICIAL_PTRS])
+        self.assertTrue(record["official_source_ptrs_match"])
+        target = record["text_owners"][0]
+        self.assertEqual(target["font_origin_y"], 313.0)
+        self.assertEqual(target["font_scale_x"], 1.0)
+        self.assertEqual(target["font_scale_y"], 1.0)
+        self.assertEqual([(n["x"], n["y"]) for n in target["nodes"][:3]],
+                         [(117.0, 313.0), (133.0, 313.0), (149.0, 313.0)])
 
     @unittest.skipUnless(SLOT3.exists(), "original copied slot-3 unavailable")
     def test_task_address_is_not_assumed_globally_valid(self):

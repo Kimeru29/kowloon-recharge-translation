@@ -148,3 +148,20 @@ python3 -m tools.r67_chamber_runtime_probe \
 ```
 
 If and only if the user separately authorizes read-only PINE access to a running instance where PINE is already enabled, supply that socket explicitly with `--socket` instead. The probe cannot enable a disabled socket itself. Compare the failing font's Y and horizontal glyph-node positions against the archived offline coordinates and verify that the candidate's JALs are active. If the provisional task address no longer points to H_TalkBuddyTask, do not draw conclusions. **No next release candidate or merge of PR #42 until runtime ownership is established.**
+
+## 2026-10-11 latest user-provided slot-1 — unambiguous build mismatch
+
+The user explicitly stated that the visible-bubble slot-1 save was made with `67.14g-chamber-correct-font-target.iso`. The **only newly written slot-1** in the normal PCSX2 savestate folder was:
+
+`~/Library/Application Support/PCSX2/sstates/SLPM-66511 (8F452AD4).01.p2s`, mtime 2026-10-11 12:26, 9,729,949 bytes; original SHA-256 **`d1770f35a39937be62bdcf08b2f6ab267b2e35b35de432fb7cf15046867a63f3`**. It was copied byte-exact to ignored `local/r67-14h-20261011-live-bubble-slot1-copy.p2s` (same SHA), with screenshot extracted as `local/r67-14h-20261011-actual-slot1-screenshot.png`. Original untouched. The embedded screenshot depicts the user's failing scene with text below the bubble.
+
+**This is demonstrably r67.14h, not r67.14g:**
+- Saved game CRC `8F452AD4` matches the r67.14h ISO; r67.14g was `8DEE32A7`.
+- EE code at `0x18E004 = 0x0C258F30`, the r67.14h *horizontal cursor* hook; r67.14g uses the native `0xC6810048` there.
+- EE `0x189ED8 = 0x0C062250`, the *unpatched* font-clear call; r67.14g uses a pre-glyph hook there.
+- Both story callsites `0x1661BC/0x16628C` redirect to the r67.14h comment wrappers.
+- PCSX2 `emulog.txt` independently records active CRC `8F452AD4` at the run and slot-1 save.
+
+**What the captured live-frame memory really shows:** Chamber task (`0xE11C80`) has comment/story index 2 and font object owner `0x014E7240`, nested font `0x014E6F40`; the current short comment (“any time.”, eight atlas glyphs plus space/sentinel entries) is present as normal native nodes, starting `(117,313)`, `(133,313)`, `(149,313)`, continuing 16-unit increments at **fixed Y=313**. The font's horizontal and vertical scales are both **1.0** in that captured object; the intended post-render 0.40 setting is not reflected in the captured object. This is stronger evidence of a failed or missed presentation path, but it cannot prove where the *r67.14g* pre-glyph hook went wrong.
+
+**Do not proceed with a purported r67.14g fix based only on this r67.14h snapshot.** Ask the user to perform a true cold boot/reset after selecting `67.14g-chamber-correct-font-target.iso` (not merely disc swap or savestate restore) and save slot 1 again during the comment. A correctly captured r67.14g state should appear separately in the CRC-specific slot directory as `SLPM-66511 (8DEE32A7).01.p2s`, and the first-level code should have the hooked font clear and native cursor word. If that file does not appear, inspect current PCSX2 loaded-disc status before assuming anything. Preserve all saved states and no PCSX2 automation. The read-only probe now fingerprints the captured instructions to avoid this regression.

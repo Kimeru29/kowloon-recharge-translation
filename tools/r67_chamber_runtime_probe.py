@@ -18,6 +18,22 @@ from pathlib import Path
 CALLSITES = (0x1661BC, 0x16628C, 0x189ED8, 0x18E004)
 SOURCE_PTR_RECORDS = (0x4D33B8, 0x4D33BC, 0x4D33C8)
 KNOWN_OFFICIAL_PTRS = (0x92D0C8, 0x92D104, 0x92D140)
+ORIGINAL_CURSOR_WORD = 0xC6810048
+ORIGINAL_FONT_CLEAR_CALL = 0x0C062250
+R67_14H_CURSOR_CALL = 0x0C258F30
+
+def identify_revision(callsites: dict[str, str]) -> str:
+    """Instruction fingerprint; not a claim that a particular hook executed."""
+    cursor = int(callsites["0x18e004"], 16)
+    font_clear = int(callsites["0x189ed8"], 16)
+    if cursor == R67_14H_CURSOR_CALL and font_clear == ORIGINAL_FONT_CLEAR_CALL:
+        return "r67.14h executable hook (NOT r67.14g)"
+    if cursor == ORIGINAL_CURSOR_WORD and font_clear != ORIGINAL_FONT_CLEAR_CALL:
+        return "pre-layout font-clear hook family (r67.14e/g; verify exact helper bytes)"
+    if cursor == ORIGINAL_CURSOR_WORD and font_clear == ORIGINAL_FONT_CLEAR_CALL:
+        return "no hook at either sampled site (older executable or restored state)"
+    return "unrecognized or mixed executable callsites"
+
 TASK_ADDRESS = 0xE11C80  # previously recorded chamber task; may vary
 EE_SIZE = 0x2000000
 NODE_LIMIT = 48
@@ -112,6 +128,7 @@ def snapshot(reader, task: int = TASK_ADDRESS) -> dict:
     result = {
         "status": "DIAGNOSTIC_ONLY_NOT_RUNTIME_ACCEPTANCE",
         "callsite_words": sites,
+        "instruction_fingerprint": identify_revision(sites),
         "source_pointers": [hex(ptr) for ptr in pointers],
         "official_source_ptrs_match": tuple(pointers) == KNOWN_OFFICIAL_PTRS,
         "task": hex(task),
