@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "approval_status": "USER_VISUALLY_APPROVED_2026_10_12",
+  "approval_source": "User confirmed 'everything Astra worked on is now working perfectly' on 2026-10-12, with request for permanent locks.",
+  "immutable_release": "r67.14y",
+  "iso_sha256": "079b4d0ed73fb010b0d0020f5a3e84357b44804a9b2a2425fa3328fd497aee8f",
+  "staged_elf_sha256": "73c27c2728609c7ee38f9c21cfcbc1a26ca980dc8b45b19383d64677c8eba369",
+  "installed_elf_sha256": "e11997c7b344cfb811497aa8c3bbaef86059a4e40911585f26442ff7a92ebf8d",
+  "previous_approved_q_iso_sha256": "3c07d63b0be346bc8493de581c28772272a2c6dd56a1704d528e0c95c7d44e96",
+  "previous_approved_t_iso_sha256": "03526a1779822ad1ec15136c26ff8c3b50d6997bb395a601db228b3fc2fe321f",
+  "user_accepted_owners": [
+    "601 ordinary-event companion dialogue records including opening and post-Chamber; 600 independent AFK records",
+    "11 Anubis, Snake Staff and Heaven Door inspection records",
+    "Grasp and Record actions",
+    "Soul Well Yes/No/Save/Load, Save warning and Load/Save/Back graphic atlas",
+    "Previously approved Lion Statue and 58 Stone tablet records",
+    "Previously approved history and opening dialogue"
+  ],
+  "human_and_ai_change_policy": "Never change an accepted owner without an explicit user confirmation for that proposed change AND a documented AI technical review approving the exact scoped byte ownership. New diagnostic builds may exist without gameplay approval, but do not promote them to main.",
+  "z_exception_review": {
+    "request_source": "User's 2026-10-12 screenshot/report explicitly requests Storeroom name and Storeroom inscription only.",
+    "technical_review": "Exact 5 current pointer words pinned to verified Japanese sources; official PS4 match for Storeroom and 3 inscription source rows; all earlier ELF bytes unchanged except pointer words and p_filesz; entire finished ISO audited.",
+    "scope": [
+      "0x591098",
+      "0x59109c",
+      "0x5910a0",
+      "0x5cd6b4",
+      "0x5cd84c"
+    ],
+    "new_candidate_gameplay_approval": "PENDING"
+  }
+}
