@@ -1,0 +1,78 @@
+{
+  "acceptance": "USER_CONFIRMED_LION_FULLY_ENCLOSED_AND_POST_CHAMBER_STONE_TABLET_ENCLOSED_CENTERED",
+  "accepted_tablet_records": {
+    "0x58a250": {
+      "pointer_words": [
+        "0x962c7a",
+        "0x962d3c",
+        "0x962d60",
+        "0x962d8c",
+        "0x795b9c",
+        "0x962c94"
+      ],
+      "text_sha256": [
+        "caedbfb5a5309d73d5c891de4524afcbb755bfcc003251a4ff3fe25f4fa702c6",
+        "05390b1d28f67133a6f4cfab989b89813e889b47cd15dcb882a8d800e9e44d11",
+        "80cd1b9dfaeb60680c0f5d7314dacf6eb1cfe20cf28a5ce53273b0c6e10d5f07",
+        "e8eb2032573a793945874aa51e023b2de4e70230e2fd086ee144f6c8b7ec7bc5",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ]
+    },
+    "0x590f30": {
+      "pointer_words": [
+        "0x962c7a",
+        "0x962d3c",
+        "0x964040",
+        "0x964066",
+        "0x96408e",
+        "0x962c94"
+      ],
+      "text_sha256": [
+        "caedbfb5a5309d73d5c891de4524afcbb755bfcc003251a4ff3fe25f4fa702c6",
+        "05390b1d28f67133a6f4cfab989b89813e889b47cd15dcb882a8d800e9e44d11",
+        "62ff394ce01f3a422d2f4f528a6b87a94562422e9dbbb6b0c256d8a7d3174844",
+        "c5abdac653011c20e273e0747852acd1d56842dd9bab63900ed171ee7c24ef84",
+        "d9a7e43e7e9ad6be454ad6168307ac8b79d2ed3c6402f0887c384a60d4456a5b"
+      ]
+    },
+    "0x590fb0": {
+      "pointer_words": [
+        "0x962c7a",
+        "0x962d3c",
+        "0x9640ba",
+        "0x9640da",
+        "0x964102",
+        "0x962c94"
+      ],
+      "text_sha256": [
+        "caedbfb5a5309d73d5c891de4524afcbb755bfcc003251a4ff3fe25f4fa702c6",
+        "05390b1d28f67133a6f4cfab989b89813e889b47cd15dcb882a8d800e9e44d11",
+        "391e695581f596c8b936421faf5ddd40fa661a5927e1a4eaa850b3447d121c60",
+        "ac7deb82a09b63436532b53dfa64144a180a44b49879907f8d49c408b108c999",
+        "8b6d862663387ef715bd61146e6ef2ab547ab2ba81135cbd3f3556cabba9cd20"
+      ]
+    }
+  },
+  "all_populated_tablet_rows": 160,
+  "all_stone_tablet_records": 58,
+  "item_label_native_callsites": {
+    "0x2a2a6c": "0xc258ff4",
+    "0x2a6060": "0xc258ff4"
+  },
+  "item_name_cp932_sha256": "90be0e98e12e05cc516bd2189f00da4452104b3cd87a93ff884a0541a2bdaa5d",
+  "item_name_pointer_offset": "0x391928",
+  "item_name_pointer_value": "0x92cbca",
+  "lion_private_helper_bytes": 112,
+  "lion_private_helper_sha256": "168c3779bdd1acf029b8d9850d79522fd914f160a43cbc50eb7ce741dbca60ed",
+  "lion_private_helper_va": "0x963fd0",
+  "max_full_width_glyphs": 21,
+  "native_horizontal_scale": 0.72,
+  "native_item_id": 413,
+  "private_helper_scale_instruction_words": {
+    "0x96400c": "0x3c083f38",
+    "0x964010": "0x350851ec"
+  },
+  "reference_diagnostic_elf_sha256": "062689efed67a83f24f7524cedb50a21505ce6431f456fc196961d98cd434a3d",
+  "reference_diagnostic_iso_sha256": "03526a1779822ad1ec15136c26ff8c3b50d6997bb395a601db228b3fc2fe321f",
+  "schema_version": 1
+}
