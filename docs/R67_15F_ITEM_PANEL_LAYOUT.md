@@ -1,6 +1,6 @@
 # r67.15f Item Panel Layout — Diagnostic Release Handoff
 
-**Status: DIAGNOSTIC_VALIDATED_AWAITING_GAMEPLAY_APPROVAL.** The diagnostic ISO, complete-disc audit, finished-image checks and full regression suite pass. The final suite ran 550 tests: 536 passed, 14 fixture-dependent skips, zero failures/errors. Publication is tracked below; no merge or gameplay approval is implied.
+**Status: GAMEPLAY APPROVED (2026-10-14).** The user confirmed that all r67.15f Compound/Can't bubble, item-title, and stat-label issues are resolved in PCSX2. A separate immutable approved baseline is pinned in `docs/R67_15F_APPROVED_LOCK.json` and validated by `tests/test_r67_15f_approved_lock.py`. The post-approval full suite passed **560 tests (14 skipped, no failures)**; see `local/r67-15f-approved-full-suite.log`. Original release test reports remain historical; visual review does not establish unperformed cross-release memory-card save/load validation.
 
 **Goal:** correct the Compound/Can't backing, compact complete Items-card names, and translate the proven Items stat tiles without changing numbers, global renderers, or accepted unrelated behavior.
 
