@@ -1,0 +1,34 @@
+{
+  "release": "r67.15f",
+  "approval_status": "gameplay-approved",
+  "approval_date": "2026-10-14",
+  "approval_scope": "User confirmed all r67.15f Compound/Can't backing, card names, stats and item UI fixes working in PCSX2",
+  "iso_filename": "67.15f-item-panel-layout.iso",
+  "iso_size_bytes": 2095382528,
+  "iso_sha256": "e60551bb44fdc27c29b06484a56722d54c0522591c87386741bd6e7d954ff9c0",
+  "installed_elf_sha256": "418864fdb8700f100218a1dcb06aa90d71ce45b8ca5b98aaa9a8d46171378da1",
+  "installed_group4_sha256": "9e6450469c6d7628c1d9e7af0f7ac96278c97bc79c380c2c6a6543d65317786a",
+  "protected_tmx_sha256": {
+    "GRP004/GP004_14.TMX": "268a0e21e374e714b974c034aef52fac4319f1a890224dfe91a71640df0879ab",
+    "GRP004/GP004_05.TMX": "2b3d6e15140840318cdbd2b551f6b6ac46a4abe2a3159825d996f03d37e2ca5d",
+    "GRP004/GP004_18.TMX": "c56143976d29f7df46d449f393ce599bf14c454bc37a4bb8559cea03189a3972",
+    "GRP004/GP004_19.TMX": "9ff48ef38c12ed5d3b76e3f602ae1c36cfec8158a47d11290ff8ec276335d3b6"
+  },
+  "tool_sha256": {
+    "tools/r67_15f_item_panel_layout.py": "f591acf14dfd03142b548653eadba1d9609f5063f6d5a2edc7565c661f706eb1",
+    "tools/r67_15f_item_panel_art.py": "446b4e6de832f66b0fcd6fecfea22666602f8aa2a4e2d1cc134852d95beca5f2",
+    "tools/r67_15f_iso_release.py": "28adbac3ca327cf47ebb5b6f377a3be9a1a69dc600729a385e633255bd642a49"
+  },
+  "native_hook_words": {
+    "0x14b58": "5d922508",
+    "0xdb44": "8a92250c"
+  },
+  "locked_behavior": {
+    "backing": "Compound/Can't: original left anchor; grow right edge; stable X/Y/fade; both native 5E/5F sprite modes",
+    "titles": "Compact complete text for regular and equipped item cards with validated 446 primary catalog names and bounded 196px width",
+    "stats": "English Shots/ATK/Range/AP/Durability/Absorption/Recovery/Increase, Strength/Mind/Vitality/Spirit/Insight/Instinct/Agility; numbers unchanged",
+    "art": "GP004_14 16 localized tiles, GP004_05/18/19 preserved; source glyph provenance and raster output fixed",
+    "preservation": "Accepted r67.15d behavior, story, AFK, save descriptors and approved older presentation"
+  },
+  "policy": "Revisions require documented native owner evidence, reviewer approval and explicit user authorization before changing protected hashes; never regenerate baseline silently."
+}
