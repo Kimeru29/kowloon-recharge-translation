@@ -335,7 +335,7 @@ Retain full-screen context with any close crop. Assess at native logical scale a
 | Finished-image startup | Reports inspected: raw154/155; scoped155/155, only explicit `memory_card_8` exception |
 | Finished-image history/save | Reports inspected:4/4 history regions;15 save descriptors exact; Q/T pass; runtime save compatibility unverified |
 | Fresh full suite | **550 tests run, 536 passed, 14 skipped, zero failures/errors**, 131.781s, Python 3.14; `local/r67-15f-full-suite-final.log` |
-| Commit/PR/release publication | Pending |
+| Commit/PR/release publication | Implementation commit `f9692361e4af30a475f54ed1ea351cbb3f055b03`; pushed [draft PR #50](https://github.com/Kimeru29/kowloon-recharge-translation/pull/50), stacked on PR #49; not merged |
 | Runtime visual approval | Pending; no-input constraint remains |
 
 Historical attempts: an earlier focused historical run recorded38 passes,1 skip and7 environment errors from absent corpus/UnityPy. The first full-suite attempt ran550 tests in111.852s, with9 errors and14 skips; all9 errors were reads of immutable Zstandard-compressed ZIP `.p2s` fixtures under the default Python3.13 environment. Its log is preserved as `local/r67-15f-full-suite.log`. The same runtime limitation is documented for14y. The rerun uses the already-installed **`/opt/homebrew/bin/python3.14`**, with no fixture or test changes. Neither failed attempt is a green suite result.
@@ -366,14 +366,17 @@ The earlier 15b/15c/15d images were restored only to absent paths from preserved
 | Accepted 15d | `5d5850b660e92d9fd0dcb11456519d99b060cbaae131ebf48f6d0f80262a446d` |
 | Parent 15e | `442bc5bde6e8382aeacb8a03fbac34b04e3150bf96e8d209507006cd5d8f0014` |
 
-Branch: `fix/67.15f-item-panel-layout`. Stacked base: `fix/67.15e-compound-bubble`, parent [draft PR #49](https://github.com/Kimeru29/kowloon-recharge-translation/pull/49). The implementation commit and new draft PR URL will be recorded after publication. No merge is authorized before explicit user approval of new gameplay screenshots.
+Branch: `fix/67.15f-item-panel-layout`. Stacked base: `fix/67.15e-compound-bubble`, parent [draft PR #49](https://github.com/Kimeru29/kowloon-recharge-translation/pull/49). Implementation commit: **`f9692361e4af30a475f54ed1ea351cbb3f055b03`**. Published [draft PR #50 — Fit compound bubbles and compact item cards](https://github.com/Kimeru29/kowloon-recharge-translation/pull/50). This publication-metadata update is documentation-only; the implementation and audited ISO are unchanged. The original worktree is retained. No merge is authorized before explicit user approval of new gameplay screenshots.
 
 ## Return prompt for the next handoff
 
 ```text
 Continue Kowloon r67.15f from docs/R67_15F_ITEM_PANEL_LAYOUT.md in
 /Users/juan.pena/repos/kowloon-recharge-translation/.worktrees/first-save-r67.
-Branch: fix/67.15f-item-panel-layout. Continue the diagnostic release handoff;
+Branch: fix/67.15f-item-panel-layout. Draft stacked PR #50:
+https://github.com/Kimeru29/kowloon-recharge-translation/pull/50
+Implementation commit:f9692361e4af30a475f54ed1ea351cbb3f055b03.
+Continue the diagnostic release handoff;
 do not restart completed diagnosis or review implementation absent a reported
 bug. Preserve unrelated work, historical tests and immutable fixtures.
 
