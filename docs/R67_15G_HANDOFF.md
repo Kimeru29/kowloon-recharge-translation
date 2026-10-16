@@ -10,6 +10,8 @@ Worktree: `/Users/juan.pena/repos/kowloon-recharge-translation/.worktrees/first-
 
 Branch: `feat/67.15g-prologue-details-help`, based on approved `00121314506b4abdf00fb71bdca8276a72536194` on `fix/67.15f-item-panel-layout`. PR #50 for that baseline has already merged; the baseline branch remains available for the requested stacked draft. No merge of this branch is authorized.
 
+Publication: [draft PR #51](https://github.com/Kimeru29/kowloon-recharge-translation/pull/51), targeting `fix/67.15f-item-panel-layout`. Implementation and tested source checkpoint: `3741dfc` (`Add audited r67.15g partial translation diagnostic`). This publication note is a subsequent documentation-only change. The branch was pushed; the worktree and all prior releases are retained. Do not merge on the strength of static audits.
+
 | Immutable input | SHA-256 |
 | --- | --- |
 | `local/r67-candidates/67.15f-item-panel-layout.iso` | `e60551bb44fdc27c29b06484a56722d54c0522591c87386741bd6e7d954ff9c0` |
