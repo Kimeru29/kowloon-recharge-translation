@@ -18,6 +18,12 @@ Branch: `fix/67.15h-details-area-transition`.
 Base: `c2033b1fa77957ce888649cecb8f8951467a9eb5`,
 `feat/67.15g-prologue-details-help` ([draft PR #51](https://github.com/Kimeru29/kowloon-recharge-translation/pull/51)).
 
+Publication: [draft PR #52](https://github.com/Kimeru29/kowloon-recharge-translation/pull/52),
+stacked on `feat/67.15g-prologue-details-help`. Implementation and verified build
+checkpoint: `905d4b1` (`Fix r67.15h item text bounds and HANT viewport handle pool`).
+This publication note is a subsequent documentation-only commit. The branch is
+pushed; no merge is authorized or performed.
+
 ## Changes and native ownership
 
 | Component | Owners and correction | Evidence |
@@ -83,7 +89,7 @@ These checks do not establish runtime save compatibility.
 No original ISO, save, card, savestate, emulator configuration or emulator
 session was modified. The build audited its `.incomplete` clone before renaming
 it; startup report paths therefore retain that temporary name. The final ISO's
-hash is identical. Publication status is recorded below after the push/PR.
+hash is identical. Publication status is recorded above.
 
 ```sh
 uv run --quiet --python /opt/homebrew/bin/python3.14 \

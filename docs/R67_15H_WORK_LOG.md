@@ -62,7 +62,7 @@ Baseline suite: 621 tests, 14 skipped, zero failures (129.011 seconds).
 - [x] Deterministic component composition and exact complete-disc audit.
 - [x] q/t/latest locks, history 4/4, save identity 15/15, startup raw154/scoped155
   with only the documented memory_card_8 exception, fresh full suite.
-- [ ] New diagnostic ISO and comprehensive handoff; commit, push, draft stacked PR.
+- [x] New diagnostic ISO and comprehensive handoff; commit, push, draft stacked PR.
 - [ ] User cold-boot gameplay screenshots: overflow cases, HANT scroll, and door.
 
 Fresh integrated suite: **664 tests, 14 skipped, zero failures**, 142.018 seconds.
@@ -74,6 +74,13 @@ finished-image ROFS audit. Complete-disc comparison: 2,095,382,528 bytes,
 67,452 changed versus 15f (including inherited 15g), zero unexplained. Final
 ISO SHA-256: `3c4a2a57079070fed5c205aa338e45d88371164dc4ccc0db36fc402f88c5ace8`.
 See [handoff](R67_15H_HANDOFF.md) for artifact paths, hashes and runtime limits.
+
+Published implementation checkpoint `905d4b1` on
+`fix/67.15h-details-area-transition`, with
+[draft PR #52](https://github.com/Kimeru29/kowloon-recharge-translation/pull/52)
+targeting `feat/67.15g-prologue-details-help`. No merge; the existing worktree,
+all prior releases and original saves remain in place. Only new gameplay
+acceptance and the loading-causality question remain open for this diagnostic.
 
 Ruling: follow the user's explicit autonomous-work and Astra/Luna routing
 instructions rather than adding routine approval or redundant review cycles.
