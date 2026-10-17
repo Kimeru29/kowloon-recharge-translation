@@ -17,7 +17,12 @@ Worktree: `/Users/juan.pena/repos/kowloon-recharge-translation/.worktrees/first-
 Branch: `fix/67.15i-hant-text-item-details`.
 Base: `c4918364a9d0ee016c3c8a0c1f08dbdf71cfa9c2` (15h).
 The integration PR targets main and includes the pending 15g and 15h commits,
-not just the final correction. Publication details are recorded below.
+not just the final correction. Publication:
+[PR #53](https://github.com/Kimeru29/kowloon-recharge-translation/pull/53),
+target **main**. Implementation/build checkpoint: `3766343`. This publication
+note is a subsequent documentation-only commit. The user authorized merging;
+consult the PR and remote main for its live integration state. The worktree and
+all release artifacts are retained after integration.
 
 ## Root causes and narrow corrections
 
