@@ -1,5 +1,9 @@
 # AI handoff — Kowloon re-charge PS2 English translation
 
+Latest diagnostic: [r67.15j text bounds and Help layout](R67_15J_HANDOFF.md).
+Read that handoff first for the current release, acceptance limits and next
+screenshot checklist; the history below remains useful background.
+
 ## Mission
 
 Create a high-quality English translation of the Japanese PS2 **Kowloon Youma Gakuenki re-charge** by backporting the official PS4 remaster English wherever correspondence is provable, then translate PS2/re-charge-exclusive material separately. Pablo supervises; the agent performs reverse engineering, tooling, builds, validation, documentation and Git work.

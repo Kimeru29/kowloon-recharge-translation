@@ -9,6 +9,25 @@ Status meanings:
 - **Still Japanese / unresolved** — no safe accepted English implementation exists yet.
 - **Not runtime-tested** — statically translated/verified but not yet observed successfully in PCSX2.
 
+## Current diagnostic: r67.15j
+
+See [the r67.15j handoff](R67_15J_HANDOFF.md) for exact owners, hashes, tests,
+known translation gaps and the next screenshot checklist. This section records
+the latest evidence; older rows below retain their historical scope.
+
+| Surface | Current evidence |
+|---|---|
+| Aqua Regia doorway transition | User confirmed the prior loading fix works; unchanged in j. |
+| HANT body visibility across menus | User confirmed text is visible again; viewport repair unchanged in j. |
+| Item Details, recipes and dungeon inspection bounds | Reported overflow corrected in j; full installed catalogues pass native geometry checks. New runtime screenshots pending. |
+| Item Screen / Synthesis Help | Semantic icon/text reflow in j, with all five affected pages checked. New runtime screenshots pending. |
+| Place / Take action captions | Official corpus matches applied and caption fit tested; new runtime screenshots pending. |
+| Complete English coverage | Not claimed: 36 Details fallback records and one unmatched dungeon entry action remain. |
+
+ISO: `67.15j-generic-text-bounds.iso`, SHA-256
+`26ced321471b4415c2a855079c778502ed7c043d2e9467c8c1edc1833b58a079`.
+Main integration is authorized independently of gameplay acceptance.
+
 ## Startup / first-play flow
 
 | Surface | Status | Evidence / next action |
