@@ -10,6 +10,11 @@ visibility work in the preceding build. Those fixes are retained.
 Worktree: `/Users/juan.pena/repos/kowloon-recharge-translation/.worktrees/first-save-r67`.
 Branch: `fix/67.15j-generic-text-bounds`.
 Base: `a7a029c9ce51b3691ff37fbfbf051d7a6f0bc1db` (main, r67.15i).
+Implementation checkpoint: `30adec3`.
+Publication: [PR #54](https://github.com/Kimeru29/kowloon-recharge-translation/pull/54),
+target `main`. This publication note follows the implementation commit. Consult
+the PR and remote main for the live merge commit; the diagnostic hashes below
+are independent of this documentation-only update.
 The user explicitly authorized integration into main. That is not visual
 approval of this diagnostic. No PCSX2 configuration, session, memory card,
 save, or savestate was changed. Every prior release remains in place.
@@ -165,7 +170,7 @@ instruction tests and static budgets must not be called cold-boot screenshots.
 
 The independent review attempt did not complete because the review service was
 unavailable. No independent-review approval is claimed. Publication references
-are recorded below after the implementation commit is pushed.
+are recorded above.
 
 Translation completeness remains separate from layout coverage: 36 existing
 Details records retain original-language fallback, and dungeon action `入る`
