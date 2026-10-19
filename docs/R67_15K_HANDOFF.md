@@ -17,12 +17,15 @@ unsupported processor comparisons; its ISO, ELF and reports are retained in
 | Startup | Raw 154/155; scoped 155/155 with only the established `memory_card_8` exception. |
 | Protected history / saves | 4/4 regions; 15/15 descriptors, namespace `BISLPM-66511Save`, serial `SLPM-66511`. Static preservation, not runtime compatibility proof. |
 | Resources / accepted locks | 10,656 ROFS records; DATA.CVM, artwork and ADV unchanged; q/t and accepted f locks pass with their documented reconstruction scope. |
-| Pull request / integration reference | **PENDING — do not infer from the current branch** |
+| Pull request / integration reference | [PR #55](https://github.com/Kimeru29/kowloon-recharge-translation/pull/55), targeting `main`; use the PR merge commit as the integration reference. |
 | Cold-boot visual approval | **PENDING — no runtime approval claimed** |
 
 The worktree is `/Users/juan.pena/repos/kowloon-recharge-translation/.worktrees/first-save-r67`,
 on `fix/67.15k-description-word-wrap`. The only requested change in this
 release is the two description-family layout paths; preserve all unrelated work.
+Implementation commits are `e5250b9` and `1fe7423`. The user's latest instruction
+authorizes integration into main independently of gameplay approval. The PR
+records the final merge state; do not infer visual acceptance from that state.
 
 Diagnostic: `local/r67-candidates/67.15k-description-word-wrap.iso`.
 Executable/report: `local/r67-15k-description-word-wrap.elf` and

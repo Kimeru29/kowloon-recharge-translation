@@ -71,5 +71,7 @@ Files: `tools/r67_15k_iso_release.py`, `tests/test_r67_15k_iso_release.py`,
 - [x] Build a separate versioned diagnostic and audit every changed ISO byte.
 - [x] Run all standing startup/history/save/resource locks and full suite.
 - [x] Document native owners, hashes, limitations, and screenshot checklist.
-- [ ] Commit, push, and integrate only after verification under the user's
-  existing authorization; do not conflate integration with visual approval.
+- [x] Commit and push after verification. Main integration is tracked by
+  [PR #55](https://github.com/Kimeru29/kowloon-recharge-translation/pull/55)
+  under the user's existing authorization; its merge state is independent of
+  visual approval.
