@@ -68,8 +68,8 @@ Files: `tools/r67_15k_iso_release.py`, `tests/test_r67_15k_iso_release.py`,
 `tests/test_r67_15k_release_lock.py`, `docs/R67_15K_HANDOFF.md`,
 `docs/LOCALIZATION_STATUS.md`.
 
-- [ ] Build a separate versioned diagnostic and audit every changed ISO byte.
-- [ ] Run all standing startup/history/save/resource locks and full suite.
-- [ ] Document native owners, hashes, limitations, and screenshot checklist.
+- [x] Build a separate versioned diagnostic and audit every changed ISO byte.
+- [x] Run all standing startup/history/save/resource locks and full suite.
+- [x] Document native owners, hashes, limitations, and screenshot checklist.
 - [ ] Commit, push, and integrate only after verification under the user's
   existing authorization; do not conflate integration with visual approval.

@@ -6,7 +6,7 @@ import unittest
 from unicorn import Uc, UC_ARCH_MIPS, UC_MODE_LITTLE_ENDIAN, UC_MODE_MIPS64
 from unicorn import mips_const as reg
 from tools.r67_15k_word_wrap import Context, fixture, invoke
-from tools.r67_15k_kernel import build_kernel
+from tools.r67_15k_kernel import audit_ee_cop1, build_kernel
 
 
 class NativeKernelTests(unittest.TestCase):
@@ -57,6 +57,27 @@ class NativeKernelTests(unittest.TestCase):
         self.assertEqual(report['unresolved_symbols'], [])
         self.assertGreater(report['relocations'], 0)
         self.assertEqual(report['stack_bytes'], 64)
+
+    def test_shipped_cop1_functions_are_supported_by_the_ee_not_just_generic_mips(self):
+        # EE S-format dispatch accepts CMP.F/EQ/LT/LE at 30/32/34/36, not the
+        # generic signaling comparisons at 3C/3E that Unicorn also implements.
+        supported = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                     0x16, 0x18, 0x19, 0x1a, 0x1c, 0x1d, 0x1e, 0x1f,
+                     0x24, 0x28, 0x29, 0x30, 0x32, 0x34, 0x36}
+        bad = []
+        for offset in range(0, self.report['text_size'], 4):
+            word = struct.unpack_from('<I', self.code, offset)[0]
+            if word >> 26 == 17 and word >> 21 & 31 == 16 and word & 63 not in supported:
+                bad.append((hex(0x980000 + offset), hex(word)))
+        self.assertEqual(bad, [])
+
+    def test_raw_audit_rejects_generic_comparisons_and_unsupported_formats(self):
+        for word in (0x4604083c, 0x4604083e, 0x46040835, 0x46040837,
+                     0x46200000, 0x46800021, 0x45040000):
+            with self.subTest(word=hex(word)):
+                with self.assertRaisesRegex(ValueError, 'unsupported EE COP1'):
+                    audit_ee_cop1(struct.pack('<I', word), 0x980000)
+        audit_ee_cop1(struct.pack('<II', 0x46040834, 0x46040836))
 
 
 if __name__ == '__main__':

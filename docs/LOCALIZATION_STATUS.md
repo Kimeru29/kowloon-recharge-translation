@@ -9,23 +9,22 @@ Status meanings:
 - **Still Japanese / unresolved** — no safe accepted English implementation exists yet.
 - **Not runtime-tested** — statically translated/verified but not yet observed successfully in PCSX2.
 
-## Current diagnostic: r67.15j
+## Current diagnostic: r67.15k
 
-See [the r67.15j handoff](R67_15J_HANDOFF.md) for exact owners, hashes, tests,
+See [the r67.15k handoff](R67_15K_HANDOFF.md) for exact owners, hashes, tests,
 known translation gaps and the next screenshot checklist. This section records
 the latest evidence; older rows below retain their historical scope.
 
 | Surface | Current evidence |
 |---|---|
-| Aqua Regia doorway transition | User confirmed the prior loading fix works; unchanged in j. |
-| HANT body visibility across menus | User confirmed text is visible again; viewport repair unchanged in j. |
-| Item Details, recipes and dungeon inspection bounds | Reported overflow corrected in j; full installed catalogues pass native geometry checks. New runtime screenshots pending. |
-| Item Screen / Synthesis Help | Semantic icon/text reflow in j, with all five affected pages checked. New runtime screenshots pending. |
-| Place / Take action captions | Official corpus matches applied and caption fit tested; new runtime screenshots pending. |
+| Aqua Regia doorway transition | User confirmed the loading fix works; unchanged in k. |
+| HANT body visibility across menus | User confirmed text is visible again; unchanged in k. |
+| Item Details and dungeon inspection bodies | Latest screenshots still show overflow, probably on j; exact running ISO unconfirmed, memory-card boot confirmed. k installs final-draw live-metric word wrapping for both owner families. Static/native harness checks are not visual approval; new k screenshots required. |
+| Recipe names, Item Screen / Synthesis Help, and Place / Take actions | User reported everything except the two description bodies solved. Preserve accepted j implementations byte-for-byte in k. |
 | Complete English coverage | Not claimed: 36 Details fallback records and one unmatched dungeon entry action remain. |
 
-ISO: `67.15j-generic-text-bounds.iso`, SHA-256
-`26ced321471b4415c2a855079c778502ed7c043d2e9467c8c1edc1833b58a079`.
+ISO: `67.15k-description-word-wrap.iso`, SHA-256
+`ad706667ff82b3e3374ada0426193f8527c6af3714ed7462b5db05166d509b53`.
 Main integration is authorized independently of gameplay acceptance.
 
 ## Startup / first-play flow

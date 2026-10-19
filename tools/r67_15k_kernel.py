@@ -1,6 +1,6 @@
 """Build and narrowly relocate a freestanding, audited R5900 layout kernel.
 
-The compiler emits the MIPS II subset of the EE ISA. Generic MIPS ordered
+The compiler emits the MIPS II subset of the EE ISA. Generic MIPS unordered
 comparisons are lowered to the EE's equivalent finite-input comparisons.
 No shared-library loader, GP/GOT relocation, or external runtime is involved.
 """
@@ -11,6 +11,24 @@ import struct
 import subprocess
 
 from tools.r67_15k_word_wrap import KERNEL
+
+
+def audit_ee_cop1(code, base=0):
+    """Check raw EE dispatch encodings, not generic MIPS mnemonic aliases."""
+    single = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+              0x16, 0x18, 0x19, 0x1a, 0x1c, 0x1d, 0x1e, 0x1f,
+              0x24, 0x28, 0x29, 0x30, 0x32, 0x34, 0x36}
+    for offset in range(0, len(code), 4):
+        word = struct.unpack_from('<I', code, offset)[0]
+        if word >> 26 != 17:
+            continue
+        form, function = word >> 21 & 31, word & 63
+        valid = (form in (0, 2, 4, 6) or
+                 (form == 8 and word >> 16 & 31 in (0, 1, 2, 3)) or
+                 (form == 16 and function in single) or
+                 (form == 20 and function == 0x20))
+        if not valid:
+            raise ValueError(f'unsupported EE COP1 instruction at {base + offset:#x}: {word:#010x}')
 
 
 @lru_cache(maxsize=1)
@@ -100,15 +118,18 @@ def build_kernel(base):
     comparisons = 0
     for offset in range(text_offset, text_offset + text['sh_size'], 4):
         word = struct.unpack_from('<I', output, offset)[0]
-        if word >> 26 == 17 and word >> 21 & 31 == 16 and word & 63 in (0x34, 0x35, 0x36, 0x37):
-            function = 0x3c if word & 63 in (0x34, 0x35) else 0x3e
+        if word >> 26 == 17 and word >> 21 & 31 == 16 and word & 63 in (0x35, 0x37):
+            # EE LT/LE are 34/36. 3C/3E exist on generic MIPS but not on EE.
+            # Layout metrics are finite; unordered and ordered predicates agree.
+            function = (word & 63) - 1
             struct.pack_into('<I', output, offset, (word & ~63) | function)
             comparisons += 1
+    audit_ee_cop1(output[text_offset:text_offset + text['sh_size']], base + text_offset)
     legal = {'addiu', 'addu', 'and', 'andi', 'b', 'bc1f', 'bc1t', 'beq', 'beqz',
              'bne', 'bnez', 'j', 'jr', 'lbu', 'lhu', 'lui', 'lw', 'lwc1', 'move',
              'nop', 'or', 'ori', 'sll', 'slt', 'slti', 'sltiu', 'sltu', 'srl',
              'subu', 'sw', 'swc1', 'xor', 'xori', 'mtc1', 'mfc1', 'add.s',
-             'sub.s', 'mul.s', 'mov.s', 'cvt.s.w', 'c.eq.s', 'c.lt.s', 'c.le.s'}
+             'sub.s', 'mul.s', 'mov.s', 'cvt.s.w', 'c.eq.s', 'c.olt.s', 'c.ole.s'}
     disassembler = Cs(CS_ARCH_MIPS, CS_MODE_MIPS32 | CS_MODE_LITTLE_ENDIAN)
     instructions = list(disassembler.disasm(output[text_offset:text_offset + text['sh_size']],
                                             base + text_offset))

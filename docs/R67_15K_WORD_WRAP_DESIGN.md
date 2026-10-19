@@ -1,7 +1,8 @@
 # r67.15k description word wrapping
 
-Status: owner-local implementation and 25 focused tests pass; release audit and
-visual approval are still pending.
+Status: owner-local implementation and corrected release audit complete.
+See R67_15K_HANDOFF.md for final verification totals and runtime limits.
+Visual approval remains pending.
 
 ## Scope
 
@@ -81,8 +82,9 @@ previous release artifacts. No emulator/session/settings changes are authorized.
 - Each inspection callback resolves and reflows the complete four-handle
   group, without relying on draw order. Its copied native allocator reserves
   0x258 bytes and stores the owning M_ObjDtl private pointer at +0x254.
-  Native allocation, stack arguments, callback, destructor and metadata are
-  covered by execution tests. The original destructor still owns the block.
+  Native allocation, stack arguments, callback registration and metadata are
+  covered by execution tests. The original destructor address is preserved;
+  this is not yet a full execution test of destruction and owner teardown.
 - The inspection backing comprises sprites 0x91/0x92/0x93, all anchored at
   (256,256), or Y=-32 for a high-positioned panel. The lower backing reaches
   anchorY+187. Body starts at anchorY+92; a 90-pixel content height leaves five
@@ -99,6 +101,10 @@ previous release artifacts. No emulator/session/settings changes are authorized.
   selection; use the MIPS II subset supported by the EE, with an instruction
   allowlist and explicit finite-input comparison lowering. Only HI16/LO16 and
   local J26 relocations are accepted. Current kernel stack usage is 64 bytes.
+- Raw EE COP1 audit rejects generic-MIPS-only encodings. EE LT/LE use functions
+  0x34/0x36, not 0x3C/0x3E. Only unordered 0x35/0x37 are lowered to 0x34/0x36
+  for finite layout inputs. A first unpublished build using the wrong mapping
+  was quarantined; the corrected release hash is locked independently.
 - All requested ordinary layout uses live font metrics. Unknown controls,
   malformed pointers or more than 1024 nodes reject before any geometry write.
   This is a safety boundary, not proof that arbitrary new control types wrap.
