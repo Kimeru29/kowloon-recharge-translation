@@ -1,9 +1,15 @@
 # r67.15k — live-metric description wrapping
 
-## Handoff status
+## Gameplay approval recorded on 2026-10-19
 
-The corrected r67.15k diagnostic is built and its complete disc audit passes.
-Gameplay evidence is still pending. An earlier unpublished k build used
+The user confirmed that the r67.15k gameplay fixes work perfectly. This approval covers the current in-game Item SELECT Details and grouped inspection description word wrapping, and previously accepted UI behavior. The immutable approved image and its native owner bytes are now pinned by `docs/R67_15K_APPROVED_LOCK.json`, verified by `tools/r67_15k_approved_lock.py` and regression-tested by `tests/test_r67_15k_approved_lock.py`. The record also pins the existing r67.15g–k implementation and regression files to prevent unreviewed changes. Any later change needs a separate, expressly reviewed approval baseline.
+
+The historical release report remains unchanged (`gameplay_approved: false`, `runtime_verified: false`) because it describes **the evidence available at build time**. The separate approval manifest records the user's later visual signoff. The post-approval suite passed **764 tests (13 expected skips, zero failures/errors)** with pinned Python 3.14 dependencies; see `local/r67-15k-approval-full-suite.log`. The nine new fail-closed approval tests passed independently, and the manifest pins 52 existing g–k implementation/regression files, five native callbacks, four texture owners, and the complete approved ISO/ELF. No independent automated PCSX2 walkthrough or cross-release memory-card smoke test is claimed.
+
+## Handoff status (historical diagnostic)
+
+The corrected r67.15k diagnostic was built and its complete disc audit passed.
+At the time of building, gameplay evidence was still pending. An earlier unpublished k build used
 unsupported processor comparisons; its ISO, ELF and reports are retained in
 `local/r67-15k-rejected-generic-cop1/` for diagnosis, not distribution.
 
