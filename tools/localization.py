@@ -81,9 +81,17 @@ class DcGroup:
     lines: tuple[str, ...]
     synthetic_keys: tuple[int, ...]
     replace_end: int
+    name_controls: tuple[str, ...] = ()
 
     def encoded_replacement(self) -> bytes:
-        return b"r".join(encode_ps2_english(line) for line in self.lines)
+        macros = {"(px)": "px", "(pn1)": "pn", "(pm1)": "pm"}
+        def encode_line(line):
+            parts = re.split(r"(\(px\)|\(pn1\)|\(pm1\))", line)
+            return b"".join(macros[part].encode("ascii") if part in macros
+                            and macros[part] in self.name_controls
+                            else encode_ps2_english(part) for part in parts)
+        return b"r".join(encode_line(line) for line in self.lines)
+
 
 
 @dataclass(frozen=True)
@@ -102,15 +110,36 @@ class DcLocalization:
         header_size = struct.unpack_from("<H", raw, 0)[0] * 4
         boundaries = _cp932_boundaries(raw, header_size)
         pairs = sorted((int(key), str(value)) for key, value in zip(keys, values))
+        if len({key for key, _ in pairs}) != len(pairs):
+            raise ValueError("Duplicate DC anchors are not synthetic continuations")
+        pointer_starts = {word * 4 for word in struct.unpack_from(f"<{header_size // 2}H", raw)}
+        name_controls = tuple(token for token in ("px", "pn", "pm")
+                              if any(raw[offset:offset + 2] == token.encode("ascii")
+                                     for offset in boundaries))
+        macros = {"(px)": "px", "(pn1)": "pn", "(pm1)": "pm"}
+        for _, value in pairs:
+            for macro in re.findall(r"\(p[a-z]+[0-9]*\)", value):
+                if macro not in macros or macros[macro] not in name_controls:
+                    raise ValueError("Unproven name substitution control in official text")
 
         grouped: list[dict[str, Any]] = []
         for key, value in pairs:
-            if key not in boundaries:
+            consecutive = bool(grouped and key == grouped[-1]["anchor"] + len(grouped[-1]["lines"]))
+            if key not in boundaries or consecutive:
                 if not grouped:
                     raise ValueError(f"Synthetic DC key {key} has no preceding anchor")
+                if not consecutive or key in pointer_starts:
+                    raise ValueError(f"DC key {key} is not a consecutive synthetic continuation")
+                # A synthetic key indexes an English line within one source
+                # span. It cannot consume a real control delimiter/entry point.
+                byte = raw[key] if key in boundaries else None
+                inside_name_control = raw[grouped[-1]["anchor"]:key + 1] in (b"px", b"pn", b"pm")
+                if byte is not None and byte < 0x80 and not inside_name_control:
+                    raise ValueError(f"DC continuation {key} overlaps a control boundary")
                 grouped[-1]["lines"].append(value)
                 grouped[-1]["synthetic_keys"].append(key)
                 continue
+
             grouped.append({"anchor": key, "lines": [value], "synthetic_keys": []})
 
         anchors = [entry["anchor"] for entry in grouped]
@@ -170,6 +199,7 @@ class DcLocalization:
                     lines=tuple(entry["lines"]),
                     synthetic_keys=tuple(entry["synthetic_keys"]),
                     replace_end=replace_end,
+                    name_controls=name_controls,
                 )
             )
 

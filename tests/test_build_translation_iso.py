@@ -123,6 +123,28 @@ def make_nested_iso(path: Path) -> dict[str, int]:
 
 
 class WholeIsoOverlayBuildTests(unittest.TestCase):
+    def test_growing_cvm_keeps_an_already_relocated_elf_after_the_shifted_tail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, output = root / 'base.iso', root / 'candidate.iso'
+            meta = make_nested_iso(source)
+            raw = bytearray(source.read_bytes())
+            elf = bytes(raw[22 * SECTOR_SIZE:22 * SECTOR_SIZE + 128])
+            shifted_elf = meta['tail_extent'] + 1
+            raw[shifted_elf * SECTOR_SIZE:shifted_elf * SECTOR_SIZE + 128] = elf
+            raw[20 * SECTOR_SIZE + 2:20 * SECTOR_SIZE + 10] = both_u32(shifted_elf)
+            source.write_bytes(raw)
+            overlay_root = root / 'overlay' / 'DG'
+            overlay_root.mkdir(parents=True)
+            (overlay_root / 'A.MTX').write_bytes(b'E' * 3000)
+            report = build_translation_iso(source, output, collect_overlay([('new', overlay_root.parent)]))
+            self.assertEqual(report['elf_output_extent'], shifted_elf + 2)
+            with output.open('rb') as stream, mmap.mmap(stream.fileno(), 0, access=mmap.ACCESS_READ) as image:
+                _, records = index_iso(image)
+                executable = find_record(records, 'SLPM_665.11')
+                cvm = find_record(records, 'DATA.CVM')
+                self.assertGreaterEqual(executable.extent, cvm.extent + cvm.sectors)
+
     def test_relocates_growing_embedded_file_and_preserves_shifted_outer_tail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

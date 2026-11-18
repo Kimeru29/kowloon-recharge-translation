@@ -9,23 +9,61 @@ Status meanings:
 - **Still Japanese / unresolved** — no safe accepted English implementation exists yet.
 - **Not runtime-tested** — statically translated/verified but not yet observed successfully in PCSX2.
 
-## Current diagnostic: r67.15k
+## Current approved baseline: r67.15k; r67.15l static integration complete
 
-See [the r67.15k handoff](R67_15K_HANDOFF.md) for exact owners, hashes, tests,
-known translation gaps and the next screenshot checklist. This section records
-the latest evidence; older rows below retain their historical scope.
+See [the r67.15k handoff](R67_15K_HANDOFF.md) for the approved baseline and
+its user-confirmed gameplay record. r67.15l ports the official Emotion Input
+wheel lettering into `BLBRD/B_GP001.BIN`. The art transform and manifest are
+frozen; art tests pass **9/9**, native coverage is frozen at **18 passing
+tests**, and fresh art-plus-composition tests pass **21 in 15.871 seconds**.
+The final CLI build passed with exit code 0. The final ISO is
+`local/r67-candidates/67.15l-emotion-wheel.iso`, SHA-256
+`c70dd6e70c9be85c05732bfc3f4fa60ff1c9e7c280470d7ebe9c76c7a7290f94`.
+The 2,095,382,528-byte disc audit reports 60,028 changed bytes, all in the
+603,520-byte `BLBRD/B_GP001.BIN` resource, and zero unexplained bytes. The
+installed ELF is byte-identical to approved k; startup is 154/155 raw and
+155/155 scoped under only the `memory_card_8` exception. History, save, and
+ROFS checks report 4 history regions, 15 save descriptors, and 10,656 ROFS
+records with zero mismatches. The final focused release suite passes **40/40
+in 24.794 seconds** (exit 0), including the installed release-lock test
+(`local/r67-15l-final-focused.log`). The integrated full suite passes **804
+tests in 234.789 seconds** (exit 0): 791 executed passing, 13 expected skips,
+and zero failures/errors (`local/r67-15l-final-suite.log`). The skips are five
+CVM/KSF/MTX module skips, one old graphics-port skip, six historical
+finished-ISO skips (q, t, u, z, a, and r67.12 history), and one DG13
+structural-corpus skip. All new/current installed-candidate and
+history-environment checks ran without skips. Frozen-source verification
+passed: 52 protected k-source files and the historical report are unchanged;
+the independent approved-k ISO SHA-256 is still
+`ad706667ff82b3e3374ada0426193f8527c6af3714ed7462b5db05166d509b53`.
+
+The historical precoverage artifact set is preserved at
+`local/r67-15l-precoverage-20261021/`. The earlier ISO digest
+`38319eb2ab1dca658377eb7cf226f16760763832fd58c49b630375dc5c8ebc04` is not
+the final acceptance image. Do not overwrite or relabel that evidence. The
+current approved source remains the r67.15k ISO, SHA-256
+`ad706667ff82b3e3374ada0426193f8527c6af3714ed7462b5db05166d509b53`.
+Runtime approval requires the final exact ISO hash and user-reviewed
+screenshots from that same image. Older rows below retain their historical
+scope.
 
 | Surface | Current evidence |
 |---|---|
 | Aqua Regia doorway transition | User confirmed the loading fix works; unchanged in k. |
 | HANT body visibility across menus | User confirmed text is visible again; unchanged in k. |
-| Item Details and dungeon inspection bodies | Latest screenshots still show overflow, probably on j; exact running ISO unconfirmed, memory-card boot confirmed. k installs final-draw live-metric word wrapping for both owner families. Static/native harness checks are not visual approval; new k screenshots required. |
+| Item Details and dungeon inspection bodies | **Working / runtime-proven for approved k.** The user confirmed the k gameplay fixes work perfectly on 2026-10-19; see the approval record in the [k handoff](R67_15K_HANDOFF.md). |
 | Recipe names, Item Screen / Synthesis Help, and Place / Take actions | User reported everything except the two description bodies solved. Preserve accepted j implementations byte-for-byte in k. |
 | Complete English coverage | Not claimed: 36 Details fallback records and one unmatched dungeon entry action remain. |
+| Emotion Input wheel labels | **Not runtime-tested.** Frozen official PS4 art covers 56 drawings in paired, gold, and glow variants. Art tests: 9/9; native coverage: 18 passing tests; fresh art-plus-composition: 21 passing in 15.871 seconds; final focused release suite: **40/40 PASS** in 24.794 seconds (exit 0), including installed release-lock test; integrated full suite: **804 tests PASS** in 234.789 seconds (791 executed passing, 13 expected skips, zero failures/errors). Logs: `local/r67-15l-final-focused.log` and `local/r67-15l-final-suite.log`. Final ISO SHA-256 is `c70dd6e70c9be85c05732bfc3f4fa60ff1c9e7c280470d7ebe9c76c7a7290f94`; the 2,095,382,528-byte audit found 60,028 changes only in `BLBRD/B_GP001.BIN`, with zero unexplained bytes. Runtime/visual acceptance still requires user-reviewed screenshots from this exact ISO. See the [r67.15l art record](R67_15L_EMOTION_WHEEL.md) and [release handoff](R67_15L_HANDOFF.md). |
+
+See the [r67.15l release handoff](R67_15L_HANDOFF.md) for complete build
+metrics, native/art map, current suite state, and the hash-pinned visual
+acceptance checklist. Static checks do not count as runtime proof.
 
 ISO: `67.15k-description-word-wrap.iso`, SHA-256
 `ad706667ff82b3e3374ada0426193f8527c6af3714ed7462b5db05166d509b53`.
-Main integration is authorized independently of gameplay acceptance.
+The k gameplay approval is recorded separately from the historical diagnostic
+report. Main integration status is managed by the main agent.
 
 ## Startup / first-play flow
 
