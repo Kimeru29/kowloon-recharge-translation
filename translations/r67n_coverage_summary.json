@@ -1,0 +1,73 @@
+{
+  "entry_status_counts": {
+    "correspondence unresolved": 2439,
+    "deliberate technical-safety fallback": 11,
+    "historical English installed; semantic-cluster correspondence requires review": 9,
+    "inherited approved constrained choice": 2,
+    "official English available; not installed": 56,
+    "official English installed": 98966,
+    "official U+3000 no-op": 4
+  },
+  "file_relation_counts": {
+    "exact": 2032,
+    "missing counterpart; correspondence unresolved": 898,
+    "structural": 48,
+    "template": 54
+  },
+  "files": 3032,
+  "finding_status_counts": {
+    "correspondence unresolved": 25997,
+    "deliberate technical-safety fallback": 11,
+    "official English available; not installed": 56
+  },
+  "installed_native_ksf_labels": 1136,
+  "iso_sha256": "c3aa8a847f9ed505ca62d11dfa22cfd6e28a9c8f3d63900928f41824e00ea1f0",
+  "japanese_text_candidates": 26064,
+  "limits": [
+    "Each DC key is an official map entry. Synthetic continuation keys belong to shared source spans.",
+    "Lexical MTX candidates may be names, punctuation, labels, commands with text operands, or dialogue. Runtime display and route reachability remain untested.",
+    "KSF candidates come only from active native choice slots. Packed binary data and MTX pointer headers are excluded.",
+    "Known all-control MTX payloads use positively identified complete hashes. Missing same-path counterparts leave correspondence unresolved.",
+    "The PS4 payload index lists same-kind byte-identical files by SHA-256. Shared data alone does not establish shared display context.",
+    "ADV-only inventory. ELF tables, graphics, fonts, audio, and save data are outside the scanned trees."
+  ],
+  "official_dc_entries": 101487,
+  "producer_report_sha256": {
+    "/Users/juan.pena/repos/kowloon-recharge-translation/.worktrees/startup-flow-v10/local/structural-import-report.json": "9250a3f653a3b007ee59dd88303d06c50bce016ac21793a56c297b061bd829d8",
+    "local/r67m-integration/structural-report-v2.json": "d78515baaa1e425a98d426ddb6c589b0f2fb431d77083485575cac8e19e14639",
+    "local/r67n-ksf-structural/report.json": "a6ca7b10b58297fe506bd7afef61be84cd913de9061db60b6d07564d5623ec57",
+    "local/r67n-ksf/report.json": "4f24b0e56a97f4d1c665194d7c6aebf833efd62d1acabf03a45acbcd426b4a54",
+    "local/r67n-names-final/report.json": "78fdd32978298c5e69838781aa6d370e4ca5b8c1541bf471da5f5c795789cf56",
+    "local/r67n-partial/report.json": "554e548e729cb6d1b2881b53a6dee15303e1e4d007e7e6f2b147ac1da51b4899"
+  },
+  "source_counts": {
+    "KSF": {
+      "common": 1067,
+      "english_entries": 1089,
+      "exact": 1010,
+      "mapped": 164,
+      "ps2-only": 449,
+      "ps2_total": 1516,
+      "structural": 29,
+      "template": 28,
+      "unmapped": 903
+    },
+    "MTX": {
+      "common": 1067,
+      "english_entries": 100398,
+      "exact": 1022,
+      "mapped": 1028,
+      "ps2-only": 449,
+      "ps2_total": 1516,
+      "structural": 19,
+      "template": 26,
+      "unmapped": 39
+    }
+  },
+  "source_inventory_sha256": "1ab214641ae7906e7f4afc3eb6ccca53ad14116390baeaaf214e98e9687633db",
+  "whole_file_alias_audit": {
+    "ps2_mtx_with_byte_identical_alternate_mapped_ps4_file": 0,
+    "ps2_mtx_without_same_path_map": 488,
+    "ps4_mtx_with_map": 1028
+  }
+}
