@@ -69,3 +69,19 @@ python3 -m unittest tests.test_r67n_ksf tests.test_ksf_import tests.test_ksf_cor
 ```
 
 16 focused tests passed, including complete-source reproducibility, stale-output rejection and native-anchor drift detection. Input inventory SHA-256 is `98d47250eae57a9ae34dc1da11f5cb9da1d196a530a3a90047e31c96bd9a089e`. Overlay inventory SHA-256 is `ccb9eb4a16313f75341a609bb09f69ac2e340006f558dcf5d58679f7bc7e2d71`.
+
+## Additional official choices from structurally changed files
+
+The original exact importer omitted 169 official DC entries in 20 nonidentical KSF assets. The new `tools.r67n_ksf_structural` compares complete native event records at the same scenario ordinal and choice index. It requires byte-identical fixed metadata, flags and all Japanese label payloads, verifies that each key begins an active PS4 field, and retains the pristine PS2 file as its installation preimage. This proves 126 records; 116 official strings fit the 29-byte plus NUL limit and are installed across 15 files. Ten proven strings exceed capacity, and 43 entries lack complete record correspondence. No operand or text normalization establishes a match. Only the established repeated-space display convention is applied to the proven official English.
+
+`local/r67n-ksf-structural/report.json` contains every one of the 169 entries, source/map/output hashes, original record and choice indexes, field offsets and exact context evidence. Reproduction requires a fresh directory:
+
+```sh
+python -m tools.r67n_ksf_structural \
+  --ps2-adv local/r67n-sources/assets/ADV \
+  --ps4-adv local/r67-15k-source-recovery/extracted/uroot/Media/StreamingAssets/data/ADV \
+  --installed-iso local/r67m-integration/release-pinned-20261031/67.15m-cumulative-script-wheel.iso \
+  --output local/r67n-ksf-structural-reproduction
+```
+
+Across all 1,089 mapped KSF entries the final inventory distinguishes 973 installed official choices, four official blank no-ops, two inherited approved constrained choices, 56 over-capacity official strings, eleven safety fallbacks and 43 unresolved record correspondences. The latter two Japanese populations are not classified as PS2-exclusive.
