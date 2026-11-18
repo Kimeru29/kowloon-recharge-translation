@@ -8,6 +8,7 @@ This diagnostic continues the exact r67.15m cumulative disc. It retains the game
 |---|---|
 | Repository worktree | `/Users/juan.pena/.codex/worktrees/r67m-cumulative-script/kowloon-recharge-translation` |
 | Branch | `feat/67.15n-official-script-transfer` |
+| Draft PR | [#57](https://github.com/Kimeru29/kowloon-recharge-translation/pull/57), targeting `main`; do not merge before gameplay approval |
 | Candidate | `local/r67n-release/67.15n-official-script-diagnostic.iso` |
 | ISO SHA-256 | `c3aa8a847f9ed505ca62d11dfa22cfd6e28a9c8f3d63900928f41824e00ea1f0` |
 | Bytes | 2,095,382,528 |
