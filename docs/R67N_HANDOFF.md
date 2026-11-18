@@ -84,7 +84,7 @@ The independent whole-disc auditor derives exact expected writes from m and the 
 - Raw startup 154/155, scoped 155/155 with only the pre-existing bounded `memory_card_8` exception.
 - Four history lock regions and fifteen save descriptors preserved, serial `SLPM-66511`, namespace `BISLPM-66511Save`.
 - All 52 approved producer files and immutable historical k report verified unchanged.
-- Final suite: **894 run; 887 passed, seven historical skips, zero failures/errors** (224.454 seconds). New installed-ISO checks ran; history guards used the final n ELF/ISO. Two complete builds produced the identical candidate hash. Results are recorded in `local/r67n-session/final-validation.json` and the delivered validation logs.
+- Final suite: **894 run; 887 passed, seven historical skips, zero failures/errors** (224.454 seconds). New installed-ISO checks ran; history guards used the final n ELF/ISO. Three complete builds, including a fresh end-to-end source reproduction, produced the identical candidate hash. Results are recorded in `local/r67n-session/final-validation.json` and the delivered validation logs.
 
 The initial resumed suite failed because temporary owned-source aliases had disappeared; those failures and logs were retained. Once aliases were restored, the prebuild full suite passed 876 tests with seven historical skips. A separate final run requires the installed n ISO and passes its ELF/ISO to the existing history checks. Static checks do not establish cross-release save compatibility or gameplay approval.
 
