@@ -11,6 +11,20 @@ Status meanings:
 
 ## Current approved baseline: r67.15k; r67.15l static integration complete
 
+### Latest cumulative diagnostic: r67.15o (November 19, 2026)
+
+[r67.15o handoff](R67O_HANDOFF.md): ISO SHA-256
+`049b68c70c74f99b195975000c90e064b5106cbe18cf0dc89f87b44526081b13`.
+The finished inventory verifies 98,201 MTX official entries, 1,079 guarded
+English choice labels, four stock blank no-ops and 2,203 unresolved official
+array entries. It adds 305 full official entries over n and 7,402 fixed
+speaker headers. The independent audit compared all 2,095,382,528 bytes with
+zero unexplained changes. Choice rendering and speaker identity have native
+execution evidence; the o game has not been played by the agent. Pablo
+explicitly reserved actual gameplay verification for his own playthrough.
+These surfaces remain **Not runtime-tested**. The approved baseline and
+merge gate remain unchanged. Phase 2 has not started.
+
 See [the r67.15k handoff](R67_15K_HANDOFF.md) for the approved baseline and
 its user-confirmed gameplay record. r67.15l ports the official Emotion Input
 wheel lettering into `BLBRD/B_GP001.BIN`. The art transform and manifest are

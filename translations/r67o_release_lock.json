@@ -1,0 +1,42 @@
+{
+  "baseline_iso_sha256": "c3aa8a847f9ed505ca62d11dfa22cfd6e28a9c8f3d63900928f41824e00ea1f0",
+  "changed_bytes": 7285685,
+  "entry_status_counts": {
+    "correspondence unresolved": 2203,
+    "official English installed": 98201,
+    "official English installed via guarded native ELF choice table": 1079,
+    "official U+3000 no-op": 4
+  },
+  "final_validation_sha256": "7770093d545d187ce863327bc5b6907f7d0fb174d41f77535ec72e6de04ef60c",
+  "gameplay_approved": false,
+  "gameplay_verifier": "Pablo, by playing; explicitly reserved on 2026-11-19",
+  "installed_elf_sha256": "fd4760a3c96260ef0fde8cf113a9cc49d46fe732a7f7b0087357f612f1182787",
+  "inventory_sha256": {
+    "entries.json": "a3c14d67bfe51da80f67d739f3aaaad2d0424c7b9c44dada0eddd3bc15606d41",
+    "files.json": "a9b8ddb3b8dde628edc25af6bc37a797c56b3b383d5e75bb9ef383df12258af0",
+    "japanese.json": "addd9cf4f84ef1cc4a16d60ec128cfe74d1e71e0e5c5bb67d2b6a9e90af37b94",
+    "ksf-labels.json": "157d614e6630c80bc4f45f97f52d1f14db6f088b042d2d531730b122fb7efeb1",
+    "ps4-payload-index.json": "5b53dd15a8a7576020a2048e84d6f47267cfdb542d0c7914591da7f82ad498c3",
+    "speakers.json": "2e782af6cc626d7c435df6f86ad36ca3e94e10eee8348524dca8cc8c936e554d",
+    "summary.json": "1d736560fb90ae695a716b6941f2a487ac45144c42dbab1c42807acff6f97c1d"
+  },
+  "iso_bytes": 2095382528,
+  "iso_sha256": "049b68c70c74f99b195975000c90e064b5106cbe18cf0dc89f87b44526081b13",
+  "merge_approved": false,
+  "new_full_official_entries": 305,
+  "phase_2_started": false,
+  "producer_report_sha256": {
+    "r67o-bundles": "879ab842981954c52f1b0df60c466f0dcba5161b7379818b694609ac22395938",
+    "r67o-choices": "3dc1400704f2a68ce32578febcbbf47b578dc6780596a81ecaa70fb1ae811ba3",
+    "r67o-kwlnscr": "4f7c0671e09ea26f916d6d3bb675021f2a202f7fd5a52b33e342fe76e1afa4ab",
+    "r67o-speakers": "548b58519e885b34f8c536e11dbe4dcd3f5bcfb5c53e50e3fc80c6aa71543bf9"
+  },
+  "release": "r67.15o-cumulative-official-diagnostic",
+  "release_report_sha256": "86dcbbd0eee797f8183ebe53e900b0e276b8e73464ff129b5d524f0f2775539e",
+  "runtime_verified": false,
+  "schema_version": 1,
+  "speaker_files": 478,
+  "speaker_occurrences": 7402,
+  "unexplained_bytes": 0,
+  "whole_disc_bytes_compared": 2095382528
+}
