@@ -155,6 +155,8 @@ def _mapped_direct_span_with_prefix_insertion(
     control delimiter must still agree. It covers a PS2-only setup-command
     prefix without weakening ordinary interior boundary checks.
     """
+    if start != int.from_bytes(ps4_raw[:2], "little") * 4:
+        return None
     for block in blocks:
         if block.size <= 0 or block.a != start or end > block.a + block.size:
             continue
@@ -166,6 +168,30 @@ def _mapped_direct_span_with_prefix_insertion(
         right2 = _normalize_control_context(_ascii_right_signature(ps2_raw, mapped_end))
         if right4 == right2 or _right_control_delimiter(right4) == _right_control_delimiter(right2):
             return mapped_start, mapped_end
+    return None
+
+
+def _mapped_unique_context_span(ps4_raw, ps2_raw, blocks, start, end):
+    """Prove a short label by a unique, long, byte-identical script context.
+
+    Numeric operands are never normalized. Both source images must contain
+    the complete exact context exactly once; original PS2 controls stay intact.
+    """
+    for block in blocks:
+        if not (block.a <= start < end <= block.a + block.size):
+            continue
+        if block.size - (end - start) < 64:
+            continue
+        context = ps4_raw[block.a:block.a + block.size]
+        if sum(byte >= 0x80 for byte in context) < 32:
+            continue
+        if (ps4_raw.find(context) != block.a
+                or ps4_raw.find(context, block.a + 1) >= 0
+                or ps2_raw.find(context) != block.b
+                or ps2_raw.find(context, block.b + 1) >= 0):
+            continue
+        mapped_start = block.b + start - block.a
+        return mapped_start, mapped_start + end - start
     return None
 
 
@@ -199,6 +225,12 @@ def import_structural_mtx(
             mapped = _mapped_direct_span_with_prefix_insertion(
                 ps4_raw, ps2_raw, blocks, group.anchor, group.replace_end
             )
+        mode = "direct"
+        if mapped is None:
+            mapped = _mapped_unique_context_span(
+                ps4_raw, ps2_raw, blocks, group.anchor, group.replace_end
+            )
+            mode = "unique_context"
         if mapped is None:
             continue
         start, end = mapped
@@ -206,7 +238,7 @@ def import_structural_mtx(
             continue
         replacements.append(MtxReplacement(start, end, group.encoded_replacement()))
         spans.append(
-            StructuralSpan(index, index, group.anchor, group.replace_end, start, end, "direct", 1.0)
+            StructuralSpan(index, index, group.anchor, group.replace_end, start, end, mode, 1.0)
         )
         resolved[index] = True
         direct_groups += 1

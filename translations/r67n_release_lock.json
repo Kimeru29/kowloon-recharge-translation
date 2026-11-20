@@ -1,0 +1,15 @@
+{
+  "baseline_iso_sha256": "3ad3945909d6764388984c9ae1c8796b0f4c4713ac918a5345a411c99ba22a6f",
+  "candidate_elf_sha256": "0d5ace47c618c8c9af92f76aecad72dd0da2c4f7588410d2f9d866458a8f38bb",
+  "candidate_iso_sha256": "c3aa8a847f9ed505ca62d11dfa22cfd6e28a9c8f3d63900928f41824e00ea1f0",
+  "gameplay_approved": false,
+  "group4_sha256": "9e6450469c6d7628c1d9e7af0f7ac96278c97bc79c380c2c6a6543d65317786a",
+  "manifest_sha256": "15a5809572fa59d49c0085361382de2b0d4a439977fc1c23dc4280f24c76d0b5",
+  "name_repair_occurrences": 1288,
+  "new_ksf_official_entries": 116,
+  "new_mtx_official_entries": 5275,
+  "release": "r67.15n-official-script-diagnostic",
+  "runtime_verified": false,
+  "total_mtx_official_entries": 98002,
+  "wheel_sha256": "d92a980c945b355f270bef75d759c20b95afe3a3f514158a1937ebea41c0e7ee"
+}
