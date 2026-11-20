@@ -86,6 +86,7 @@ def build_translation_iso(
     elf_input_extent = 0
     elf_output_extent = 0
     elf_relocated = False
+    elf_extended_in_place = False
 
     with destination.open("r+b") as handle:
         image = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_WRITE)
@@ -216,12 +217,22 @@ def build_translation_iso(
                 raise ValueError("Serial/save identity missing from translated SLPM_665.11")
 
             elf_output_sectors = (len(elf_bytes) + SECTOR_SIZE - 1) // SECTOR_SIZE
-            if elf_output_sectors <= game_elf.sectors:
-                # Cumulative sources can already have their ELF in the outer tail.
-                # Its allocation moves with that tail when DATA.CVM grows.
-                elf_output_extent = game_elf.extent + (
-                    growth_sectors if game_elf.extent >= old_cvm_end_sector else 0
+            # An ELF from a cumulative source moves with the outer tail if DATA.CVM grows.
+            shifted_elf_extent = game_elf.extent + (
+                growth_sectors if game_elf.extent >= old_cvm_end_sector else 0
+            )
+            # Reuse the allocation only when it is the last, unshared outer extent.
+            elf_extended_in_place = (
+                elf_output_sectors > game_elf.sectors
+                and game_elf.extent + game_elf.sectors == highest_outer_sector
+                and all(
+                    record is game_elf or record.extent + record.sectors <= game_elf.extent
+                    for record in outer_records
                 )
+                and shifted_elf_extent + elf_output_sectors <= outer_volume
+            )
+            if elf_output_sectors <= game_elf.sectors or elf_extended_in_place:
+                elf_output_extent = shifted_elf_extent
             else:
                 elf_relocated = True
                 elf_output_extent = highest_outer_sector + growth_sectors
@@ -348,6 +359,7 @@ def build_translation_iso(
         "elf_input_extent": elf_input_extent,
         "elf_output_extent": elf_output_extent,
         "elf_relocated": elf_relocated,
+        "elf_extended_in_place": elf_extended_in_place,
         "elf_size": len(elf_bytes) if elf_bytes is not None else None,
         "collisions": [asdict(collision) for collision in overlay.collisions],
         "files": build_rows,
