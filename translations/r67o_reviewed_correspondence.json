@@ -1,0 +1,446 @@
+{
+  "clusters": {
+    "DG/DG13_02.MTX:7088": {
+      "entries": [
+        {
+          "dc_key": 7088,
+          "installed_bytes_sha256": "ace61514b05e01041f2ce4bded529823d889523dedd2bb87305f0d04d2605343",
+          "installed_length": 48,
+          "installed_offset": 12513,
+          "official_array_index": 206,
+          "official_text_utf8_sha256": "916bcd91fd73d4c77304589cb7d0a0e70293e15781db176a3fbd550cc060f24a",
+          "ps2_group_or_cluster_range": [
+            7088,
+            7127
+          ],
+          "ps4_group_range": [
+            7088,
+            7112
+          ]
+        },
+        {
+          "dc_key": 7113,
+          "installed_bytes_sha256": "68aedda81b1d3c0978b86db9e7c65f189b3fd0b4b33c12be7eed0d257b60f2f6",
+          "installed_length": 44,
+          "installed_offset": 12562,
+          "official_array_index": 207,
+          "official_text_utf8_sha256": "79711b64adf8ee56cf21fa7acc1a9b50f6b9c089e4b44a97c875840a018d527b",
+          "ps2_group_or_cluster_range": [
+            7088,
+            7127
+          ],
+          "ps4_group_range": [
+            7113,
+            7125
+          ]
+        }
+      ],
+      "group_indices": [
+        312,
+        313
+      ],
+      "source": {
+        "canonical_utf8_sha256": "bf65e5e83fd055a737453129573efb2aeae602a141ee9c3e05b162d5652132ca",
+        "pointer_slots": [
+          13
+        ],
+        "ps2_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "44bd7ae60f478fae1061e11a7739f4b94d1daf917982d33b6fc8a01a63f89c21",
+          "98fd27fdfbc71b801aabea34a5b2142cb518819bf3668dd69e3d08a44751bc9e"
+        ],
+        "ps2_range": [
+          7088,
+          7127
+        ],
+        "ps2_span_sha256": "defe9dc4dfb2abd042b980a3ce6ba8e03847f675ed7c3f52c54cd32dff2ea361",
+        "ps4_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "44bd7ae60f478fae1061e11a7739f4b94d1daf917982d33b6fc8a01a63f89c21",
+          "b34596fa5a6c943199424f0b3c707b4d6a457776393e699a90291f712847c6fd"
+        ],
+        "ps4_range": [
+          7088,
+          7125
+        ],
+        "ps4_span_sha256": "6f5a110c65ece88a6762578725faa470066e4caf5e625c257a62d0a237c91645"
+      }
+    },
+    "FN/FN13_16.MTX:1646": {
+      "entries": [
+        {
+          "dc_key": 1646,
+          "installed_bytes_sha256": "2b66e18b18132a013b25cd54b72d9fe69a38f70205172fbee9d8fa3cab261469",
+          "installed_length": 46,
+          "installed_offset": 2498,
+          "official_array_index": 50,
+          "official_text_utf8_sha256": "b88810956c38b66fdbe4b8facbc856eee02c01f7be767801d5c39edf145f6c67",
+          "ps2_group_or_cluster_range": [
+            1646,
+            1691
+          ],
+          "ps4_group_range": [
+            1646,
+            1691
+          ]
+        }
+      ],
+      "group_indices": [
+        78
+      ],
+      "source": {
+        "canonical_utf8_sha256": "78f30acd93ef428d7ad83dc29e620f57ef1c22e383627a68230f4e368a0fee74",
+        "pointer_slots": [
+          12
+        ],
+        "ps2_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "df7e70e5021544f4834bbee64a9e3789febc4be81470df629cad6ddb03320a5c",
+          "98fd27fdfbc71b801aabea34a5b2142cb518819bf3668dd69e3d08a44751bc9e"
+        ],
+        "ps2_range": [
+          1646,
+          1691
+        ],
+        "ps2_span_sha256": "1155b5d710217302448f7f2602d1de0915a9007d3b9f52dcdeeee3d631bb7a81",
+        "ps4_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "df7e70e5021544f4834bbee64a9e3789febc4be81470df629cad6ddb03320a5c",
+          "98fd27fdfbc71b801aabea34a5b2142cb518819bf3668dd69e3d08a44751bc9e"
+        ],
+        "ps4_range": [
+          1646,
+          1691
+        ],
+        "ps4_span_sha256": "116e80bb6b049129039c262267806d705d904bd983a3d00bf1443551afa64ccc"
+      }
+    },
+    "MS/MS05_01.MTX:28761": {
+      "entries": [
+        {
+          "dc_key": 28761,
+          "installed_bytes_sha256": "3d6de46afc54d2668790a20740daf4cc34d46bc19f2a3286e6176870d986d614",
+          "installed_length": 64,
+          "installed_offset": 46421,
+          "official_array_index": 846,
+          "official_text_utf8_sha256": "38aa3a21d4a5b473f5d6afb79f7f35fb70159410477da2e3e9011ccc45bc5a16",
+          "ps2_group_or_cluster_range": [
+            28761,
+            28785
+          ],
+          "ps4_group_range": [
+            28761,
+            28787
+          ]
+        }
+      ],
+      "group_indices": [
+        1360
+      ],
+      "source": {
+        "canonical_utf8_sha256": "88719716f1108ad822d64b77e9793b404ec31311b039166f2dfe3907ac84a9ac",
+        "pointer_slots": [
+          154
+        ],
+        "ps2_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "454349e422f05297191ead13e21d3db520e5abef52055e4964b82fb213f593a1"
+        ],
+        "ps2_range": [
+          28761,
+          28785
+        ],
+        "ps2_span_sha256": "3c1dd195d2e51ca151e98cbacc878df9c28d76a193a14b5fd6e73f3b2c6c3a0f",
+        "ps4_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "454349e422f05297191ead13e21d3db520e5abef52055e4964b82fb213f593a1"
+        ],
+        "ps4_range": [
+          28761,
+          28787
+        ],
+        "ps4_span_sha256": "75af12c0da4a9b374db7d08d634bd2245f80b80a663215e8c2448fbe493474d8"
+      }
+    },
+    "MS/MS05_03.MTX:16985": {
+      "entries": [
+        {
+          "dc_key": 16985,
+          "installed_bytes_sha256": "f3a9ad9aba586092a035842df3cb72ce62e2317cf4cf06a26d467472a147e2da",
+          "installed_length": 52,
+          "installed_offset": 29869,
+          "official_array_index": 505,
+          "official_text_utf8_sha256": "a9abfe0ac17ea385358dbac07e53f8e8c6fc551d8f4978871677eed2109e0d1c",
+          "ps2_group_or_cluster_range": [
+            16985,
+            17048
+          ],
+          "ps4_group_range": [
+            16985,
+            17001
+          ]
+        },
+        {
+          "dc_key": 17002,
+          "installed_bytes_sha256": "cad9cb19ec0d9e3dc9c5bdf3268986c5a2769ca7b7b24aab32100bc6090ff491",
+          "installed_length": 62,
+          "installed_offset": 29922,
+          "official_array_index": 506,
+          "official_text_utf8_sha256": "2e522d8795dd297e736c539f05dc3667165b3a019c01630bd6b5ef86895bc88c",
+          "ps2_group_or_cluster_range": [
+            16985,
+            17048
+          ],
+          "ps4_group_range": [
+            17002,
+            17043
+          ]
+        }
+      ],
+      "group_indices": [
+        739,
+        740
+      ],
+      "source": {
+        "canonical_utf8_sha256": "b8f169858959f905f73e4a28a0f2c460b8cfe70fd251a17105e237d22eb8d5fb",
+        "pointer_slots": [
+          99
+        ],
+        "ps2_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "9c7d3cc1bee7acc045c697d6d56fd8d9a1732f31ccd59c2a56872456e648f72d"
+        ],
+        "ps2_range": [
+          16985,
+          17048
+        ],
+        "ps2_span_sha256": "6e3f176946a231537f81feb79f11809d15d7694a42c6dc9199b84f046e651018",
+        "ps4_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "9c7d3cc1bee7acc045c697d6d56fd8d9a1732f31ccd59c2a56872456e648f72d"
+        ],
+        "ps4_range": [
+          16985,
+          17043
+        ],
+        "ps4_span_sha256": "04417c7f1aa2f201c2690fb475f90c7f83f50071ba5b2b5f1204a677acfccced"
+      }
+    },
+    "MS/MS05_03.MTX:8738": {
+      "entries": [
+        {
+          "dc_key": 8738,
+          "installed_bytes_sha256": "861e1dfdc81fa6026d676e0f576fd2e9fe6862c9e3e425b6ece7ec6f86a6f952",
+          "installed_length": 68,
+          "installed_offset": 14842,
+          "official_array_index": 242,
+          "official_text_utf8_sha256": "088e6bf593bf129517d9027f86f51f91c571779abf24f40952cd004ce5f97efe",
+          "ps2_group_or_cluster_range": [
+            8738,
+            8767
+          ],
+          "ps4_group_range": [
+            8738,
+            8767
+          ]
+        }
+      ],
+      "group_indices": [
+        352
+      ],
+      "source": {
+        "canonical_utf8_sha256": "509e9f079e99ca1b275b9cd9a796c42f0889832cff48bac1cef651f96914b598",
+        "pointer_slots": [
+          35
+        ],
+        "ps2_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "454349e422f05297191ead13e21d3db520e5abef52055e4964b82fb213f593a1"
+        ],
+        "ps2_range": [
+          8738,
+          8767
+        ],
+        "ps2_span_sha256": "6533718d7124ddf32c1f11ebdd7e3d5f5ee1e09e0904cce5d3184b3dc0bc3661",
+        "ps4_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "454349e422f05297191ead13e21d3db520e5abef52055e4964b82fb213f593a1"
+        ],
+        "ps4_range": [
+          8738,
+          8767
+        ],
+        "ps4_span_sha256": "8a859f9ca8d3344a36481c016caf32e3a2a24b29cffdbd7f4649f7d88fc30125"
+      }
+    },
+    "MS/MS06_01.MTX:10651": {
+      "entries": [
+        {
+          "dc_key": 10651,
+          "installed_bytes_sha256": "52a77c4ca34556b490822578271bfeb13704d5141182fcf3b9dfe853ef902930",
+          "installed_length": 40,
+          "installed_offset": 19347,
+          "official_array_index": 290,
+          "official_text_utf8_sha256": "e4e4ac99f3c1d5ed03eccc67ead35442bce6578ec55079ca6f4931e0006958df",
+          "ps2_group_or_cluster_range": [
+            10651,
+            10678
+          ],
+          "ps4_group_range": [
+            10651,
+            10676
+          ]
+        }
+      ],
+      "group_indices": [
+        425
+      ],
+      "source": {
+        "canonical_utf8_sha256": "11ca6da700231e35b58bc758e5cc8d5fb3623edccd6ff9167e5e6509adf7f4af",
+        "pointer_slots": [
+          34
+        ],
+        "ps2_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "000af259970598ab62e5f201fa9859386bb04e4fc4b109aeb5137b1835db35d6"
+        ],
+        "ps2_range": [
+          10651,
+          10678
+        ],
+        "ps2_span_sha256": "bf0c0a0b29b38a1faf2daa105f356e39355a84f5822808d5037cf0ca428d6802",
+        "ps4_boundary_sha256": [
+          "853982a0764eba5e9b4348e085c0ee1f8aeeef4d7cc3c253be69fad0bc57693a",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "000af259970598ab62e5f201fa9859386bb04e4fc4b109aeb5137b1835db35d6"
+        ],
+        "ps4_range": [
+          10651,
+          10676
+        ],
+        "ps4_span_sha256": "e5132ac82fe6516b68d6ce61df3a648cf363c594039b25466509a9f61397212e"
+      }
+    },
+    "MS/MS11_03.MTX:7267": {
+      "entries": [
+        {
+          "dc_key": 7267,
+          "installed_bytes_sha256": "e5c6349f5275d450f49b6a99051503286d67583b242eade5f46de0dc00d5ad16",
+          "installed_length": 68,
+          "installed_offset": 12199,
+          "official_array_index": 195,
+          "official_text_utf8_sha256": "d7d2eb8e492cc4ac4615ad54c1571adf68579e726cafd3a84f1a47c6abf2ba26",
+          "ps2_group_or_cluster_range": [
+            7267,
+            7306
+          ],
+          "ps4_group_range": [
+            7267,
+            7304
+          ]
+        }
+      ],
+      "group_indices": [
+        280
+      ],
+      "source": {
+        "canonical_utf8_sha256": "5ee185ed13a439a8ad13161df27fa3f50a476144360669af19b4b94edb75f183",
+        "pointer_slots": [
+          28
+        ],
+        "ps2_boundary_sha256": [
+          "29f94193b135c8842b64a72126ec8145a2b47c7d346e6919fa6a8ba1331d352f",
+          "acac86c0e609ca906f632b0e2dacccb2b77d22b0621f20ebece1a4835b93f6f0",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "454349e422f05297191ead13e21d3db520e5abef52055e4964b82fb213f593a1"
+        ],
+        "ps2_range": [
+          7267,
+          7306
+        ],
+        "ps2_span_sha256": "621541cf18db7002b879d5713b98db01cfa089ecd0b2d393a80301a2bb79d63a",
+        "ps4_boundary_sha256": [
+          "29f94193b135c8842b64a72126ec8145a2b47c7d346e6919fa6a8ba1331d352f",
+          "acac86c0e609ca906f632b0e2dacccb2b77d22b0621f20ebece1a4835b93f6f0",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "454349e422f05297191ead13e21d3db520e5abef52055e4964b82fb213f593a1"
+        ],
+        "ps4_range": [
+          7267,
+          7304
+        ],
+        "ps4_span_sha256": "176696838f2820a127a7695c32119f5370a1c292ac7fda87b82ae5cf1c6db359"
+      }
+    }
+  },
+  "files": {
+    "DG/DG13_02.MTX": {
+      "dc_path": "DG/EN/DG13_02DC.json",
+      "dc_sha256": "cfc6fa1e9c731ef5d22f206e7e429d045a8a901edafd5992e7887547d1e656eb",
+      "installed_sha256": "d173e1dc47153051dd875536d0d7e5250190cc82b9b89a2f8e8530db26f66222",
+      "installed_size": 23076,
+      "ps2_sha256": "c7697b8afde5faa98721f9a86673544b7ec0118c3d7260007d4576032a84651a",
+      "ps4_sha256": "467630048af7b82006a86855df6bd617207208ce5af5950a8a02534e04393983"
+    },
+    "FN/FN13_16.MTX": {
+      "dc_path": "FN/EN/FN13_16DC.json",
+      "dc_sha256": "02533bf3f2212105c86f2f86c13e7fa513677e839486d91fcf51f365d1953a25",
+      "installed_sha256": "39fbfae8363c081abb2795fd596d81c7a713b553c1e14a94b91d4bbdbf91bd70",
+      "installed_size": 10620,
+      "ps2_sha256": "a3e5a26a0d3fda4d90e83813c51cedc41d1e5b6a0e0114ffe85029641a45d3c5",
+      "ps4_sha256": "81d44cfc3cfa571744f506a5645f7e60213fa9f71d72d2a7b577d01ce315c83a"
+    },
+    "MS/MS05_01.MTX": {
+      "dc_path": "MS/EN/MS05_01DC.json",
+      "dc_sha256": "45b496909ebf13ea8a45768b51c868bce499c2013152a46447b890867b67c55e",
+      "installed_sha256": "9d43545e251f6e4d75790c664bb7320ede4c4939f5d72f0a59cd7e05e9a39033",
+      "installed_size": 46876,
+      "ps2_sha256": "23a89bbcb0d0d702d8d897594d69ae6235dd995b93f010dee415efb8b3a3accf",
+      "ps4_sha256": "fc1381390b92dc9bd3b86bcbfa2bbd2ecaf2244d541eea883e5ca048cf8be2d5"
+    },
+    "MS/MS05_03.MTX": {
+      "dc_path": "MS/EN/MS05_03DC.json",
+      "dc_sha256": "e5fa80b17e3a9496c0fed5c7d20b789ab0197517528918147187f88dac3e5b93",
+      "installed_sha256": "e9302f377a7dcb9d08b7ec03b840f1a80b66e2b7a1f1c0875888d03320b63352",
+      "installed_size": 47588,
+      "ps2_sha256": "1a239d650e7bb3bfb1f3ce437084ddeeb428e897d949f596000d1b6ba80d061b",
+      "ps4_sha256": "f6ca1dd2592d150819e88f8809bfcd90b6e174826fac3aadac4f04f4f84c8275"
+    },
+    "MS/MS06_01.MTX": {
+      "dc_path": "MS/EN/MS06_01DC.json",
+      "dc_sha256": "e709f02eda14cb0432d3f348e2a19b9e51ad6a7a0fe0dd71546d5d5db402631a",
+      "installed_sha256": "ae9b760703323c0012f52b9179bb3d45f914e0f840355c7e27d2ec17c2f33336",
+      "installed_size": 85204,
+      "ps2_sha256": "5c127d3e6e9afe840c8109bdb56fd9977ca7e22fec0313322234e63bd4c135a1",
+      "ps4_sha256": "b31294f4a0ad5e99f966a51138083bc5379f12081fa3fa7b9751cf993bef3dca"
+    },
+    "MS/MS11_03.MTX": {
+      "dc_path": "MS/EN/MS11_03DC.json",
+      "dc_sha256": "ee1146e9cfbd0d4a39f439d03224ccc25bf536acb88a262bf9e0378be0ecaff3",
+      "installed_sha256": "d4c7b5a5ef59cada3468740e3d5aaa6f2260259d3a722d9215e1c6580598ecf6",
+      "installed_size": 100584,
+      "ps2_sha256": "e988c19f5fe5b9dc67d24eb4b8f6a2055f811e8e986456d86b637f4bde955edb",
+      "ps4_sha256": "9f08c55a46b58bac2c88ed210f6e1d8fd2081fc78527ee955be2d874bec4c26c"
+    }
+  },
+  "schema_version": 1
+}
