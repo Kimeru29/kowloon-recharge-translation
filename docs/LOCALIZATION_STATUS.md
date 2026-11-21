@@ -130,13 +130,13 @@ report. Main integration status is managed by the main agent.
 
 ## Corpus-level translation coverage
 
-| Class | Status | Current evidence |
-| --- | --- | --- |
-| Exact mapped MTX | **Partially translated** | 962 files / 56,642 official English entries imported. 23 exact mapped files / 21,672 entries remain rejected because their localization semantics are indirect/dynamic. |
-| Changed/template MTX | **Partially translated** | 7 files / 2,284 entries proven and imported. Consolidated FD00 remains the largest special class; only `FD00_31` is currently proven among the 26-file FD00 family. |
-| KSF | **Partially translated** | 868 fitting official entries imported; 48 overflow entries and 4 ambiguous entries remain unresolved. |
-| PS2-only text | **Still Japanese / unresolved** | Lexical proxy estimates 419 novel runs / 3,672 Japanese characters beyond reused mapped content. This is an estimator, not a dialogue-line percentage. |
-| Broad graphics beyond startup | **Still Japanese / unresolved** | Indexed same-layout ports and a generalized fail-closed atlas-repack class are now proven. Other structurally changed atlases still require their own correspondence/layout proof before import. |
+| Class | Current evidence |
+| --- | --- |
+| Official MTX imports | 98,201 installed official English entries. Fixed speaker projections contribute 7,402 additional occurrences in 478 MTXs and are counted separately. |
+| Native choices | 1,079 official English labels in 441 guarded records, with four separate blank no-ops. |
+| Unresolved official entries | 2,203 original array identities await proven correspondence. See the [r67.15o handoff](R67O_HANDOFF.md) and the diagnostic inventory. |
+| Japanese text findings | 18,411 lexical findings. Of these, 104 physical KSF fallbacks have a guarded English owner. The other 18,307 findings include 18,254 MTX candidates and 53 stock choice labels. |
+| Historical graphics candidates | 85 reviewed. One H.A.N.T. popup port is promoted, five old ports and four newer wheel atlases are retained, one card already displays English, and 74 await further ownership or layout evidence. [Surface evidence](R67P_SURFACES.md) |
 
 ## Candidate history
 
