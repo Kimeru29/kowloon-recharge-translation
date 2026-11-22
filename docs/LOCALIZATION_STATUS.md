@@ -9,23 +9,79 @@ Status meanings:
 - **Still Japanese / unresolved** — no safe accepted English implementation exists yet.
 - **Not runtime-tested** — statically translated/verified but not yet observed successfully in PCSX2.
 
-## Current diagnostic: r67.15k
+## Current approved baseline: r67.15k; r67.15l static integration complete
 
-See [the r67.15k handoff](R67_15K_HANDOFF.md) for exact owners, hashes, tests,
-known translation gaps and the next screenshot checklist. This section records
-the latest evidence; older rows below retain their historical scope.
+### Latest cumulative diagnostic — r67.15q (November 21, 2026)
+
+The r67.15q installed-image replay verifies START history paging past twelve records, both end stops, return to the newest window and ring rollover. The independent disc audit verified all 10,656 embedded resources against p. The official-script and artwork dispositions carry forward from p. In-game scrolling, audio and save compatibility await Pablo's playthrough. [r67.15q handoff](R67Q_HANDOFF.md) · [r67.15p geometry and artwork handoff](R67P_HANDOFF.md)
+
+### r67.15o diagnostic (November 19, 2026)
+
+[r67.15o handoff](R67O_HANDOFF.md): ISO SHA-256
+`049b68c70c74f99b195975000c90e064b5106cbe18cf0dc89f87b44526081b13`.
+The finished inventory verifies 98,201 MTX official entries, 1,079 guarded
+English choice labels, four stock blank no-ops and 2,203 unresolved official
+array entries. It adds 305 full official entries over n and 7,402 fixed
+speaker headers. The independent audit compared all 2,095,382,528 bytes with
+zero unexplained changes. Choice rendering and speaker identity have native
+execution evidence; the o game has not been played by the agent. Pablo
+explicitly reserved actual gameplay verification for his own playthrough.
+These surfaces remain **Not runtime-tested**. The approved baseline and
+merge gate remain unchanged. Phase 2 has not started.
+
+See [the r67.15k handoff](R67_15K_HANDOFF.md) for the approved baseline and
+its user-confirmed gameplay record. r67.15l ports the official Emotion Input
+wheel lettering into `BLBRD/B_GP001.BIN`. The art transform and manifest are
+frozen; art tests pass **9/9**, native coverage is frozen at **18 passing
+tests**, and fresh art-plus-composition tests pass **21 in 15.871 seconds**.
+The final CLI build passed with exit code 0. The final ISO is
+`local/r67-candidates/67.15l-emotion-wheel.iso`, SHA-256
+`c70dd6e70c9be85c05732bfc3f4fa60ff1c9e7c280470d7ebe9c76c7a7290f94`.
+The 2,095,382,528-byte disc audit reports 60,028 changed bytes, all in the
+603,520-byte `BLBRD/B_GP001.BIN` resource, and zero unexplained bytes. The
+installed ELF is byte-identical to approved k; startup is 154/155 raw and
+155/155 scoped under only the `memory_card_8` exception. History, save, and
+ROFS checks report 4 history regions, 15 save descriptors, and 10,656 ROFS
+records with zero mismatches. The final focused release suite passes **40/40
+in 24.794 seconds** (exit 0), including the installed release-lock test
+(`local/r67-15l-final-focused.log`). The integrated full suite passes **804
+tests in 234.789 seconds** (exit 0): 791 executed passing, 13 expected skips,
+and zero failures/errors (`local/r67-15l-final-suite.log`). The skips are five
+CVM/KSF/MTX module skips, one old graphics-port skip, six historical
+finished-ISO skips (q, t, u, z, a, and r67.12 history), and one DG13
+structural-corpus skip. All new/current installed-candidate and
+history-environment checks ran without skips. Frozen-source verification
+passed: 52 protected k-source files and the historical report are unchanged;
+the independent approved-k ISO SHA-256 is still
+`ad706667ff82b3e3374ada0426193f8527c6af3714ed7462b5db05166d509b53`.
+
+The historical precoverage artifact set is preserved at
+`local/r67-15l-precoverage-20261021/`. The earlier ISO digest
+`38319eb2ab1dca658377eb7cf226f16760763832fd58c49b630375dc5c8ebc04` is not
+the final acceptance image. Do not overwrite or relabel that evidence. The
+current approved source remains the r67.15k ISO, SHA-256
+`ad706667ff82b3e3374ada0426193f8527c6af3714ed7462b5db05166d509b53`.
+Runtime approval requires the final exact ISO hash and user-reviewed
+screenshots from that same image. Older rows below retain their historical
+scope.
 
 | Surface | Current evidence |
 |---|---|
 | Aqua Regia doorway transition | User confirmed the loading fix works; unchanged in k. |
 | HANT body visibility across menus | User confirmed text is visible again; unchanged in k. |
-| Item Details and dungeon inspection bodies | Latest screenshots still show overflow, probably on j; exact running ISO unconfirmed, memory-card boot confirmed. k installs final-draw live-metric word wrapping for both owner families. Static/native harness checks are not visual approval; new k screenshots required. |
+| Item Details and dungeon inspection bodies | **Working / runtime-proven for approved k.** The user confirmed the k gameplay fixes work perfectly on 2026-10-19; see the approval record in the [k handoff](R67_15K_HANDOFF.md). |
 | Recipe names, Item Screen / Synthesis Help, and Place / Take actions | User reported everything except the two description bodies solved. Preserve accepted j implementations byte-for-byte in k. |
 | Complete English coverage | Not claimed: 36 Details fallback records and one unmatched dungeon entry action remain. |
+| Emotion Input wheel labels | **Not runtime-tested.** Frozen official PS4 art covers 56 drawings in paired, gold, and glow variants. Art tests: 9/9; native coverage: 18 passing tests; fresh art-plus-composition: 21 passing in 15.871 seconds; final focused release suite: **40/40 PASS** in 24.794 seconds (exit 0), including installed release-lock test; integrated full suite: **804 tests PASS** in 234.789 seconds (791 executed passing, 13 expected skips, zero failures/errors). Logs: `local/r67-15l-final-focused.log` and `local/r67-15l-final-suite.log`. Final ISO SHA-256 is `c70dd6e70c9be85c05732bfc3f4fa60ff1c9e7c280470d7ebe9c76c7a7290f94`; the 2,095,382,528-byte audit found 60,028 changes only in `BLBRD/B_GP001.BIN`, with zero unexplained bytes. Runtime/visual acceptance still requires user-reviewed screenshots from this exact ISO. See the [r67.15l art record](R67_15L_EMOTION_WHEEL.md) and [release handoff](R67_15L_HANDOFF.md). |
+
+See the [r67.15l release handoff](R67_15L_HANDOFF.md) for complete build
+metrics, native/art map, current suite state, and the hash-pinned visual
+acceptance checklist. Static checks do not count as runtime proof.
 
 ISO: `67.15k-description-word-wrap.iso`, SHA-256
 `ad706667ff82b3e3374ada0426193f8527c6af3714ed7462b5db05166d509b53`.
-Main integration is authorized independently of gameplay acceptance.
+The k gameplay approval is recorded separately from the historical diagnostic
+report. Main integration status is managed by the main agent.
 
 ## Startup / first-play flow
 
@@ -78,13 +134,13 @@ Main integration is authorized independently of gameplay acceptance.
 
 ## Corpus-level translation coverage
 
-| Class | Status | Current evidence |
-| --- | --- | --- |
-| Exact mapped MTX | **Partially translated** | 962 files / 56,642 official English entries imported. 23 exact mapped files / 21,672 entries remain rejected because their localization semantics are indirect/dynamic. |
-| Changed/template MTX | **Partially translated** | 7 files / 2,284 entries proven and imported. Consolidated FD00 remains the largest special class; only `FD00_31` is currently proven among the 26-file FD00 family. |
-| KSF | **Partially translated** | 868 fitting official entries imported; 48 overflow entries and 4 ambiguous entries remain unresolved. |
-| PS2-only text | **Still Japanese / unresolved** | Lexical proxy estimates 419 novel runs / 3,672 Japanese characters beyond reused mapped content. This is an estimator, not a dialogue-line percentage. |
-| Broad graphics beyond startup | **Still Japanese / unresolved** | Indexed same-layout ports and a generalized fail-closed atlas-repack class are now proven. Other structurally changed atlases still require their own correspondence/layout proof before import. |
+| Class | Current evidence |
+| --- | --- |
+| Official MTX imports | 98,201 installed official English entries. Fixed speaker projections contribute 7,402 additional occurrences in 478 MTXs and are counted separately. |
+| Native choices | 1,079 official English labels in 441 guarded records, with four separate blank no-ops. |
+| Unresolved official entries | 2,203 original array identities await proven correspondence. See the [r67.15o handoff](R67O_HANDOFF.md) and the diagnostic inventory. |
+| Japanese text findings | 18,411 lexical findings. Of these, 104 physical KSF fallbacks have a guarded English owner. The other 18,307 findings include 18,254 MTX candidates and 53 stock choice labels. |
+| Historical graphics candidates | 85 reviewed. One H.A.N.T. popup port is promoted, five old ports and four newer wheel atlases are retained, one card already displays English, and 74 await further ownership or layout evidence. [Surface evidence](R67P_SURFACES.md) |
 
 ## Candidate history
 

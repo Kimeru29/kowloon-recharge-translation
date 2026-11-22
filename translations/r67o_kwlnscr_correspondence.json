@@ -1,0 +1,200 @@
+{
+  "approved_groups": 146,
+  "approved_groups_sha256": "60995620809d0aa83e61092a29cec287f295f9fb48d591a54f1a03980ac665ad",
+  "baseline": {
+    "elf_sha256": "0d5ace47c618c8c9af92f76aecad72dd0da2c4f7588410d2f9d866458a8f38bb",
+    "entries": {
+      "KWLNSCR.KSF": {
+        "bytes": 39502,
+        "extent": 288706,
+        "iso_offset": 600268800,
+        "sha256": "3bc7536ae977375f949cde5376401e348a680e94915a409d54a3c034e7fd3177"
+      },
+      "KWLNSCR.MTX": {
+        "bytes": 3756,
+        "extent": 288726,
+        "iso_offset": 600309760,
+        "sha256": "dbde26549add3e1f15c54236f1e8b14bf73031327765dfb16c8036c6a544c685"
+      },
+      "MS/MS00_01.MTX": {
+        "bytes": 104,
+        "extent": 338737,
+        "iso_offset": 702732288,
+        "sha256": "4d48327f65411186c5619ef122ad4f331e4cce1912c4664a74ac4f7d941ce61d"
+      },
+      "MS/MS01_03.MTX": {
+        "bytes": 276,
+        "extent": 339455,
+        "iso_offset": 704202752,
+        "sha256": "ff44d593dd45e7108ce0848fa97a63708b7218cbdc4aac68f9fd69f0d733be36"
+      }
+    },
+    "iso_sha256": "c3aa8a847f9ed505ca62d11dfa22cfd6e28a9c8f3d63900928f41824e00ea1f0"
+  },
+  "blocks": [
+    {
+      "ps2": [
+        387,
+        1452
+      ],
+      "ps2_owners": [
+        [
+          "KWLNSCR.MTX",
+          387,
+          1
+        ]
+      ],
+      "ps4": [
+        1854,
+        2919
+      ],
+      "ps4_owners": [
+        [
+          "KWLNSCR.MTX",
+          387,
+          1
+        ],
+        [
+          "MS/MS01_03.MTX",
+          1854,
+          1
+        ]
+      ],
+      "sha256": "b08a566cec3e40c0ca697494ed6b80ecdd36a958a24221c7e6ca2cd2be9a8468"
+    },
+    {
+      "ps2": [
+        1505,
+        2772
+      ],
+      "ps2_owners": [
+        [
+          "KWLNSCR.MTX",
+          1505,
+          1
+        ]
+      ],
+      "ps4": [
+        2919,
+        4186
+      ],
+      "ps4_owners": [
+        [
+          "KWLNSCR.MTX",
+          1505,
+          1
+        ],
+        [
+          "MS/MS01_03.MTX",
+          2919,
+          1
+        ]
+      ],
+      "sha256": "69fb93afe0c09a9ba3f387892f179a9b26f2219ccaf2bc951630442cd52f0128"
+    },
+    {
+      "ps2": [
+        2772,
+        3756
+      ],
+      "ps2_owners": [
+        [
+          "KWLNSCR.MTX",
+          2772,
+          1
+        ]
+      ],
+      "ps4": [
+        4188,
+        5172
+      ],
+      "ps4_owners": [
+        [
+          "KWLNSCR.MTX",
+          2772,
+          1
+        ],
+        [
+          "MS/MS01_03.MTX",
+          4188,
+          1
+        ]
+      ],
+      "sha256": "4a65651cec554aad6495ebd5555fc529b86146fb5df46b24af93ce993b124039"
+    }
+  ],
+  "corpus": {
+    "ps2": {
+      "count": 1516,
+      "inventory_sha256": "e19842f186436b1c81257ac4c280b238004a60adcef4fb50ebcbef1077ffb876"
+    },
+    "ps4": {
+      "count": 1067,
+      "inventory_sha256": "854eda5a2a8646189e79ccd255b55724cf0ca31103f85ce91daec61728aa1ceb"
+    }
+  },
+  "disposition_entry_counts": {
+    "no bounded alternate owner": 74,
+    "ordinary name moved to immediately following blocked phonetic group": 1,
+    "title left-control context differs": 1,
+    "unsupported official phonetic macro and native one-glyph controls": 2,
+    "whole group: exact scene block, delimiters and presentation controls": 148
+  },
+  "held_anchors": {
+    "1875": "title left-control context differs",
+    "3649": "ordinary name moved to immediately following blocked phonetic group",
+    "3670": "unsupported official phonetic macro and native one-glyph controls",
+    "3760": "unsupported official phonetic macro and native one-glyph controls"
+  },
+  "native": {
+    "ksf_active_choice_payloads": [
+      30159,
+      30190
+    ],
+    "ksf_records_sha256": "db4fe640065f60d6dbd365b22f6ff28bc9af39ba119ba607ffc4b5cb449a9ca3",
+    "pristine_and_installed_ee_ranges": {
+      "0x215330..0x215374": "9abc7dddcc4df855c39b1c53bc6fb5e1f8455019ecb9ce517fc1b171ac7cb3ad",
+      "0x215604..0x2156d0": "3b5bbd9316df11dc362a5d80a9ebcb5eb674ca70e759ec3f31c959eb49d9d5e9",
+      "0x215720..0x215758": "791d0bcf368d5601928a584ee3cee941c34f985021af5cc63fb7af53c6f2fb73",
+      "0x215820..0x215854": "a1ce3ad03d2c67a444c9d82f6e82028d9af26328245201f3a87b8a62fa01e26a",
+      "0x22c1cc..0x22c1e4": "f55b0c420e8fd5f9a5d95d93dc9145e525937d5069e36efcbc4f16b9a1de7878",
+      "0x22c598..0x22c6e8": "86f3f0e6e015ad25edc5ffa581bb20027e5cb4cfce3ecce6a656eb8622919c50",
+      "0x22c77c..0x22c7dc": "487c12cbb0c06897c85cb06da21e92d067784421d291e4211b4fd04095bbfeb4",
+      "0x22d0b0..0x22d174": "6cbeb5631329f1df5db142f08bb211040861cdb6445b95eea7878a5f32571a7b",
+      "0x24d704..0x24d7f4": "90d67307d725a0d78e6e0b562a62477d1d9cb9c26c8154a7eb5756dea1779b02",
+      "0x25a39c..0x25a3d4": "3211eddaa92f142325801354f14a0bfea6948ed8a734a05dd421e8643452c05f",
+      "0x6714f0..0x67150b": "45e6a5200872e2eab8d4061dbb5315f4c7568ee824c5ea01310701871eb94c07",
+      "0x7948b0..0x7948b8": "42ea917e16888b0238e98d9c2346702477b0a8f334184df9b80b888cffaef005"
+    },
+    "pristine_ee_sha256": "6cc4f52dd2b576396003a9455f8222c9b647aa2d7076c08a97c703778d024794",
+    "ps4_prx_ranges": {
+      "0x1420a00..0x1420aa2": "34a4262487338a605468d8ca72b233721138d0c75be0a3e837f9e953d24b89b7",
+      "0x142b52c..0x142b961": "2b521feb6989b41a0acc9fc39413e6d407debc1f1e8e62c4cc3a2ac2f8df5dc5",
+      "0x142cc30..0x142e620": "6d479f22d459e6d7fd8398317048fc3553464e960b9b15a2ff1f8f700ee950af",
+      "0x189d840..0x189f430": "7b477edd038f58f9be9d8e23042560fc96f1cef54fee74e27e551bc37e9e468a",
+      "0x543650..0x545ee0": "24ef745c1e840a76983eabb250827758f1a3d941afb11af467bf2b81f96b39d1",
+      "0x547640..0x547790": "0cb6707083389895a7a05c9558ec9acf868c20544fd9fdcd0894e056252ea293",
+      "0xe19ef0..0xe19f8c": "12438b28e2f44a7aa74f5a1cb19548e6775a74f19d950d395ad775412248fa86",
+      "0xe222ba..0xe22420": "f408b24e9e5feee4d371ae3165c9ed966a5ddf9be4679b85729a155ceac0910d"
+    },
+    "ps4_prx_sha256": "fa6f474834155a111996395e48695f4d706bab94c9b682671c160a23ebadf4d3"
+  },
+  "research_contract_sha256": "37f3dc98b56438e8559f41865d7a76b4986f55409ce51136190591d6659573ab",
+  "schema_version": 1,
+  "source_files": {
+    "ps2": {
+      "KWLNSCR.KSF": "3bc7536ae977375f949cde5376401e348a680e94915a409d54a3c034e7fd3177",
+      "KWLNSCR.MTX": "dbde26549add3e1f15c54236f1e8b14bf73031327765dfb16c8036c6a544c685",
+      "MS/MS00_01.MTX": "4d48327f65411186c5619ef122ad4f331e4cce1912c4664a74ac4f7d941ce61d",
+      "MS/MS01_03.MTX": "ff44d593dd45e7108ce0848fa97a63708b7218cbdc4aac68f9fd69f0d733be36"
+    },
+    "ps4": {
+      "KWLNSCR.KSF": "3bc7536ae977375f949cde5376401e348a680e94915a409d54a3c034e7fd3177",
+      "KWLNSCR.MTX": "dbde26549add3e1f15c54236f1e8b14bf73031327765dfb16c8036c6a544c685",
+      "MS/EN/MS01_03DC.json": "d2dc92e738ed846aba8d2b029716d65b5155abbca509cf840aead5b4be5a9608",
+      "MS/MS00_01.MTX": "b3272bc0f5ed75707b209c54d2d317ad414f9e9c02d4e816a3c4ebf8c3aa28bc",
+      "MS/MS01_03.KSF": "7dbb94c25b73428c6aa130155cbf8942365e900e720de4f611e6b9e49ad7cc61",
+      "MS/MS01_03.MTX": "870a843680026c620a9100b7a38f796eca883c22687c5f8e290d0131311e01c7"
+    }
+  }
+}

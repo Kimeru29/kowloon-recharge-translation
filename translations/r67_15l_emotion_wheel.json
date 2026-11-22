@@ -1,0 +1,78 @@
+{
+  "release": "r67.15l",
+  "status": "source_and_owner_inventory",
+  "source_container": {
+    "path": "BLBRD/B_GP001.BIN",
+    "sha256": "895f3d1864a653b3eb76a06eae8b8ea65b9f31cfe156fe922eb72d9eeb967942",
+    "iso": "approved r67.15k",
+    "iso_sha256": "ad706667ff82b3e3374ada0426193f8527c6af3714ed7462b5db05166d509b53"
+  },
+  "official_source": {
+    "bundle": "/tmp/kowloon-ps4-recovered/CUSA27034/Media/StreamingAssets/BLBRD/b_gp001_en",
+    "bundle_sha256": "78ac1bcdbe7e6838be3c0d3ae49d76c290bfd3205ad55e97bc647697b3d6260b",
+    "local_fallback": "local/r67-15l-investigation/gp001_en plus gp001_jp, each relevant PNG SHA-256 pinned by the transformer",
+    "english_texture_sha256": {
+      "GP001_02": "490072a4f90b21ae3137f9eaa8a003eb3d7a7c8ee73377402d118d6a44125fb6",
+      "GP001_03": "3b13dadf29209f3d64ffc1fd1da5c97e154b1cd90a08d0825ed613d3182fb190",
+      "GP001_08": "42494369fbe7fc0686ebef4dd4782392a4f3c3881dd625c99836f1527c26eb98",
+      "GP001_10": "e00101e7b784db568f47f65f2123d4c2cd97e60be4c52abcc73d35d033ec3615"
+    }
+  },
+  "labels": ["JOY", "LOVE", "AMITY", "HOT", "COLD", "ANGER", "SOMBER", "GRIEF"],
+  "owners": {
+    "paired_plaque_defaults": [
+      {"native_id": 31, "texture": "GP001_02", "uv_pixels": [40, 0, 80, 72], "labels": ["LOVE", "JOY"]},
+      {"native_id": 32, "texture": "GP001_02", "uv_pixels": [0, 0, 40, 72], "labels": ["COLD", "ANGER"]},
+      {"native_id": 34, "texture": "GP001_02", "uv_pixels": [80, 0, 152, 40], "labels": ["AMITY", "HOT"]},
+      {"native_id": 33, "texture": "GP001_10", "uv_pixels": [160, 160, 232, 200], "labels": ["GRIEF", "SOMBER"]}
+    ],
+    "paired_plaque_variants": {
+      "texture": "GP001_10",
+      "native_ids": [109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140],
+      "uv_pixels": [
+        [40, 0, 80, 72], [80, 40, 152, 80], [0, 0, 40, 72], [80, 0, 152, 40],
+        [80, 160, 120, 232], [152, 80, 224, 120], [120, 160, 160, 232], [152, 120, 224, 160],
+        [0, 72, 40, 144], [80, 80, 152, 120], [40, 72, 80, 144], [80, 120, 152, 160],
+        [40, 144, 80, 216], [152, 40, 224, 80], [0, 144, 40, 216], [152, 0, 224, 40]
+      ]
+    },
+    "gold_single_labels": {
+      "texture": "GP001_03",
+      "native_ids": {"JOY": 53, "LOVE": 54, "AMITY": 55, "HOT": 56, "COLD": 57, "ANGER": 58, "SOMBER": 59, "GRIEF": 60},
+      "uv_pixels_by_label": {
+        "JOY": [136, 32, 168, 64], "LOVE": [136, 0, 168, 32],
+        "AMITY": [136, 64, 168, 96], "HOT": [136, 96, 168, 128],
+        "COLD": [0, 224, 32, 256], "ANGER": [32, 224, 64, 256],
+        "SOMBER": [224, 224, 256, 256], "GRIEF": [192, 224, 224, 256]
+      }
+    },
+    "glow_single_labels": {
+      "texture": "GP001_08",
+      "native_ids": [88, 89, 90, 91, 92, 93, 94, 95],
+      "uv_pixels_by_label": {
+        "JOY": [0, 0, 64, 64], "LOVE": [64, 0, 128, 64],
+        "AMITY": [128, 0, 192, 64], "HOT": [192, 0, 256, 64],
+        "COLD": [0, 64, 64, 128], "ANGER": [64, 64, 128, 128],
+        "SOMBER": [128, 64, 192, 128], "GRIEF": [192, 64, 256, 128]
+      }
+    }
+  },
+  "coverage": {
+    "textures": 4,
+    "paired_plaque_occurrences": 20,
+    "paired_label_drawings": 40,
+    "gold_label_drawings": 8,
+    "glow_label_drawings": 8,
+    "total_label_drawings": 56,
+    "no_command_behavior": "Unchanged; no-command is a native selection state, not a label texture."
+  },
+  "preservation": {
+    "container_and_tmx_geometry": "unchanged",
+    "palette_bytes": "unchanged",
+    "paired_plaque_mask": "thresholded English/Japanese texture difference union Japanese-only alpha support, 5px max-filter dilation, then LANCZOS downsample; only nonzero matte texels are eligible",
+    "gold_and_glow_mask": "each owned 32x32 gold or 64x64 glow tile is cleared to an existing transparent palette index, then official English RGBA is composited; all texels outside those UVs remain unchanged",
+    "palette_conversion": "blend source RGBA against original indexed pixel using mask coverage, then nearest-color map into the original decoded palette; original palette bytes are never written",
+    "native_program": "unchanged",
+    "runtime_status": "No emulator or in-game verification performed."
+  }
+}

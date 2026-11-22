@@ -1,0 +1,110 @@
+{
+  "baseline_iso_sha256": "c3aa8a847f9ed505ca62d11dfa22cfd6e28a9c8f3d63900928f41824e00ea1f0",
+  "historical_images": [
+    {
+      "bytes": 2095382528,
+      "path": "/Users/juan.pena/repos/kowloon-recharge-translation/.worktrees/first-save-r67/local/r67-candidates/67.15k-description-word-wrap.iso",
+      "release": "k",
+      "sha256": "ad706667ff82b3e3374ada0426193f8527c6af3714ed7462b5db05166d509b53"
+    },
+    {
+      "bytes": 2095382528,
+      "path": "/Users/juan.pena/repos/kowloon-recharge-translation/.worktrees/first-save-r67/local/r67-candidates/67.15l-emotion-wheel.iso",
+      "release": "l",
+      "sha256": "c70dd6e70c9be85c05732bfc3f4fa60ff1c9e7c280470d7ebe9c76c7a7290f94"
+    },
+    {
+      "bytes": 2095382528,
+      "path": "/Users/juan.pena/.codex/worktrees/r67m-cumulative-script/kowloon-recharge-translation/local/r67m-integration/release-pinned-20261031/67.15m-cumulative-script-wheel.iso",
+      "release": "m",
+      "sha256": "3ad3945909d6764388984c9ae1c8796b0f4c4713ac918a5345a411c99ba22a6f"
+    },
+    {
+      "bytes": 2095382528,
+      "path": "/Users/juan.pena/.codex/worktrees/r67m-cumulative-script/kowloon-recharge-translation/local/r67n-release/67.15n-official-script-diagnostic.iso",
+      "release": "n",
+      "sha256": "c3aa8a847f9ed505ca62d11dfa22cfd6e28a9c8f3d63900928f41824e00ea1f0"
+    }
+  ],
+  "history_regions": 4,
+  "installed_elf_sha256": "fd4760a3c96260ef0fde8cf113a9cc49d46fe732a7f7b0087357f612f1182787",
+  "inventory_repeat": {
+    "all_seven_json_files_byte_identical": true,
+    "files": 3032,
+    "japanese_findings": 18411,
+    "native_choice_slots": 1136,
+    "official_array_identities": 101487,
+    "speaker_occurrences": 7402,
+    "summary_sha256": "1d736560fb90ae695a716b6941f2a487ac45144c42dbab1c42807acff6f97c1d",
+    "verified_installed_ranges": 99284
+  },
+  "iso_sha256": "049b68c70c74f99b195975000c90e064b5106cbe18cf0dc89f87b44526081b13",
+  "merge_approved": false,
+  "phase_2_started": false,
+  "regression": {
+    "command": "DEVELOPER_DIR=/Library/Developer/CommandLineTools PYTHONDONTWRITEBYTECODE=1 local/r67m-integration/venv314/bin/python -m unittest discover -s tests -v",
+    "errors": 0,
+    "failures": 0,
+    "log_sha256": "651713d1d7436d3773b5491a5b0e7b8064110535c53550dddc1af760f3b833e8",
+    "passed": 1001,
+    "run": 1008,
+    "seconds": 333.25,
+    "skipped": 7,
+    "skips": [
+      "test_all_85_ports_only_modify_approved_tmx_chunks (test_first_save_graphics.FirstSaveGraphicsTests.test_all_85_ports_only_modify_approved_tmx_chunks) ... skipped 'Pristine source/ignored port report missing'",
+      "test_final_iso_embedded_elf_passes_despite_valid_builder_relocations (test_r67_14q_approved_lock.ApprovedCompanionCommentsLock.test_final_iso_embedded_elf_passes_despite_valid_builder_relocations) ... skipped 'private approved ISO/build report missing'",
+      "test_finished_iso_embedded_elf_matches_accepted_ui_lock (test_r67_14t_approved_ui_lock.ApprovedUILockTests.test_finished_iso_embedded_elf_matches_accepted_ui_lock) ... skipped 'Requires approved diagnostic ISO/report'",
+      "test_finished_iso_is_distinct_version (test_r67_14u_bubble_relative_y.BubbleVariantRelativeYTests.test_finished_iso_is_distinct_version) ... skipped 'Finished ISO required'",
+      "test_finished_iso_frozen_delta_audit_remains_exact (test_r67_14z_storeroom_tablet.ApprovedYScopedStoreroomTests.test_finished_iso_frozen_delta_audit_remains_exact) ... skipped 'Full ISO artifacts required'",
+      "test_complete_two_gigabyte_iso_owned_differences (test_r67_15a_item_ui.FinishedItemISOAuditTests.test_complete_two_gigabyte_iso_owned_differences) ... skipped 'Requires built full diagnostic'",
+      "test_final_iso_installed_elf_matches_the_same_lock (test_r67_history_layout_lock.HistoryLayoutLock.test_final_iso_installed_elf_matches_the_same_lock) ... skipped 'Untracked approved r67.12 ISO not available'"
+    ]
+  },
+  "release": "r67.15o",
+  "repeat_build": {
+    "elf_byte_identical": true,
+    "iso_byte_identical": true,
+    "report_differences": "Only candidate destination fields"
+  },
+  "rofs": {
+    "audit_kind": "finished_iso_embedded_rofs_against_installed_data_cvm",
+    "embedded_rofs_file_records": 10656,
+    "installed_elf_sha256": "fd4760a3c96260ef0fde8cf113a9cc49d46fe732a7f7b0087357f612f1182787",
+    "mismatches": 0,
+    "original_elf_sha256": "0d5ace47c618c8c9af92f76aecad72dd0da2c4f7588410d2f9d866458a8f38bb",
+    "read_only": true,
+    "relocated_or_resized_records": 477,
+    "unmatched_records": 0
+  },
+  "runtime": {
+    "candidate_iso_sha256": "049b68c70c74f99b195975000c90e064b5106cbe18cf0dc89f87b44526081b13",
+    "candidate_launched_by_agent": false,
+    "fresh_protected_live_file_count": 32,
+    "gameplay_verified": false,
+    "gameplay_verifier": "User by playing, per explicit instruction on November 19",
+    "live_drift_since_o_preparation": [],
+    "original_cards_or_states_loaded_by_o": false,
+    "prior_n_observations": "English opening, title and name-entry screens only; not evidence for o gameplay.",
+    "prior_n_profile_note": "n cold boot observed English title and name entry. Prior n process had already exited before resumed control. getApp opened normal main window; updater dismissed and window closed without game launch. Live INI differs from initial n snapshot; no restore attempted because intervening user changes cannot be excluded. Current live files freshly fingerprinted before o launch."
+  },
+  "save_descriptors": 15,
+  "schema_version": 1,
+  "source_locks": {
+    "verified_source_files": 52
+  },
+  "startup_exception": "Existing memory_card_8 bounded wording only",
+  "startup_raw_passed": 154,
+  "startup_scoped_passed": 155,
+  "whole_disc": {
+    "appended_cvm_sectors": 53,
+    "changed_bytes": 7285685,
+    "complete_disc_bytes_compared": 2095382528,
+    "elf_extended_in_place": true,
+    "elf_output_extent": 1014597,
+    "elf_relocated": false,
+    "expected_and_actual_iso_sha256": "049b68c70c74f99b195975000c90e064b5106cbe18cf0dc89f87b44526081b13",
+    "installed_elf_sha256": "fd4760a3c96260ef0fde8cf113a9cc49d46fe732a7f7b0087357f612f1182787",
+    "resource_files": 478,
+    "unexplained_bytes": 0
+  }
+}
