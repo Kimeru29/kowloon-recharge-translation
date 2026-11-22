@@ -144,6 +144,15 @@ class HistoryNavigationProbe(unittest.TestCase):
                 h.run(0x253000, address, 1)
             owner, private = h.alloc(0x44), h.alloc(0x1C0)
             h.put32(owner + 0x3C, private)
+            constructor_callers = set()
+
+            def record_constructor_caller(_engine, _address, _size, _data):
+                constructor_callers.add(h.reg(31) - 8)
+
+            # Observe the native history row constructor entry and derive the
+            # caller from live RA, since q relocates this call into its helper.
+            h.ee.hook_add(UC_HOOK_CODE, record_constructor_caller,
+                          begin=0x255E10, end=0x255E10)
 
             def current_rows():
                 rows = []
@@ -156,6 +165,7 @@ class HistoryNavigationProbe(unittest.TestCase):
 
             h.run(0x253840, owner)  # state 0
             h.run(0x253840, owner)  # build visible handles
+            self.assertTrue(constructor_callers, "history row constructor was not reached")
             initial = current_rows()
             first_visible = max(0, count - 12)
             self.assertEqual([row["record"] for row in initial], list(range(first_visible, count)))
@@ -168,6 +178,8 @@ class HistoryNavigationProbe(unittest.TestCase):
             if count > 12:
                 self.assertIn(first_visible - 1, [row["record"] for row in scrolled])
             evidence[count] = {"initial": initial, "after_older": scrolled,
-                               "native_callback": "0x253840", "new_record_constructor_call": "0x25470C"}
+                               "native_callback": "0x253840",
+                               "new_record_constructor_callers": sorted(hex(address)
+                                                                         for address in constructor_callers)}
         if report := os.getenv("R67P_HISTORY_EVIDENCE"):
             Path(report).write_text(json.dumps(evidence, indent=2) + "\n")

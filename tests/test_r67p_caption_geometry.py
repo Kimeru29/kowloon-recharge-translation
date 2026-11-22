@@ -35,6 +35,12 @@ def machine(source):
     harness = ChoiceMachine(source, report)
     for lower, upper in ((0x251F80, 0x252AE0), (0x2567F0, 0x256D90)):
         harness.ee.hook_add(UC_HOOK_CODE, harness.ee_arithmetic, begin=lower, end=upper - 1)
+    # The history navigator relocates a row loop containing EE-only COP1 operations.
+    history_hook = harness.read32(0x253DB4)
+    history_target = (history_hook & 0x03FFFFFF) << 2
+    if history_hook >> 26 == 2 and start <= history_target < end:
+        harness.ee.hook_add(UC_HOOK_CODE, harness.ee_arithmetic, begin=history_target, end=end - 1)
+
     def copy_string(_):
         raw = harness.cstring(harness.reg(5), 256)
         harness.write(harness.reg(4), raw + b"\0")

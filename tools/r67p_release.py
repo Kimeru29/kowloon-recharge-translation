@@ -177,7 +177,7 @@ def _write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
 
 
-def bind_inventory(directory, stage, output, lock, expected_hash):
+def bind_inventory(directory, stage, output, lock, expected_hash, *, release=RELEASE):
     data = {}
     for name, expected in lock["inventory_sha256"].items():
         raw = (directory / name).read_bytes()
@@ -239,7 +239,7 @@ def bind_inventory(directory, stage, output, lock, expected_hash):
             _verify_row(image, row["installed_iso_offset"], end - start, row["output_span_sha256"], row["file"])
 
         summary = data["summary.json"]
-        summary.update(release=RELEASE, iso_sha256=expected_hash, installed_elf_sha256=digest(disc.elf),
+        summary.update(release=release, iso_sha256=expected_hash, installed_elf_sha256=digest(disc.elf),
                        immediate_baseline_iso_sha256=lock["iso_sha256"],
                        inventory_preservation={"base_inventory_sha256": lock["inventory_sha256"],
                                                "asset_files_verified": len(new_offsets) - 1,
