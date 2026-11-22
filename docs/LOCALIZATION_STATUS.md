@@ -11,7 +11,11 @@ Status meanings:
 
 ## Current approved baseline: r67.15k; r67.15l static integration complete
 
-### Latest cumulative diagnostic: r67.15o (November 19, 2026)
+### Latest cumulative diagnostic — r67.15q (November 21, 2026)
+
+The r67.15q installed-image replay verifies START history paging past twelve records, both end stops, return to the newest window and ring rollover. The independent disc audit verified all 10,656 embedded resources against p. The official-script and artwork dispositions carry forward from p. In-game scrolling, audio and save compatibility await Pablo's playthrough. [r67.15q handoff](R67Q_HANDOFF.md) · [r67.15p geometry and artwork handoff](R67P_HANDOFF.md)
+
+### r67.15o diagnostic (November 19, 2026)
 
 [r67.15o handoff](R67O_HANDOFF.md): ISO SHA-256
 `049b68c70c74f99b195975000c90e064b5106cbe18cf0dc89f87b44526081b13`.
